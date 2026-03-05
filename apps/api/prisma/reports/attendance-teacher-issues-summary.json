@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-03-03T22:00:59.743Z",
+  "totalAttendance": 171,
+  "noMatch": 99,
+  "ambiguous": 38,
+  "files": {
+    "noMatchCsv": "C:\\Users\\NELSON JULIO\\crewai_ollama\\school-platform\\apps\\api\\prisma\\reports\\attendance-teacher-no-match.csv",
+    "ambiguousCsv": "C:\\Users\\NELSON JULIO\\crewai_ollama\\school-platform\\apps\\api\\prisma\\reports\\attendance-teacher-ambiguous.csv"
+  }
+}

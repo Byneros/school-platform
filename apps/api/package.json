@@ -1,0 +1,58 @@
+{
+  "name": "school-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "tsx scripts/api-smoke-tests.ts",
+    "test:regression": "tsx scripts/api-regression-tests.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:backfill": "tsx prisma/backfillSubjectHoursMode.ts && tsx prisma/backfillTeacherSchedules.ts && tsx prisma/backfillClassGradeLevel.ts",
+    "prisma:backfill:class-grade": "tsx prisma/backfillClassGradeLevel.ts",
+    "prisma:backfill:attendance-teacher": "tsx prisma/backfillAttendanceTeacherMarker.ts",
+    "prisma:backfill:parents-from-enrollments": "tsx prisma/backfillParentsFromEnrollments.ts",
+    "prisma:reset:credentials": "tsx prisma/resetDefaultCredentials.ts",
+    "prisma:reset:user": "tsx prisma/resetUserPassword.ts",
+    "prisma:report:attendance-teacher-issues": "tsx prisma/reportAttendanceTeacherAssignmentIssues.ts",
+    "prisma:migrate:full": "prisma migrate deploy && npm run prisma:backfill",
+    "prisma:seed": "prisma db seed"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@types/nodemailer": "^7.0.10",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.12.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "nodemailer": "^8.0.1",
+    "pdfkit": "^0.15.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^20.11.0",
+    "@types/pdfkit": "^0.13.3",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.4.5"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

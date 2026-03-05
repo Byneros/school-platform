@@ -1,0 +1,384 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  ADMIN
+  TEACHER
+  PARENT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum NotificationStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  SENT
+}
+
+enum AdmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum EvaluationAspect {
+  COGNITIVE
+  PERSONAL
+  SOCIAL
+}
+
+enum ObservationType {
+  ACADEMIC
+  DISCIPLINARY
+  COEXISTENCE
+}
+
+enum CertificateType {
+  STUDY
+  ENROLLMENT
+}
+
+enum PromotionStatus {
+  PROMOTED
+  NOT_PROMOTED
+  PENDING
+}
+
+enum GradeLevel {
+  PRE_JARDIN
+  JARDIN
+  TRANSICION
+  PRIMERO
+  SEGUNDO
+  TERCERO
+  CUARTO
+  QUINTO
+  SEXTO
+  SEPTIMO
+  OCTAVO
+  NOVENO
+  DECIMO
+  ONCE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  role         RoleName
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  teacher      Teacher?
+  parent       Parent?
+
+  notificationsCreated Notification[] @relation("NotificationCreator")
+  notificationsApproved Notification[] @relation("NotificationApprover")
+  studentObservationsCreated StudentObservation[] @relation("StudentObservationCreator")
+  certificatesIssued CertificateIssue[] @relation("CertificateIssuer")
+  academicClosures AcademicClosureResult[] @relation("AcademicClosureExecutor")
+
+  @@index([role, isActive])
+}
+
+model Teacher {
+  id                  String @id @default(cuid())
+  userId              String @unique
+  professionalProfile String?
+  subjects            Json?
+  subjectHours        Json?
+  subjectHoursMode    Json? // { [subject]: true|false } true = auto
+  subjectSchedules    Json? // { [subject]: [{ dayOfWeek, startTime, endTime }] }
+  cognitiveWeight     Float  @default(60)
+  personalWeight      Float  @default(20)
+  socialWeight        Float  @default(20)
+  user                User   @relation(fields: [userId], references: [id])
+  classes             Class[]
+}
+
+model Parent {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+  guardians Guardian[]
+  notificationRecipients NotificationRecipient[]
+}
+
+model Student {
+  id         String   @id @default(cuid())
+  fullName   String
+  birthDate  DateTime?
+  gradeLevel GradeLevel
+  studentGroup String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  guardians Guardian[]
+  enrollments Enrollment[]
+  invoices Invoice[]
+  notifications Notification[]
+  observations StudentObservation[]
+  certificates CertificateIssue[]
+
+  @@index([gradeLevel, studentGroup])
+  @@index([fullName])
+}
+
+model StudentObservation {
+  id          String          @id @default(cuid())
+  studentId   String
+  createdById String
+  date        DateTime
+  type        ObservationType
+  detail      String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  student   Student @relation(fields: [studentId], references: [id])
+  createdBy User    @relation("StudentObservationCreator", fields: [createdById], references: [id])
+
+  @@index([studentId, date])
+  @@index([type, date])
+  @@index([createdById, createdAt])
+}
+
+model CertificateIssue {
+  id          String          @id @default(cuid())
+  type        CertificateType
+  serial      Int
+  year        Int
+  code        String          @unique
+  studentId   String
+  issuedById  String
+  issuedAt    DateTime        @default(now())
+
+  student  Student @relation(fields: [studentId], references: [id])
+  issuedBy User    @relation("CertificateIssuer", fields: [issuedById], references: [id])
+
+  @@unique([type, year, serial])
+  @@index([studentId, issuedAt])
+  @@index([issuedById, issuedAt])
+}
+
+model AcademicClosureResult {
+  id             String          @id @default(cuid())
+  year           Int
+  enrollmentId   String
+  finalAverage   Float
+  totalSubjects  Int
+  failedSubjects Int
+  status         PromotionStatus
+  notes          String?
+  closedAt       DateTime        @default(now())
+  closedById     String
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+  closedBy   User       @relation("AcademicClosureExecutor", fields: [closedById], references: [id])
+
+  @@unique([year, enrollmentId])
+  @@index([year, status])
+  @@index([closedById, closedAt])
+}
+
+model Admission {
+  id                  String          @id @default(cuid())
+  studentName         String
+  gradeLevel          GradeLevel
+  status              AdmissionStatus @default(PENDING)
+  createdAt           DateTime        @default(now())
+  approvedAt          DateTime?
+  enrollmentDueAt     DateTime?
+  notes               String?
+  documents           Json?
+
+  studentFullName     String?
+  studentBirthDate    DateTime?
+  studentBirthPlaceDept String?
+  studentBirthPlaceCity String?
+  studentGender       String?
+  studentDocType      String?
+  studentDocNumber    String?
+  studentAddress      String?
+  guardianFullName    String?
+  guardianDocType     String?
+  guardianDocNumber   String?
+  guardianRelation    String?
+  contactPhone        String?
+  contactEmail        String?
+
+  enrollment          Enrollment?
+
+  @@index([status, createdAt])
+}
+
+model Guardian {
+  id         String @id @default(cuid())
+  parentId   String
+  studentId  String
+  relation   String
+
+  parent   Parent  @relation(fields: [parentId], references: [id])
+  student  Student @relation(fields: [studentId], references: [id])
+
+  @@unique([parentId, studentId])
+}
+
+model Class {
+  id        String @id @default(cuid())
+  teacherId String
+  gradeLevel GradeLevel
+  schedule  Json?
+
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  enrollments Enrollment[]
+}
+
+model Enrollment {
+  id        String @id @default(cuid())
+  studentId String
+  classId   String
+  year      Int
+  status    String
+  admissionId String? @unique
+
+  studentFullName      String
+  studentBirthDate     DateTime?
+  studentBirthPlaceDept String?
+  studentBirthPlaceCity String?
+  studentGender        String?
+  studentDocType       String?
+  studentDocNumber     String?
+  studentGradeLevel    GradeLevel
+  studentAddress       String?
+
+  guardianFullName     String
+  guardianDocType      String?
+  guardianDocNumber    String
+  guardianRelation     String
+
+  contactPhone         String
+  contactEmail         String?
+
+  documents            Json?
+  documentsNotes       String?
+
+  student  Student @relation(fields: [studentId], references: [id])
+  class    Class   @relation(fields: [classId], references: [id])
+  admission Admission? @relation(fields: [admissionId], references: [id])
+  attendance Attendance[]
+  grades   Grade[]
+  closureResults AcademicClosureResult[]
+
+  @@unique([studentId, classId, year])
+  @@index([classId, year, status])
+  @@index([studentGradeLevel, year])
+}
+
+model Attendance {
+  id            String           @id @default(cuid())
+  enrollmentId  String
+  date          DateTime
+  status        AttendanceStatus
+  notes         String?
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+
+  @@unique([enrollmentId, date])
+  @@index([date])
+  @@index([status, date])
+}
+
+model Grade {
+  id            String   @id @default(cuid())
+  enrollmentId  String
+  period        String
+  name          String
+  aspect        EvaluationAspect @default(COGNITIVE)
+  score         Float
+  maxScore      Float
+  createdAt     DateTime @default(now())
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+
+  @@index([period, aspect, createdAt])
+}
+
+model Invoice {
+  id         String   @id @default(cuid())
+  studentId  String
+  amount     Float
+  dueDate    DateTime
+  status     InvoiceStatus
+  createdAt  DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id])
+  payments Payment[]
+
+  @@index([status, dueDate])
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  invoiceId  String
+  amount     Float
+  paidAt     DateTime
+  method     String
+  reference  String?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+}
+
+model Notification {
+  id           String              @id @default(cuid())
+  title        String
+  body         String
+  status       NotificationStatus
+  createdAt    DateTime            @default(now())
+  approvedAt   DateTime?
+  sentAt       DateTime?
+
+  createdById  String
+  approvedById String?
+  studentId    String?
+
+  createdBy  User @relation("NotificationCreator", fields: [createdById], references: [id])
+  approvedBy User? @relation("NotificationApprover", fields: [approvedById], references: [id])
+  student   Student? @relation(fields: [studentId], references: [id])
+
+  recipients NotificationRecipient[]
+
+  @@index([status, createdAt])
+  @@index([createdById, status])
+}
+
+model NotificationRecipient {
+  id             String   @id @default(cuid())
+  notificationId String
+  parentId       String
+  readAt         DateTime?
+
+  notification Notification @relation(fields: [notificationId], references: [id])
+  parent       Parent @relation(fields: [parentId], references: [id])
+
+  @@unique([notificationId, parentId])
+}

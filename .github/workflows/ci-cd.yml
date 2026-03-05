@@ -1,0 +1,108 @@
+name: CI-CD
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+    branches:
+      - "*"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: school_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d school_platform"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/school_platform
+      JWT_SECRET: ci-jwt-secret
+      JWT_EXPIRES_IN: 8h
+      REDIS_URL: redis://localhost:6379
+      CORS_ORIGINS: http://127.0.0.1:5173,http://localhost:5173
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX: 300
+      LOGIN_RATE_LIMIT_MAX: 10
+      PORT: 4000
+      TEST_API_URL: http://127.0.0.1:4000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate
+        run: npm run prisma:generate
+
+      - name: Prisma migrate + backfill
+        run: npm run prisma:migrate:full
+
+      - name: Build API and Web
+        run: npm run build
+
+      - name: Start API
+        run: |
+          npm run start:api > api.log 2>&1 &
+          echo $! > api.pid
+
+      - name: Wait for API health
+        run: |
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4000/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not become healthy on time"
+          cat api.log || true
+          exit 1
+
+      - name: Run API smoke tests
+        run: npm run test:api
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f api.pid ]; then
+            kill "$(cat api.pid)" || true
+          fi
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: school-platform-build
+          path: |
+            apps/api/dist
+            apps/web/dist
+            api.log

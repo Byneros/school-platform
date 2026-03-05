@@ -1,0 +1,49 @@
+{
+  "name": "school-platform",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "dev:web:lan": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-web-lan.ps1 -Port 5173",
+    "dev:api": "npm --workspace apps/api run dev",
+    "dev:all": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-all.ps1",
+    "build": "npm --workspace apps/web run build && npm --workspace apps/api run build",
+    "test:api": "npm --workspace apps/api run test",
+    "test:api:regression": "npm --workspace apps/api run test:regression",
+    "db:backup": "node ./scripts/db/backup.mjs",
+    "db:restore": "node ./scripts/db/restore.mjs",
+    "start:api": "npm --workspace apps/api run start",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "prisma:generate": "npm --workspace apps/api run prisma:generate",
+    "prisma:migrate": "npm --workspace apps/api run prisma:migrate",
+    "prisma:migrate:deploy": "npm --workspace apps/api run prisma:migrate:deploy",
+    "prisma:backfill": "npm --workspace apps/api run prisma:backfill",
+    "prisma:migrate:full": "npm --workspace apps/api run prisma:migrate:full",
+    "prisma:seed": "npm --workspace apps/api run prisma:seed",
+    "preprod:verify": "node ./scripts/preprod-verify.mjs",
+    "ops:health": "node ./scripts/health-check.mjs",
+    "nginx:generate:multi": "node ./scripts/generate-nginx-multi.mjs",
+    "certbot:multi:plan": "node ./scripts/certbot-multi.mjs --mode issue --email admin@tudominio.com",
+    "certbot:multi:issue": "node ./scripts/certbot-multi.mjs --mode issue --email admin@tudominio.com --execute",
+    "certbot:multi:renew": "node ./scripts/certbot-multi.mjs --mode renew --execute",
+    "certbot:multi:renew:dryrun": "node ./scripts/certbot-multi.mjs --mode renew-dry-run --execute",
+    "bootstrap:multi:plan": "node ./scripts/bootstrap-multi-schools.mjs --config infra/bootstrap/schools-batch.json",
+    "bootstrap:multi:run": "node ./scripts/bootstrap-multi-schools.mjs --config infra/bootstrap/schools-batch.json --execute",
+    "pm2:start": "npx pm2 start ecosystem.config.cjs --env production",
+    "pm2:restart": "npx pm2 restart ecosystem.config.cjs --env production",
+    "pm2:stop": "npx pm2 stop ecosystem.config.cjs",
+    "pm2:delete": "npx pm2 delete ecosystem.config.cjs",
+    "pm2:status": "npx pm2 status",
+    "pm2:logs": "npx pm2 logs --lines 200",
+    "pm2:save": "npx pm2 save",
+    "pm2:startup": "npx pm2 startup"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.2",
+    "tsx": "^4.21.0"
+  }
+}

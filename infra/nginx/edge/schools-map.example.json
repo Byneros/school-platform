@@ -1,0 +1,12 @@
+[
+  {
+    "collegeCode": "colegio-a",
+    "domain": "colegio-a.tudominio.com",
+    "webPort": 8081
+  },
+  {
+    "collegeCode": "colegio-b",
+    "domain": "colegio-b.tudominio.com",
+    "webPort": 8082
+  }
+]

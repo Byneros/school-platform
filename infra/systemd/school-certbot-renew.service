@@ -1,0 +1,12 @@
+[Unit]
+Description=Renovacion SSL multi-colegio y recarga segura de Nginx
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/school-platform
+ExecStart=/opt/school-platform/scripts/certbot-renew-and-reload.sh /opt/school-platform
+

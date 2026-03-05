@@ -1,0 +1,40 @@
+﻿import { Router } from "express";
+import authRoutes from "./auth.js";
+import userRoutes from "./users.js";
+import studentRoutes from "./students.js";
+import attendanceRoutes from "./attendance.js";
+import gradeRoutes from "./grades.js";
+import notificationRoutes from "./notifications.js";
+import paymentRoutes from "./payments.js";
+import reportRoutes from "./reports.js";
+import admissionRoutes from "./admissions.js";
+import enrollmentRoutes from "./enrollments.js";
+import invoiceRoutes from "./invoices.js";
+import teacherRoutes from "./teacher.js";
+import parentRoutes from "./parent.js";
+import classRoutes from "./classes.js";
+import brandingRoutes from "./branding.js";
+import studentObservationRoutes from "./studentObservations.js";
+import academicClosureRoutes from "./academicClosure.js";
+
+const router = Router();
+
+router.use("/auth", authRoutes);
+router.use("/users", userRoutes);
+router.use("/students", studentRoutes);
+router.use("/attendance", attendanceRoutes);
+router.use("/grades", gradeRoutes);
+router.use("/notifications", notificationRoutes);
+router.use("/payments", paymentRoutes);
+router.use("/reports", reportRoutes);
+router.use("/admissions", admissionRoutes);
+router.use("/enrollments", enrollmentRoutes);
+router.use("/invoices", invoiceRoutes);
+router.use("/teacher", teacherRoutes);
+router.use("/parent", parentRoutes);
+router.use("/classes", classRoutes);
+router.use("/branding", brandingRoutes);
+router.use("/student-observations", studentObservationRoutes);
+router.use("/academic-closure", academicClosureRoutes);
+
+export default router;

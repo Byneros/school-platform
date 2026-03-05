@@ -1,0 +1,19 @@
+
+> dev:api
+> npm --workspace apps/api run dev
+
+
+> school-api@0.1.0 dev
+> tsx watch src/index.ts
+
+API running on http://localhost:4001
+c:\Users\NELSON JULIO\crewai_ollama\school-platform\node_modules\jsonwebtoken\sign.js:111
+    return failure(new Error('secretOrPrivateKey must have a value'));
+                   ^
+
+Error: secretOrPrivateKey must have a value
+    at module.exports [as sign] (c:\Users\NELSON JULIO\crewai_ollama\school-platform\node_modules\jsonwebtoken\sign.js:111:20)
+    at signToken (c:\Users\NELSON JULIO\crewai_ollama\school-platform\apps\api\src\routes\auth.ts:14:21)
+    at <anonymous> (c:\Users\NELSON JULIO\crewai_ollama\school-platform\apps\api\src\routes\auth.ts:35:18)
+
+Node.js v22.17.1

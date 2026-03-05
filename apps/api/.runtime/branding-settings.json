@@ -1,0 +1,83 @@
+{
+  "promotionRulesHistory": [
+    {
+      "id": "2b66f239-255c-46d2-8dc5-62c000c87410",
+      "changedAt": "2026-03-04T22:51:36.723Z",
+      "changedById": "cmlfwvhoa00007zp7jz2a9vx6",
+      "changedByName": "Administrador Principal",
+      "previous": {
+        "minAverage": 62,
+        "maxFailedSubjects": 1
+      },
+      "next": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      }
+    },
+    {
+      "id": "7494c175-5103-4ec8-933c-be8ec87f698c",
+      "changedAt": "2026-03-04T22:51:36.711Z",
+      "changedById": "cmlfwvhoa00007zp7jz2a9vx6",
+      "changedByName": "Administrador Principal",
+      "restoredFromId": "b6f73bff-8922-497a-a3c5-1d1618ae82cf",
+      "previous": {
+        "minAverage": 62,
+        "maxFailedSubjects": 1
+      },
+      "next": {
+        "minAverage": 62,
+        "maxFailedSubjects": 1
+      }
+    },
+    {
+      "id": "b6f73bff-8922-497a-a3c5-1d1618ae82cf",
+      "changedAt": "2026-03-04T22:51:36.689Z",
+      "changedById": "cmlfwvhoa00007zp7jz2a9vx6",
+      "changedByName": "Administrador Principal",
+      "previous": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      },
+      "next": {
+        "minAverage": 62,
+        "maxFailedSubjects": 1
+      }
+    },
+    {
+      "changedAt": "2026-03-04T22:39:54.539Z",
+      "changedById": "cmlfwvhoa00007zp7jz2a9vx6",
+      "changedByName": "Administrador Principal",
+      "previous": {
+        "minAverage": 61,
+        "maxFailedSubjects": 2
+      },
+      "next": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      }
+    },
+    {
+      "changedAt": "2026-03-04T22:39:44.582Z",
+      "changedById": "cmlfwvhoa00007zp7jz2a9vx6",
+      "changedByName": "Administrador Principal",
+      "previous": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      },
+      "next": {
+        "minAverage": 61,
+        "maxFailedSubjects": 2
+      }
+    }
+  ],
+  "schoolName": "Administracion General de la Gestion Academica",
+  "logoDataUrl": null,
+  "primaryColor": "#0033ff",
+  "secondaryColor": "#001eff",
+  "accentColor": "#000000",
+  "footerText": "Comprometidos con la excelencia academica y formacion integral.",
+  "promotionRules": {
+    "minAverage": 60,
+    "maxFailedSubjects": 2
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "defaults": {
+    "repoUrl": "https://github.com/tu-org/school-platform.git",
+    "branch": "main",
+    "repoDir": "/opt/school-platform",
+    "webPortStart": 8081
+  },
+  "schools": [
+    {
+      "collegeCode": "colegio-a",
+      "domain": "colegio-a.tudominio.com",
+      "email": "admin@tudominio.com",
+      "schoolName": "Colegio A"
+    },
+    {
+      "collegeCode": "colegio-b",
+      "domain": "colegio-b.tudominio.com",
+      "email": "admin@tudominio.com",
+      "schoolName": "Colegio B",
+      "webPort": 8082
+    }
+  ]
+}
+
