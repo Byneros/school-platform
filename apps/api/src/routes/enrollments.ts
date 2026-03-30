@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Prisma } from "@prisma/client";
 import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { validate } from "../utils/validate.js";
@@ -45,7 +46,7 @@ function isEmailLike(value: string) {
 }
 
 async function linkParentToStudent(
-  tx: typeof prisma,
+  tx: Prisma.TransactionClient,
   params: { studentId: string; guardianRelation?: string | null; contactEmail?: string | null; guardianFullName?: string | null }
 ) {
   const email = normalizeEmail(params.contactEmail || "");

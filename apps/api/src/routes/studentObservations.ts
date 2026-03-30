@@ -5,7 +5,7 @@ import { enqueueNotification } from "../services/notificationQueue.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { validate } from "../utils/validate.js";
 import { createStudentObservationSchema, updateStudentObservationSchema } from "../schemas/studentObservations.js";
-import { composeNotificationBodyWithMeta } from "../utils/notificationMeta.js";
+import { composeNotificationBodyWithMeta, type NotificationLegalReference } from "../utils/notificationMeta.js";
 
 const router = Router();
 
@@ -189,7 +189,7 @@ const academicTemplate = {
 
 const coexistenceNotificationTemplates: Record<
   CoexistenceProtocolType,
-  { title: string; body: string; legalReference: string; adminTitle: string; adminBody: string }
+  { title: string; body: string; legalReference: NotificationLegalReference; adminTitle: string; adminBody: string }
 > = {
   TIPO_I: {
     title: "Compromiso de corresponsabilidad familia-escuela",

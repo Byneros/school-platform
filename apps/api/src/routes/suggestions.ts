@@ -546,7 +546,7 @@ router.get("/", requireAuth, async (req, res) => {
     const options: Array<{ value: string; label: string }> = [];
     enrollments.forEach((e) => {
       const studentName = String(e.student?.fullName || e.studentFullName || "").trim();
-      const grade = String(e.grade || getEnrollmentGradeLevel(e) || "").trim();
+      const grade = String(getEnrollmentGradeLevel(e) || e.studentGradeLevel || "").trim();
       const group = String(e.student?.studentGroup || "").trim();
       const matchesQuery = !qLower || studentName.toLowerCase().includes(qLower) || grade.toLowerCase().includes(qLower);
       if (!matchesQuery) return;

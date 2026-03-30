@@ -32,7 +32,7 @@ function isEmailLike(value: string) {
 }
 
 async function linkParentToStudent(
-  tx: typeof prisma,
+  tx: Prisma.TransactionClient,
   params: { studentId: string; guardianRelation?: string | null; contactEmail?: string | null; guardianFullName?: string | null }
 ) {
   const email = normalizeEmail(params.contactEmail || "");

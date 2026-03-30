@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { Prisma } from "@prisma/client";
+import { Prisma, type AdmissionStatus, type InvoiceStatus } from "@prisma/client";
 import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import PDFDocument from "pdfkit";
@@ -2097,8 +2097,9 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     if (!ws) return { headers: [] as string[], rows: [] as Array<Record<string, any>> };
     const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as any[];
     if (!data.length) return { headers: [] as string[], rows: [] as Array<Record<string, any>> };
-    const [headerRow, ...rows] = data;
-    const headers = (headerRow || []).map((h: any) => String(h || "").trim());
+    const [rawHeaderRow, ...rows] = data;
+    const headerRow = Array.isArray(rawHeaderRow) ? rawHeaderRow : [];
+    const headers: string[] = headerRow.map((h) => String(h || "").trim());
     const parsedRows = rows
       .filter((row) => Array.isArray(row) && row.some((cell) => String(cell || "").trim() !== ""))
       .map((row) => {
@@ -2448,11 +2449,15 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         continue;
       }
       if (modeIsImport) {
+        const admissionStatusRaw = normalizeText(row.status).toUpperCase();
+        const admissionStatus: AdmissionStatus = ["PENDING", "APPROVED", "REJECTED"].includes(admissionStatusRaw)
+          ? (admissionStatusRaw as AdmissionStatus)
+          : "PENDING";
         await prisma.admission.create({
           data: {
             studentName,
             gradeLevel: gradeLevel as any,
-            status: normalizeText(row.status) || "PENDING",
+            status: admissionStatus,
             guardianFullName: normalizeText(row.guardianFullName) || "",
             guardianDocNumber: normalizeText(row.guardianDocNumber) || "",
             guardianRelation: normalizeText(row.guardianRelation) || "",
@@ -2482,12 +2487,16 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         continue;
       }
       if (modeIsImport) {
+        const invoiceStatusRaw = normalizeText(row.status).toUpperCase();
+        const invoiceStatus: InvoiceStatus = ["PENDING", "PAID", "OVERDUE"].includes(invoiceStatusRaw)
+          ? (invoiceStatusRaw as InvoiceStatus)
+          : "PENDING";
         await prisma.invoice.create({
           data: {
             studentId,
             amount,
             dueDate,
-            status: normalizeText(row.status) || "PENDING"
+            status: invoiceStatus
           }
         });
         result.created.invoices += 1;

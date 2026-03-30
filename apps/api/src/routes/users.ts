@@ -427,6 +427,7 @@ router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createUserSchema)
 });
 
 router.patch("/:id", requireAuth, requireRole(["ADMIN"]), validate(updateUserSchema), async (req, res) => {
+  const auth = (req as any).auth;
   const { params, body } = (req as any).validated;
   const principalAdmin = await prisma.user.findFirst({
     where: { role: "ADMIN" },
