@@ -52,9 +52,21 @@ enum ObservationType {
   COEXISTENCE
 }
 
+enum CoexistenceProtocol {
+  TIPO_I
+  TIPO_II
+  TIPO_III
+}
+
 enum CertificateType {
   STUDY
   ENROLLMENT
+}
+
+enum CertificateRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum PromotionStatus {
@@ -94,8 +106,11 @@ model User {
 
   notificationsCreated Notification[] @relation("NotificationCreator")
   notificationsApproved Notification[] @relation("NotificationApprover")
+  notificationsTargeted Notification[] @relation("NotificationTarget")
   studentObservationsCreated StudentObservation[] @relation("StudentObservationCreator")
   certificatesIssued CertificateIssue[] @relation("CertificateIssuer")
+  certificateRequestsRequested CertificateRequest[] @relation("CertificateRequester")
+  certificateRequestsReviewed CertificateRequest[] @relation("CertificateReviewer")
   academicClosures AcademicClosureResult[] @relation("AcademicClosureExecutor")
 
   @@index([role, isActive])
@@ -114,6 +129,7 @@ model Teacher {
   socialWeight        Float  @default(20)
   user                User   @relation(fields: [userId], references: [id])
   classes             Class[]
+  tasks               Task[]
 }
 
 model Parent {
@@ -139,6 +155,7 @@ model Student {
   notifications Notification[]
   observations StudentObservation[]
   certificates CertificateIssue[]
+  certificateRequests CertificateRequest[]
 
   @@index([gradeLevel, studentGroup])
   @@index([fullName])
@@ -150,6 +167,11 @@ model StudentObservation {
   createdById String
   date        DateTime
   type        ObservationType
+  coexistenceProtocol CoexistenceProtocol?
+  coexistenceOffense String?
+  followUpDate DateTime?
+  followUpCompleted Boolean @default(false)
+  followUpCompletedAt DateTime?
   detail      String
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -160,6 +182,7 @@ model StudentObservation {
   @@index([studentId, date])
   @@index([type, date])
   @@index([createdById, createdAt])
+  @@index([followUpDate, followUpCompleted])
 }
 
 model CertificateIssue {
@@ -178,6 +201,25 @@ model CertificateIssue {
   @@unique([type, year, serial])
   @@index([studentId, issuedAt])
   @@index([issuedById, issuedAt])
+}
+
+model CertificateRequest {
+  id            String                  @id @default(cuid())
+  type          CertificateType
+  status        CertificateRequestStatus @default(PENDING)
+  studentId     String
+  requestedById String
+  requestedAt   DateTime                @default(now())
+  reviewedById  String?
+  reviewedAt    DateTime?
+
+  student     Student @relation(fields: [studentId], references: [id])
+  requestedBy User    @relation("CertificateRequester", fields: [requestedById], references: [id])
+  reviewedBy  User?   @relation("CertificateReviewer", fields: [reviewedById], references: [id])
+
+  @@index([status, requestedAt])
+  @@index([studentId, requestedAt])
+  @@index([requestedById, requestedAt])
 }
 
 model AcademicClosureResult {
@@ -288,6 +330,7 @@ model Enrollment {
   attendance Attendance[]
   grades   Grade[]
   closureResults AcademicClosureResult[]
+  taskScores TaskScore[]
 
   @@unique([studentId, classId, year])
   @@index([classId, year, status])
@@ -321,6 +364,40 @@ model Grade {
   enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
 
   @@index([period, aspect, createdAt])
+}
+
+model Task {
+  id        String @id @default(cuid())
+  teacherId String
+  gradeLevel GradeLevel
+  group     String?
+  period    String
+  title     String
+  aspect    EvaluationAspect @default(COGNITIVE)
+  maxScore  Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  scores  TaskScore[]
+
+  @@index([teacherId, gradeLevel, group, period])
+  @@unique([teacherId, gradeLevel, group, period, title, aspect])
+}
+
+model TaskScore {
+  id           String @id @default(cuid())
+  taskId       String
+  enrollmentId String
+  score        Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  task       Task       @relation(fields: [taskId], references: [id])
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+
+  @@unique([taskId, enrollmentId])
+  @@index([enrollmentId])
 }
 
 model Invoice {
@@ -360,10 +437,12 @@ model Notification {
   createdById  String
   approvedById String?
   studentId    String?
+  targetUserId String?
 
   createdBy  User @relation("NotificationCreator", fields: [createdById], references: [id])
   approvedBy User? @relation("NotificationApprover", fields: [approvedById], references: [id])
   student   Student? @relation(fields: [studentId], references: [id])
+  targetUser User? @relation("NotificationTarget", fields: [targetUserId], references: [id])
 
   recipients NotificationRecipient[]
 

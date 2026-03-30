@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 
 if (-not $ApiTarget) {
   $apiEnv = Join-Path $PSScriptRoot "..\\apps\\api\\.env"
-  $apiPort = 4002
+  $apiPort = 4003
 
   if (Test-Path $apiEnv) {
     $portLine = Get-Content $apiEnv | Where-Object { $_ -match "^\s*PORT\s*=" } | Select-Object -First 1

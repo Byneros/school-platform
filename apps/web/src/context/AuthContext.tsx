@@ -7,7 +7,12 @@ type AuthContextValue = {
   initializing: boolean;
   inactivityWarning: boolean;
   extendSession: () => void;
-  login: (email: string, password: string) => Promise<AuthUser>;
+  login: (email: string, password: string) => Promise<
+    | { status: "ok"; user: AuthUser }
+    | { status: "2fa"; token: string; email: string; role?: AuthUser["role"]; expiresAt?: string; devCode?: string }
+  >;
+  verifyTwoFactor: (token: string, code: string) => Promise<AuthUser>;
+  resendTwoFactor: (token: string) => Promise<{ ok: boolean; devCode?: string }>;
   logout: () => void;
 };
 
@@ -130,12 +135,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: email.trim().toLowerCase(),
       password: password.trim()
     });
+    if (data?.requiresTwoFactor) {
+      return {
+        status: "2fa",
+        token: data.twoFactorToken,
+        email: data.email,
+        role: data.role,
+        expiresAt: data.expiresAt,
+        devCode: data.devCode
+      };
+    }
+    const authUser: AuthUser = { token: data.token, role: data.role, fullName: data.fullName };
+    setAuth(authUser);
+    setUser(authUser);
+    setInitializing(false);
+    return { status: "ok", user: authUser };
+  };
+
+  const verifyTwoFactor = async (token: string, code: string) => {
+    const data = await apiPost("/auth/2fa/verify", {
+      token,
+      code: code.trim()
+    });
     const authUser: AuthUser = { token: data.token, role: data.role, fullName: data.fullName };
     setAuth(authUser);
     setUser(authUser);
     setInitializing(false);
     return authUser;
   };
+
+  const resendTwoFactor = async (token: string) =>
+    apiPost("/auth/2fa/resend", { token });
 
   const logout = () => {
     clearAuth();
@@ -145,7 +175,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ user, initializing, inactivityWarning, extendSession, login, logout }),
+    () => ({
+      user,
+      initializing,
+      inactivityWarning,
+      extendSession,
+      login,
+      verifyTwoFactor,
+      resendTwoFactor,
+      logout
+    }),
     [user, initializing, inactivityWarning]
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

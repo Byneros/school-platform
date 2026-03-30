@@ -5,6 +5,7 @@ import "./styles.css";
 import AppShell from "./components/AppShell";
 import LoginPage from "./pages/LoginPage";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminAlerts from "./pages/AdminAlerts";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import ParentDashboard from "./pages/ParentDashboard";
 import AdminUsers from "./pages/AdminUsers";
@@ -16,8 +17,9 @@ import AdminTeacherHours from "./pages/AdminTeacherHours";
 import AdminCertificates from "./pages/AdminCertificates";
 import AdminAcademicClosure from "./pages/AdminAcademicClosure";
 import TeacherAttendance from "./pages/TeacherAttendance";
-import TeacherGrades from "./pages/TeacherGrades";
 import TeacherComms from "./pages/TeacherComms";
+import TeacherTasks from "./pages/TeacherTasks";
+import TeacherGrades from "./pages/TeacherGrades";
 import ParentBoletines from "./pages/ParentBoletines";
 import ParentPagos from "./pages/ParentPagos";
 import ParentComunicados from "./pages/ParentComunicados";
@@ -37,6 +39,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               element={
                 <ProtectedRoute roles={["ADMIN"]}>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin/alertas"
+              element={
+                <ProtectedRoute roles={["ADMIN"]}>
+                  <AdminAlerts />
                 </ProtectedRoute>
               }
             />
@@ -149,6 +159,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               element={
                 <ProtectedRoute roles={["TEACHER"]}>
                   <TeacherGrades />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="teacher/tareas-calificaciones"
+              element={
+                <ProtectedRoute roles={["TEACHER"]}>
+                  <TeacherTasks />
                 </ProtectedRoute>
               }
             />

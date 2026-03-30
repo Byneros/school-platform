@@ -20,7 +20,7 @@ if (-not (Test-Command "npm")) {
 Write-Host "Levantando infraestructura (Postgres, Redis, Mailpit)..." -ForegroundColor Yellow
 docker compose -f "infra/docker-compose.yml" up -d
 
-$healthUrl = "http://127.0.0.1:4002/health"
+$healthUrl = "http://127.0.0.1:4003/health"
 $apiReady = $false
 
 Write-Host "Iniciando API (nueva ventana)..." -ForegroundColor Yellow
@@ -40,9 +40,9 @@ for ($i = 0; $i -lt 40; $i++) {
 }
 
 if ($apiReady) {
-  Write-Host "API lista en http://localhost:4002" -ForegroundColor Green
+  Write-Host "API lista en http://localhost:4003" -ForegroundColor Green
 } else {
-  Write-Host "API no respondio a tiempo en http://localhost:4002/health." -ForegroundColor DarkYellow
+  Write-Host "API no respondio a tiempo en http://localhost:4003/health." -ForegroundColor DarkYellow
   Write-Host "Revisa la ventana de API para ver el error." -ForegroundColor DarkYellow
 }
 
@@ -55,6 +55,6 @@ Write-Host "1) API"
 Write-Host "2) Web"
 Write-Host ""
 Write-Host "Utiles:"
-Write-Host "- Health API: http://localhost:4002/health"
+Write-Host "- Health API: http://localhost:4003/health"
 Write-Host "- Mailpit: http://localhost:8025"
 Write-Host "- Apagar infra: npm run infra:down"

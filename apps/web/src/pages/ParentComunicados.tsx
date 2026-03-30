@@ -1,13 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import { apiGet } from "../services/api";
+import { isDueProcessNotification } from "../utils/notificationPriority";
 
 export default function ParentComunicados() {
   const [items, setItems] = useState<Array<any>>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState("");
+  const prioritizedItems = useMemo(
+    () => [...items].sort((a, b) => Number(isDueProcessNotification(b?.notification)) - Number(isDueProcessNotification(a?.notification))),
+    [items]
+  );
 
   useEffect(() => {
     apiGet(`/parent/notifications?page=${page}&pageSize=10${statusFilter ? `&status=${statusFilter}` : ""}`).then((res) => {
@@ -27,11 +32,29 @@ export default function ParentComunicados() {
           { key: "status", label: "Estado" },
           { key: "date", label: "Fecha" }
         ]}
-        rows={items.map((i: any) => ({
-          title: i.notification?.title || "",
-          status: i.notification?.status || "SENT",
-          date: i.notification?.createdAt?.slice(0, 10) || ""
-        }))}
+        rowStyle={(row) =>
+          (row as any).__priority
+            ? { background: "#fef2f2", borderLeft: "4px solid #ef4444" }
+            : undefined
+        }
+        rows={prioritizedItems.map((i: any) => {
+          const dueProcess = isDueProcessNotification(i.notification);
+          return {
+            __priority: dueProcess,
+            title: (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span>{i.notification?.title || ""}</span>
+                {dueProcess && (
+                  <span style={{ padding: "2px 8px", borderRadius: 999, background: "#fee2e2", color: "#b91c1c", fontSize: 12 }}>
+                    Prioridad
+                  </span>
+                )}
+              </div>
+            ),
+            status: i.notification?.status || "SENT",
+            date: i.notification?.createdAt?.slice(0, 10) || ""
+          };
+        })}
       />
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
         <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>

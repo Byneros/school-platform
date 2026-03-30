@@ -21,6 +21,9 @@ export default function AppShell() {
     accentColor: "#f59e0b"
   });
   const [canEditBranding, setCanEditBranding] = useState(false);
+  const [pendingCertificateRequests, setPendingCertificateRequests] = useState(0);
+  const [pendingNotifications, setPendingNotifications] = useState(0);
+  const [teacherHasObserverAccess, setTeacherHasObserverAccess] = useState(true);
 
   const loadBranding = () =>
     apiGet("/branding")
@@ -45,11 +48,74 @@ export default function AppShell() {
   useEffect(() => {
     if (!user || user.role !== "ADMIN") {
       setCanEditBranding(false);
+      setPendingCertificateRequests(0);
+      setPendingNotifications(0);
       return;
     }
     apiGet("/branding/access")
       .then((res) => setCanEditBranding(Boolean(res?.canEdit)))
       .catch(() => setCanEditBranding(false));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || user.role !== "ADMIN") return;
+    const loadPendingRequests = () => {
+      apiGet("/reports/certificate/requests?page=1&pageSize=1&status=PENDING")
+        .then((res) => setPendingCertificateRequests(Number(res?.total || 0)))
+        .catch(() => setPendingCertificateRequests(0));
+    };
+    const safeLoad = () => {
+      if (document.visibilityState !== "visible") return;
+      loadPendingRequests();
+    };
+    loadPendingRequests();
+    const handler = () => loadPendingRequests();
+    const intervalId = window.setInterval(safeLoad, 30000);
+    const visibilityHandler = () => safeLoad();
+    window.addEventListener("certificate-requests-updated", handler);
+    document.addEventListener("visibilitychange", visibilityHandler);
+    return () => {
+      window.removeEventListener("certificate-requests-updated", handler);
+      document.removeEventListener("visibilitychange", visibilityHandler);
+      window.clearInterval(intervalId);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || user.role !== "TEACHER") {
+      setTeacherHasObserverAccess(true);
+      return;
+    }
+    apiGet("/student-observations/allowed-students")
+      .then((res) => {
+        const list = Array.isArray(res) ? res : [];
+        setTeacherHasObserverAccess(list.length > 0);
+      })
+      .catch(() => setTeacherHasObserverAccess(true));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || user.role !== "ADMIN") return;
+    const loadPending = () => {
+      apiGet("/notifications?page=1&pageSize=1&status=PENDING")
+        .then((res) => setPendingNotifications(Number(res?.total || 0)))
+        .catch(() => setPendingNotifications(0));
+    };
+    const safeLoad = () => {
+      if (document.visibilityState !== "visible") return;
+      loadPending();
+    };
+    loadPending();
+    const handler = () => loadPending();
+    const intervalId = window.setInterval(safeLoad, 30000);
+    const visibilityHandler = () => safeLoad();
+    window.addEventListener("notifications-updated", handler);
+    document.addEventListener("visibilitychange", visibilityHandler);
+    return () => {
+      window.removeEventListener("notifications-updated", handler);
+      document.removeEventListener("visibilitychange", visibilityHandler);
+      window.clearInterval(intervalId);
+    };
   }, [user]);
 
   useEffect(() => {
@@ -112,15 +178,30 @@ export default function AppShell() {
               {user.role === "ADMIN" && (
                 <>
                   <NavLink to="/admin">Dashboard</NavLink>
+                  <NavLink to="/admin/alertas">Alertas</NavLink>
                   <NavLink to="/admin/usuarios">Usuarios</NavLink>
                   <NavLink to="/admin/admisiones">Admisiones</NavLink>
                   <NavLink to="/admin/asistencia">Asistencia por grado</NavLink>
                   <NavLink to="/admin/observador">Observador</NavLink>
-                  <NavLink to="/admin/certificados">Libro de certificados</NavLink>
+                  <NavLink to="/admin/certificados">
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <span>Libro de certificados</span>
+                      {pendingCertificateRequests > 0 && (
+                        <span className="badge badge-warning">{pendingCertificateRequests}</span>
+                      )}
+                    </span>
+                  </NavLink>
                   <NavLink to="/admin/cierre-academico">Cierre academico</NavLink>
                   <NavLink to="/admin/horas-docentes">Horas docentes</NavLink>
                   <NavLink to="/admin/finanzas">Finanzas</NavLink>
-                  <NavLink to="/admin/notificaciones">Notificaciones</NavLink>
+                  <NavLink to="/admin/notificaciones">
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <span>Notificaciones</span>
+                      {pendingNotifications > 0 && (
+                        <span className="badge badge-warning">{pendingNotifications}</span>
+                      )}
+                    </span>
+                  </NavLink>
                   {canEditBranding && <NavLink to="/admin/personalizacion">Personalizacion</NavLink>}
                 </>
               )}
@@ -128,7 +209,7 @@ export default function AppShell() {
                 <>
                   <NavLink to="/teacher">Dashboard</NavLink>
                   <NavLink to="/teacher/asistencia">Asistencia por grado</NavLink>
-                  <NavLink to="/teacher/calificaciones">Calificaciones</NavLink>
+                  <NavLink to="/teacher/tareas-calificaciones">Tareas y Calificaciones</NavLink>
                   <NavLink to="/teacher/observador">Observador</NavLink>
                   <NavLink to="/teacher/comunicaciones">Comunicaciones</NavLink>
                 </>
@@ -141,6 +222,32 @@ export default function AppShell() {
                   <NavLink to="/parent/pagos">Pagos</NavLink>
                   <NavLink to="/parent/comunicados">Comunicados</NavLink>
                 </>
+              )}
+              <div className="sidebar-title" style={{ marginTop: 16 }}>Acciones rapidas</div>
+              {user.role === "ADMIN" && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <Link className="button secondary" to="/admin/alertas">Ver alertas</Link>
+                  <Link className="button secondary" to="/admin/admisiones">Nueva admision</Link>
+                  <Link className="button secondary" to="/admin/usuarios">Crear usuario</Link>
+                  <Link className="button secondary" to="/admin/notificaciones">Crear notificacion</Link>
+                  <Link className="button secondary" to="/admin/observador">Registrar observacion</Link>
+                </div>
+              )}
+              {user.role === "TEACHER" && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <Link className="button secondary" to="/teacher/asistencia">Registrar asistencia</Link>
+                  <Link className="button secondary" to="/teacher/tareas-calificaciones">Tareas y calificaciones</Link>
+                  {teacherHasObserverAccess && (
+                    <Link className="button secondary" to="/teacher/observador">Registrar observacion</Link>
+                  )}
+                </div>
+              )}
+              {user.role === "PARENT" && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <Link className="button secondary" to="/parent/boletines">Ver boletines</Link>
+                  <Link className="button secondary" to="/parent/pagos">Ver pagos</Link>
+                  <Link className="button secondary" to="/parent/comunicados">Ver comunicados</Link>
+                </div>
               )}
             </aside>
             <div>

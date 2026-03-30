@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import { apiGet, apiPost } from "../services/api";
+import { isDueProcessNotification, prioritizeDueProcess } from "../utils/notificationPriority";
 
 const convivenciaTemplates = [
   {
@@ -44,6 +45,14 @@ export default function TeacherComms() {
   const [adminTotal, setAdminTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState("");
   const [form, setForm] = useState({ studentId: "", legalReference: "LEY_1620_2013", templateKey: "", title: "", body: "" });
+  const prioritizedNotifications = useMemo(
+    () => prioritizeDueProcess(notifications),
+    [notifications]
+  );
+  const prioritizedAdminNotifications = useMemo(
+    () => prioritizeDueProcess(adminNotifications),
+    [adminNotifications]
+  );
 
   const load = () => {
     apiGet("/teacher/students").then((res) => setStudents(res)).catch(() => undefined);
@@ -140,12 +149,30 @@ export default function TeacherComms() {
           { key: "status", label: "Estado" },
           { key: "date", label: "Fecha" }
         ]}
-        rows={notifications.map((n) => ({
-          title: n.title,
+        rowStyle={(row) =>
+          (row as any).__priority
+            ? { background: "#fef2f2", borderLeft: "4px solid #ef4444" }
+            : undefined
+        }
+        rows={prioritizedNotifications.map((n) => {
+          const dueProcess = isDueProcessNotification(n);
+          return {
+            __priority: dueProcess,
+            title: (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span>{n.title}</span>
+                {dueProcess && (
+                  <span style={{ padding: "2px 8px", borderRadius: 999, background: "#fee2e2", color: "#b91c1c", fontSize: 12 }}>
+                    Prioridad
+                  </span>
+                )}
+              </div>
+            ),
           legalReference: legalReferenceLabels[String(n.legalReference || "")] || "-",
           status: n.status,
           date: n.createdAt.slice(0, 10)
-        }))}
+          };
+        })}
       />
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
         <button className="button secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
@@ -167,12 +194,30 @@ export default function TeacherComms() {
             { key: "status", label: "Estado" },
             { key: "date", label: "Fecha" }
           ]}
-          rows={adminNotifications.map((n) => ({
-            title: n.title,
+          rowStyle={(row) =>
+            (row as any).__priority
+              ? { background: "#fef2f2", borderLeft: "4px solid #ef4444" }
+              : undefined
+          }
+          rows={prioritizedAdminNotifications.map((n) => {
+            const dueProcess = isDueProcessNotification(n);
+            return {
+              __priority: dueProcess,
+              title: (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span>{n.title}</span>
+                  {dueProcess && (
+                    <span style={{ padding: "2px 8px", borderRadius: 999, background: "#fee2e2", color: "#b91c1c", fontSize: 12 }}>
+                      Prioridad
+                    </span>
+                  )}
+                </div>
+              ),
             body: n.body || "",
             status: n.status,
             date: n.createdAt.slice(0, 10)
-          }))}
+            };
+          })}
         />
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
           <button className="button secondary" disabled={adminPage <= 1} onClick={() => setAdminPage(adminPage - 1)}>

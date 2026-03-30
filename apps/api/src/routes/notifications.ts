@@ -13,6 +13,21 @@ import {
 
 const router = Router();
 
+async function ensureParentRecipientsForNotification(notificationId: string) {
+  const parents = await prisma.parent.findMany({
+    select: { id: true }
+  });
+  if (!parents.length) return 0;
+  await prisma.notificationRecipient.createMany({
+    data: parents.map((p) => ({
+      notificationId,
+      parentId: p.id
+    })),
+    skipDuplicates: true
+  });
+  return parents.length;
+}
+
 // Docente crea notificacion (pendiente)
 router.post("/", requireAuth, requireRole(["TEACHER"]), validate(createNotificationSchema), async (req, res) => {
   const auth = (req as any).auth;
@@ -46,6 +61,28 @@ router.post("/", requireAuth, requireRole(["TEACHER"]), validate(createNotificat
 router.post("/admin", requireAuth, requireRole(["ADMIN"]), validate(createAdminNotificationSchema), async (req, res) => {
   const auth = (req as any).auth;
   const { body } = (req as any).validated;
+  const audience = body.audience;
+  const studentId = body.studentId ? String(body.studentId).trim() : "";
+  const targetUserId = body.targetUserId ? String(body.targetUserId).trim() : "";
+
+  if (studentId && !(audience === "PARENTS" || audience === "BOTH")) {
+    return res.status(400).json({ message: "studentId solo aplica para audiencia de padres" });
+  }
+  if (targetUserId && !(audience === "TEACHERS" || audience === "BOTH")) {
+    return res.status(400).json({ message: "targetUserId solo aplica para audiencia de docentes" });
+  }
+
+  if (studentId) {
+    const student = await prisma.student.findUnique({ where: { id: studentId }, select: { id: true } });
+    if (!student) return res.status(404).json({ message: "Estudiante no encontrado" });
+  }
+  if (targetUserId) {
+    const target = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true, role: true } });
+    if (!target || target.role !== "TEACHER") {
+      return res.status(400).json({ message: "Docente no valido para notificacion individual" });
+    }
+  }
+
   const notification = await prisma.notification.create({
     data: {
       title: body.title,
@@ -53,15 +90,22 @@ router.post("/admin", requireAuth, requireRole(["ADMIN"]), validate(createAdminN
       status: "APPROVED",
       createdById: auth.userId,
       approvedById: auth.userId,
-      approvedAt: new Date()
+      approvedAt: new Date(),
+      ...(studentId ? { studentId } : {}),
+      ...(targetUserId ? { targetUserId } : {})
     }
   });
+  let parentRecipients = 0;
+  if (body.audience === "PARENTS" || body.audience === "BOTH") {
+    parentRecipients = await ensureParentRecipientsForNotification(notification.id);
+  }
   const queueResult = await enqueueNotification(notification.id);
   res.json({
     ...notification,
     audience: body.audience,
     legalReference: body.legalReference || null,
     body: stripNotificationMeta(notification.body),
+    parentRecipients,
     queue: queueResult
   });
 });
@@ -74,7 +118,8 @@ router.post("/:id/approve", requireAuth, requireRole(["ADMIN"]), validate(approv
     where: { id: params.id },
     data: { status: "APPROVED", approvedById: auth.userId, approvedAt: new Date() }
   });
-  const queueResult = await enqueueNotification(notification.id);
+  const audience = extractNotificationAudience(notification.body);
+  const queueResult = audience === "ADMINS" ? { queued: false } : await enqueueNotification(notification.id);
   res.json({
     ...notification,
     queue: queueResult
@@ -128,6 +173,10 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const [data, total] = await Promise.all([
     prisma.notification.findMany({
       where,
+      include: {
+        student: { select: { id: true, fullName: true, gradeLevel: true, studentGroup: true } },
+        targetUser: { select: { id: true, fullName: true, role: true, email: true } }
+      },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize

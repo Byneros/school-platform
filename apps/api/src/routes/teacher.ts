@@ -3,8 +3,11 @@ import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { buildXlsxReportBuffer, sendTabularPdf } from "../utils/reportExport.js";
 import { getBrandingSettings } from "../utils/brandingSettings.js";
-import { extractNotificationLegalReference, stripNotificationMeta } from "../utils/notificationMeta.js";
+import { composeNotificationBodyWithMeta, extractNotificationLegalReference, stripNotificationMeta } from "../utils/notificationMeta.js";
+import { enqueueNotification } from "../services/notificationQueue.js";
 import PDFDocument from "pdfkit";
+import { validate } from "../utils/validate.js";
+import { createTaskSchema, deleteTaskSchema, updateTaskSchema, upsertTaskScoreSchema } from "../schemas/tasks.js";
 
 const router = Router();
 type SubjectSlot = {
@@ -140,6 +143,54 @@ function dayOfWeekInSpanishUpper(date = new Date(), timeZone = "America/Bogota")
 
 function getEnrollmentGradeLevel(enrollment: any) {
   return String(enrollment?.class?.gradeLevel || "").trim();
+}
+const gradeLabelsFull: Record<string, string> = {
+  PRE_JARDIN: "Pre Jardin",
+  JARDIN: "Jardin",
+  TRANSICION: "Transicion",
+  PRIMERO: "Primero",
+  SEGUNDO: "Segundo",
+  TERCERO: "Tercero",
+  CUARTO: "Cuarto",
+  QUINTO: "Quinto",
+  SEXTO: "Sexto",
+  SEPTIMO: "Septimo",
+  OCTAVO: "Octavo",
+  NOVENO: "Noveno",
+  DECIMO: "Decimo",
+  ONCE: "Once"
+};
+
+function gradeLabelFull(value: string) {
+  return gradeLabelsFull[String(value || "").trim()] || value || "";
+}
+
+function parseTaskGroup(value: string) {
+  const raw = String(value || "").trim();
+  const upper = raw.toUpperCase();
+  if (!raw) {
+    return { group: "", mode: "any" as const };
+  }
+  if (upper === "SIN_GRUPO" || upper === "SIN GRUPO" || raw === "-") {
+    return { group: "", mode: "empty" as const };
+  }
+  return { group: raw, mode: "exact" as const };
+}
+
+async function resolveTeacherGradeGroups(userId: string) {
+  const teacher = await prisma.teacher.findUnique({
+    where: { userId },
+    select: { subjectSchedules: true }
+  });
+  if (!teacher) return [];
+  const slots = normalizeTeacherSlots(teacher.subjectSchedules);
+  const uniquePairs = Array.from(
+    new Set(slots.map((s) => `${normalizeGradeKey(s.gradeLevel)}::${normalizeGroupKey(s.group || "")}`))
+  ).map((key) => {
+    const [gradeLevel, group] = key.split("::");
+    return { gradeLevel, group };
+  });
+  return uniquePairs;
 }
 const dayLabelShort: Record<string, string> = {
   LUNES: "Lunes",
@@ -966,6 +1017,355 @@ router.get("/enrollments", requireAuth, requireRole(["TEACHER"]), async (req, re
   res.json(data);
 });
 
+router.get("/tasks/board", requireAuth, requireRole(["TEACHER"]), async (req, res) => {
+  const auth = (req as any).auth;
+  const gradeLevelRaw = String(req.query.gradeLevel || "").trim().toUpperCase();
+  const { group: groupRaw, mode: groupMode } = parseTaskGroup(String(req.query.group || ""));
+  const period = String(req.query.period || "P1").trim();
+  if (!gradeLevelRaw) return res.status(400).json({ message: "gradeLevel requerido" });
+
+  const teacher = await prisma.teacher.findUnique({ where: { userId: auth.userId } });
+  if (!teacher) return res.json({ tasks: [], students: [], scores: [] });
+
+  const allowedPairs = await resolveTeacherGradeGroups(auth.userId);
+  const normalizedGrade = normalizeGradeKey(gradeLevelRaw);
+  const normalizedGroup = normalizeGroupKey(groupRaw);
+  const isAllowed = allowedPairs.some((pair) => {
+    const pairGrade = normalizeGradeKey(pair.gradeLevel);
+    const pairGroup = normalizeGroupKey(pair.group || "");
+    if (pairGrade !== normalizedGrade) return false;
+    if (groupMode === "empty") {
+      return !pairGroup || pairGroup === "-" || pairGroup === "SIN_GRUPO";
+    }
+    if (groupMode === "exact") {
+      if (!pairGroup || pairGroup === "-" || pairGroup === "SIN_GRUPO") return true;
+      return pairGroup === normalizedGroup;
+    }
+    return true;
+  });
+  if (!isAllowed) return res.status(403).json({ message: "No tienes permisos para este grado/grupo" });
+
+  const enrollments = await prisma.enrollment.findMany({
+    where: {
+      class: { gradeLevel: gradeLevelRaw as any },
+      ...(groupMode === "exact"
+        ? { student: { studentGroup: { equals: groupRaw, mode: "insensitive" as const } } }
+        : groupMode === "empty"
+        ? { student: { OR: [{ studentGroup: null }, { studentGroup: "" }] } }
+        : {})
+    },
+    include: { student: true, class: true },
+    orderBy: { studentFullName: "asc" }
+  });
+
+  const taskWhere: any = {
+    teacherId: teacher.id,
+    gradeLevel: gradeLevelRaw as any,
+    period
+  };
+  if (groupMode !== "any") {
+    taskWhere.group = groupMode === "exact" ? groupRaw : null;
+  }
+  const tasks = await prisma.task.findMany({
+    where: taskWhere,
+    orderBy: { createdAt: "asc" }
+  });
+
+  const enrollmentIds = enrollments.map((e) => e.id);
+  const taskIds = tasks.map((t) => t.id);
+
+  const scores = taskIds.length
+    ? await prisma.taskScore.findMany({
+        where: { taskId: { in: taskIds }, enrollmentId: { in: enrollmentIds } },
+        select: { id: true, taskId: true, enrollmentId: true, score: true }
+      })
+    : [];
+
+  res.json({
+    tasks,
+    students: enrollments.map((e) => ({
+      enrollmentId: e.id,
+      studentId: e.studentId,
+      fullName: e.student?.fullName || e.studentFullName,
+      grade: getEnrollmentGradeLevel(e),
+      group: String(e.student?.studentGroup || "")
+    })),
+    scores
+  });
+});
+
+router.post("/tasks", requireAuth, requireRole(["TEACHER"]), validate(createTaskSchema), async (req, res) => {
+  const auth = (req as any).auth;
+  const { body } = (req as any).validated;
+  const gradeLevelRaw = String(body.gradeLevel || "").trim().toUpperCase();
+  const { group: groupRaw, mode: groupMode } = parseTaskGroup(String(body.group || ""));
+
+  const teacher = await prisma.teacher.findUnique({ where: { userId: auth.userId } });
+  if (!teacher) return res.status(403).json({ message: "Docente no encontrado" });
+
+  const allowedPairs = await resolveTeacherGradeGroups(auth.userId);
+  const normalizedGrade = normalizeGradeKey(gradeLevelRaw);
+  const normalizedGroup = normalizeGroupKey(groupRaw);
+  const isAllowed = allowedPairs.some((pair) => {
+    const pairGrade = normalizeGradeKey(pair.gradeLevel);
+    const pairGroup = normalizeGroupKey(pair.group || "");
+    if (pairGrade !== normalizedGrade) return false;
+    if (groupMode === "empty") {
+      return !pairGroup || pairGroup === "-" || pairGroup === "SIN_GRUPO";
+    }
+    if (groupMode === "exact") {
+      if (!pairGroup || pairGroup === "-" || pairGroup === "SIN_GRUPO") return true;
+      return pairGroup === normalizedGroup;
+    }
+    return true;
+  });
+  if (!isAllowed) return res.status(403).json({ message: "No tienes permisos para este grado/grupo" });
+
+  try {
+    const created = await prisma.task.create({
+      data: {
+        teacherId: teacher.id,
+        gradeLevel: gradeLevelRaw as any,
+        group: groupMode === "exact" ? groupRaw : null,
+        period: String(body.period || "").trim(),
+        title: String(body.title || "").trim(),
+        aspect: body.aspect,
+        maxScore: body.maxScore
+      }
+    });
+
+    const enrollments = await prisma.enrollment.findMany({
+      where: {
+        class: { gradeLevel: gradeLevelRaw as any },
+        ...(groupMode === "exact"
+          ? { student: { studentGroup: { equals: groupRaw, mode: "insensitive" as const } } }
+          : groupMode === "empty"
+          ? { student: { OR: [{ studentGroup: null }, { studentGroup: "" }] } }
+          : {})
+      },
+      select: { studentId: true, student: { select: { fullName: true } } }
+    });
+
+    if (enrollments.length > 0) {
+      const gradeLabel = gradeLabelFull(gradeLevelRaw);
+      const groupLabel =
+        groupMode === "exact" && groupRaw ? ` - Grupo ${groupRaw}` : groupMode === "empty" ? " - Sin grupo" : "";
+      const bodyText = `Nueva tarea registrada.\nGrado: ${gradeLabel}${groupLabel}\nPeriodo: ${created.period}\nPuntaje maximo: ${created.maxScore}`;
+      const notificationBody = composeNotificationBodyWithMeta(bodyText, "PARENTS");
+      const notifications = await Promise.all(
+        enrollments.map((e) =>
+          prisma.notification.create({
+            data: {
+              title: `Nueva tarea: ${created.title}`,
+              body: notificationBody,
+              status: "APPROVED",
+              createdById: auth.userId,
+              approvedById: auth.userId,
+              approvedAt: new Date(),
+              studentId: e.studentId
+            }
+          })
+        )
+      );
+      const studentIds = enrollments.map((e) => e.studentId);
+      const guardians = await prisma.guardian.findMany({
+        where: { studentId: { in: studentIds } },
+        select: { studentId: true, parentId: true }
+      });
+      const parentsByStudent = new Map<string, string[]>();
+      guardians.forEach((g) => {
+        if (!parentsByStudent.has(g.studentId)) parentsByStudent.set(g.studentId, []);
+        parentsByStudent.get(g.studentId)!.push(g.parentId);
+      });
+      const recipients = notifications.flatMap((notification) => {
+        const parents = notification.studentId ? parentsByStudent.get(notification.studentId) || [] : [];
+        return parents.map((parentId) => ({
+          notificationId: notification.id,
+          parentId
+        }));
+      });
+      if (recipients.length > 0) {
+        await prisma.notificationRecipient.createMany({
+          data: recipients,
+          skipDuplicates: true
+        });
+      }
+      await Promise.all(notifications.map((notification) => enqueueNotification(notification.id)));
+    }
+
+    res.json(created);
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return res.status(409).json({ message: "Ya existe una tarea con ese nombre para este periodo." });
+    }
+    res.status(400).json({ message: error?.message || "No se pudo crear la tarea" });
+  }
+});
+
+router.post("/tasks/score", requireAuth, requireRole(["TEACHER"]), validate(upsertTaskScoreSchema), async (req, res) => {
+  const auth = (req as any).auth;
+  const { body } = (req as any).validated;
+  const teacher = await prisma.teacher.findUnique({ where: { userId: auth.userId } });
+  if (!teacher) return res.status(403).json({ message: "Docente no encontrado" });
+
+  const task = await prisma.task.findUnique({ where: { id: body.taskId } });
+  if (!task || task.teacherId !== teacher.id) {
+    return res.status(404).json({ message: "Tarea no encontrada" });
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id: body.enrollmentId },
+    include: { student: true, class: true }
+  });
+  if (!enrollment) return res.status(404).json({ message: "Estudiante no encontrado" });
+
+  const enrollmentGrade = normalizeGradeKey(getEnrollmentGradeLevel(enrollment));
+  const enrollmentGroup = normalizeGroupKey(String(enrollment.student?.studentGroup || ""));
+  const taskGrade = normalizeGradeKey(task.gradeLevel);
+  const taskGroup = normalizeGroupKey(task.group || "");
+  if (enrollmentGrade !== taskGrade) {
+    return res.status(400).json({ message: "La tarea no corresponde al grado del estudiante" });
+  }
+  if (task.group && taskGroup && enrollmentGroup !== taskGroup) {
+    return res.status(400).json({ message: "La tarea no corresponde al grupo del estudiante" });
+  }
+
+  if (body.score > task.maxScore) {
+    return res.status(400).json({ message: "La calificacion supera el maximo permitido" });
+  }
+
+  const taskScore = await prisma.taskScore.upsert({
+    where: { taskId_enrollmentId: { taskId: task.id, enrollmentId: enrollment.id } },
+    update: { score: body.score },
+    create: { taskId: task.id, enrollmentId: enrollment.id, score: body.score }
+  });
+
+  const existingGrade = await prisma.grade.findFirst({
+    where: {
+      enrollmentId: enrollment.id,
+      period: task.period,
+      name: task.title,
+      aspect: task.aspect
+    }
+  });
+
+  const grade = existingGrade
+    ? await prisma.grade.update({
+        where: { id: existingGrade.id },
+        data: { score: body.score, maxScore: task.maxScore }
+      })
+    : await prisma.grade.create({
+        data: {
+          enrollmentId: enrollment.id,
+          period: task.period,
+          name: task.title,
+          aspect: task.aspect,
+          score: body.score,
+          maxScore: task.maxScore
+        }
+      });
+
+  res.json({ taskScore, grade });
+});
+
+router.patch("/tasks/:id", requireAuth, requireRole(["TEACHER"]), validate(updateTaskSchema), async (req, res) => {
+  const auth = (req as any).auth;
+  const { params, body } = (req as any).validated;
+  const teacher = await prisma.teacher.findUnique({ where: { userId: auth.userId } });
+  if (!teacher) return res.status(403).json({ message: "Docente no encontrado" });
+
+  const task = await prisma.task.findUnique({ where: { id: params.id } });
+  if (!task || task.teacherId !== teacher.id) {
+    return res.status(404).json({ message: "Tarea no encontrada" });
+  }
+
+  const updates: any = {};
+  if (body.title !== undefined) updates.title = String(body.title || "").trim();
+  if (body.aspect !== undefined) updates.aspect = body.aspect;
+  if (body.maxScore !== undefined) updates.maxScore = body.maxScore;
+  if (body.period !== undefined) updates.period = String(body.period || "").trim();
+
+  if (Object.keys(updates).length === 0) return res.json(task);
+
+  try {
+    const enrollmentRows = await prisma.taskScore.findMany({
+      where: { taskId: task.id },
+      select: { enrollmentId: true }
+    });
+    const enrollmentIds = enrollmentRows.map((row) => row.enrollmentId);
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const nextTask = await tx.task.update({
+        where: { id: task.id },
+        data: updates
+      });
+
+      if (enrollmentIds.length > 0) {
+        const gradeWhere: any = {
+          enrollmentId: { in: enrollmentIds },
+          name: task.title,
+          period: task.period,
+          aspect: task.aspect
+        };
+        const gradeUpdates: any = {};
+        if (updates.title !== undefined) gradeUpdates.name = updates.title;
+        if (updates.period !== undefined) gradeUpdates.period = updates.period;
+        if (updates.aspect !== undefined) gradeUpdates.aspect = updates.aspect;
+        if (updates.maxScore !== undefined) gradeUpdates.maxScore = updates.maxScore;
+        if (Object.keys(gradeUpdates).length > 0) {
+          await tx.grade.updateMany({ where: gradeWhere, data: gradeUpdates });
+        }
+      }
+
+      return nextTask;
+    });
+
+    res.json(updated);
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return res.status(409).json({ message: "Ya existe una tarea con ese nombre para este periodo." });
+    }
+    res.status(400).json({ message: error?.message || "No se pudo actualizar la tarea" });
+  }
+});
+
+router.delete("/tasks/:id", requireAuth, requireRole(["TEACHER"]), validate(deleteTaskSchema), async (req, res) => {
+  const auth = (req as any).auth;
+  const { params } = (req as any).validated;
+  const teacher = await prisma.teacher.findUnique({ where: { userId: auth.userId } });
+  if (!teacher) return res.status(403).json({ message: "Docente no encontrado" });
+
+  const task = await prisma.task.findUnique({ where: { id: params.id } });
+  if (!task || task.teacherId !== teacher.id) {
+    return res.status(404).json({ message: "Tarea no encontrada" });
+  }
+
+  const enrollmentRows = await prisma.taskScore.findMany({
+    where: { taskId: task.id },
+    select: { enrollmentId: true }
+  });
+  const enrollmentIds = enrollmentRows.map((row) => row.enrollmentId);
+
+  await prisma.$transaction([
+    prisma.taskScore.deleteMany({ where: { taskId: task.id } }),
+    ...(enrollmentIds.length > 0
+      ? [
+          prisma.grade.deleteMany({
+            where: {
+              enrollmentId: { in: enrollmentIds },
+              name: task.title,
+              period: task.period,
+              aspect: task.aspect
+            }
+          })
+        ]
+      : []),
+    prisma.task.delete({ where: { id: task.id } })
+  ]);
+
+  res.json({ deleted: true });
+});
+
 router.get("/attendance", requireAuth, requireRole(["TEACHER", "ADMIN"]), async (req, res) => {
   const auth = (req as any).auth;
   const isTeacher = auth.role === "TEACHER";
@@ -1498,40 +1898,69 @@ router.get("/grades/final-summary", requireAuth, requireRole(["TEACHER"]), async
 
   const period = String(req.query.period || "").trim();
   const gradeLevel = String(req.query.gradeLevel || "").trim();
-  const classWhere: any = { teacherId: teacher.id };
-  if (gradeLevel) {
-    classWhere.gradeLevel = gradeLevel as any;
-  }
-  const where: any = {
-    enrollment: { class: classWhere },
-    ...(period ? { period } : {})
-  };
+  const { group: groupRaw, mode: groupMode } = parseTaskGroup(String(req.query.group || ""));
+  const allowedPairs = await resolveTeacherGradeGroups(auth.userId);
+  if (!allowedPairs.length) return res.json([]);
 
-  const grades = await prisma.grade.findMany({
-    where,
-    include: { enrollment: { include: { student: true, class: true } } },
+  const normalizedGrade = normalizeGradeKey(gradeLevel);
+  const normalizedGroup = normalizeGroupKey(groupRaw);
+  if (gradeLevel) {
+    const isAllowed = allowedPairs.some((pair) => {
+      const pairGrade = normalizeGradeKey(pair.gradeLevel);
+      const pairGroup = normalizeGroupKey(pair.group || "");
+      if (pairGrade !== normalizedGrade) return false;
+      if (groupMode === "empty") {
+        return !pairGroup || pairGroup === "-" || pairGroup === "SIN_GRUPO";
+      }
+      if (groupMode === "exact") {
+        if (!pairGroup || pairGroup === "-" || pairGroup === "SIN_GRUPO") return true;
+        return pairGroup === normalizedGroup;
+      }
+      return true;
+    });
+    if (!isAllowed) return res.status(403).json({ message: "No tienes permisos para este grado/grupo" });
+  }
+
+  const taskWhere: any = {
+    teacherId: teacher.id,
+    ...(period ? { period } : {}),
+    ...(gradeLevel ? { gradeLevel: gradeLevel as any } : {})
+  };
+  if (groupMode === "exact") {
+    taskWhere.group = { equals: groupRaw, mode: "insensitive" as const };
+  } else if (groupMode === "empty") {
+    taskWhere.group = null;
+  }
+
+  const scores = await prisma.taskScore.findMany({
+    where: { task: taskWhere },
+    include: { task: true, enrollment: { include: { student: true, class: true } } },
     orderBy: { createdAt: "desc" }
   });
 
   const byEnrollment = new Map<string, any>();
-  for (const g of grades) {
-    const key = `${g.enrollmentId}:${g.period}`;
+  for (const entry of scores) {
+    if (entry.score === null || entry.score === undefined) continue;
+    const taskMax = Number(entry.task?.maxScore || 0);
+    if (!Number.isFinite(taskMax) || taskMax <= 0) continue;
+    const pct = (Number(entry.score) / taskMax) * 100;
+    const key = `${entry.enrollmentId}:${entry.task.period}`;
     if (!byEnrollment.has(key)) {
       byEnrollment.set(key, {
-        enrollmentId: g.enrollmentId,
-        period: g.period,
-        student: g.enrollment.student.fullName,
-        grade: getEnrollmentGradeLevel(g.enrollment),
+        enrollmentId: entry.enrollmentId,
+        period: entry.task.period,
+        student: entry.enrollment.student.fullName,
+        grade: getEnrollmentGradeLevel(entry.enrollment),
+        group: String(entry.enrollment?.student?.studentGroup || ""),
         cognitive: [] as number[],
         personal: [] as number[],
         social: [] as number[]
       });
     }
-    const pct = g.maxScore > 0 ? (g.score / g.maxScore) * 100 : 0;
     const row = byEnrollment.get(key);
-    if (g.aspect === "COGNITIVE") row.cognitive.push(pct);
-    if (g.aspect === "PERSONAL") row.personal.push(pct);
-    if (g.aspect === "SOCIAL") row.social.push(pct);
+    if (entry.task.aspect === "COGNITIVE") row.cognitive.push(pct);
+    if (entry.task.aspect === "PERSONAL") row.personal.push(pct);
+    if (entry.task.aspect === "SOCIAL") row.social.push(pct);
   }
 
   const avg = (items: number[]) => (items.length ? items.reduce((s, n) => s + n, 0) / items.length : 0);
@@ -1588,13 +2017,19 @@ router.get("/notifications", requireAuth, requireRole(["TEACHER"]), async (req, 
 });
 
 router.get("/admin-notifications", requireAuth, requireRole(["TEACHER"]), async (req, res) => {
+  const auth = (req as any).auth;
   const page = Number(req.query.page || 1);
   const pageSize = Number(req.query.pageSize || 10);
   const status = String(req.query.status || "").trim();
   const where: any = {
     createdBy: { role: "ADMIN" },
     OR: [{ body: { contains: "[[audience:TEACHERS]]" } }, { body: { contains: "[[audience:BOTH]]" } }],
-    ...(status ? { status: status as any } : {})
+    ...(status ? { status: status as any } : {}),
+    AND: [
+      {
+        OR: [{ targetUserId: null }, { targetUserId: auth.userId }]
+      }
+    ]
   };
   const [data, total] = await Promise.all([
     prisma.notification.findMany({

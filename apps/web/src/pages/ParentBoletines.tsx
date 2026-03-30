@@ -28,7 +28,8 @@ export default function ParentBoletines() {
 
   const download = async () => {
     if (!studentId) return;
-    const blob = await apiDownload(`/reports/report-card/${studentId}`);
+    const query = periodFilter ? `?period=${encodeURIComponent(periodFilter)}` : "";
+    const blob = await apiDownload(`/reports/report-card/${studentId}${query}`);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -61,15 +62,36 @@ export default function ParentBoletines() {
         columns={[
           { key: "student", label: "Estudiante" },
           { key: "grade", label: "Grado" },
+          { key: "group", label: "Grupo" },
           { key: "period", label: "Periodo" },
-          { key: "score", label: "Nota" }
+          { key: "subject", label: "Asignatura" },
+          { key: "score", label: "Nota definitiva" }
         ]}
         rows={grades.map((g: any) => ({
-          student: g.enrollment?.student?.fullName || "",
+          student: g.student,
           grade: g.grade || getClassGradeLevel(g.enrollment?.class) || "",
+          group: g.group || "Sin grupo",
           period: g.period,
-          score: `${g.score}/${g.maxScore}`
-        }))}
+          subject: g.subject,
+          score: `${Number(g.finalScore || 0).toFixed(2)}/${g.maxScore ?? 0}`
+        })).sort((a, b) => {
+          const studentA = String(a.student || "");
+          const studentB = String(b.student || "");
+          if (studentA !== studentB) return studentA.localeCompare(studentB, "es");
+          const gradeA = String(a.grade || "");
+          const gradeB = String(b.grade || "");
+          if (gradeA !== gradeB) return gradeA.localeCompare(gradeB, "es");
+          const groupA = String(a.group || "");
+          const groupB = String(b.group || "");
+          if (groupA !== groupB) return groupA.localeCompare(groupB, "es");
+          const periodA = String(a.period || "");
+          const periodB = String(b.period || "");
+          if (periodA !== periodB) return periodA.localeCompare(periodB, "es");
+          const subjectA = String(a.subject || "");
+          const subjectB = String(b.subject || "");
+          if (subjectA !== subjectB) return subjectA.localeCompare(subjectB, "es");
+          return String(a.score || "").localeCompare(String(b.score || ""), "es");
+        })}
       />
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
         <select className="input" value={studentId} onChange={(e) => setStudentId(e.target.value)}>

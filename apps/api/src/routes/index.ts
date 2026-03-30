@@ -16,6 +16,7 @@ import classRoutes from "./classes.js";
 import brandingRoutes from "./branding.js";
 import studentObservationRoutes from "./studentObservations.js";
 import academicClosureRoutes from "./academicClosure.js";
+import suggestionRoutes from "./suggestions.js";
 
 const router = Router();
 
@@ -36,5 +37,6 @@ router.use("/classes", classRoutes);
 router.use("/branding", brandingRoutes);
 router.use("/student-observations", studentObservationRoutes);
 router.use("/academic-closure", academicClosureRoutes);
+router.use("/suggestions", suggestionRoutes);
 
 export default router;

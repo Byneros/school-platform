@@ -36,6 +36,50 @@ function classGradeLevelValue(classEntity: any) {
   return String(classEntity?.gradeLevel || "").trim();
 }
 
+function normalizeEmail(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isEmailLike(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+async function linkParentToStudent(
+  tx: typeof prisma,
+  params: { studentId: string; guardianRelation?: string | null; contactEmail?: string | null; guardianFullName?: string | null }
+) {
+  const email = normalizeEmail(params.contactEmail || "");
+  if (!isEmailLike(email)) return;
+  const user = await tx.user.findUnique({
+    where: { email },
+    select: { id: true, role: true }
+  });
+  if (!user || user.role !== "PARENT") return;
+
+  const parent = await tx.parent.upsert({
+    where: { userId: user.id },
+    update: {},
+    create: { userId: user.id },
+    select: { id: true }
+  });
+
+  const relation = String(params.guardianRelation || "").trim() || "Acudiente";
+  await tx.guardian.upsert({
+    where: {
+      parentId_studentId: {
+        parentId: parent.id,
+        studentId: params.studentId
+      }
+    },
+    update: { relation },
+    create: {
+      parentId: parent.id,
+      studentId: params.studentId,
+      relation
+    }
+  });
+}
+
 router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createEnrollmentSchema), async (req, res) => {
   const { body } = (req as any).validated;
   const requiredEnrollmentFields: Array<{ key: string; label: string }> = [
@@ -210,6 +254,13 @@ router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createEnrollmentS
           documents: body.documents,
           documentsNotes: body.documentsNotes
         }
+      });
+
+      await linkParentToStudent(tx, {
+        studentId: created.studentId,
+        guardianRelation: body.guardianRelation,
+        contactEmail: body.contactEmail,
+        guardianFullName: body.guardianFullName
       });
 
       if (admission) {

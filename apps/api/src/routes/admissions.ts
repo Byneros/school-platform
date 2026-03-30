@@ -23,16 +23,70 @@ function addBusinessDays(start: Date, days: number) {
   return result;
 }
 
+function normalizeEmail(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isEmailLike(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+async function linkParentToStudent(
+  tx: typeof prisma,
+  params: { studentId: string; guardianRelation?: string | null; contactEmail?: string | null; guardianFullName?: string | null }
+) {
+  const email = normalizeEmail(params.contactEmail || "");
+  if (!isEmailLike(email)) return;
+  const user = await tx.user.findUnique({
+    where: { email },
+    select: { id: true, role: true }
+  });
+  if (!user || user.role !== "PARENT") return;
+
+  const parent = await tx.parent.upsert({
+    where: { userId: user.id },
+    update: {},
+    create: { userId: user.id },
+    select: { id: true }
+  });
+
+  const relation = String(params.guardianRelation || "").trim() || "Acudiente";
+  await tx.guardian.upsert({
+    where: {
+      parentId_studentId: {
+        parentId: parent.id,
+        studentId: params.studentId
+      }
+    },
+    update: { relation },
+    create: {
+      parentId: parent.id,
+      studentId: params.studentId,
+      relation
+    }
+  });
+}
+
 router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const page = Number(req.query.page || 1);
   const pageSize = Number(req.query.pageSize || 10);
   const status = String(req.query.status || "").trim();
   const gradeLevel = String(req.query.gradeLevel || "").trim();
   const search = String(req.query.search || "").trim();
+  const now = new Date();
 
   const where: Prisma.AdmissionWhereInput = {
     enrollment: null,
-    ...(status ? { status: status as any } : {}),
+    ...(status
+      ? { status: status as any }
+      : {
+          status: { not: "APPROVED" }
+        }),
+    ...(status === "APPROVED"
+      ? {
+          OR: [{ enrollmentDueAt: null }, { enrollmentDueAt: { gte: now } }]
+        }
+      : {}),
     ...(gradeLevel ? { gradeLevel: gradeLevel as any } : {}),
     ...(search ? { studentName: { contains: search, mode: "insensitive" } } : {})
   };
@@ -50,10 +104,15 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
 });
 
 router.get("/approved", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
+  const now = new Date();
   const data = await prisma.admission.findMany({
     where: {
       status: "APPROVED",
-      enrollment: null
+      enrollment: null,
+      OR: [
+        { enrollmentDueAt: null },
+        { enrollmentDueAt: { gte: now } }
+      ]
     },
     orderBy: { createdAt: "asc" }
   });
@@ -264,34 +323,39 @@ router.patch("/:id/status", requireAuth, requireRole(["ADMIN"]), validate(update
           guardianRelation: admission.guardianRelation,
           guardianDocType: admission.guardianDocType
         });
-        if (guardianValidationError) {
-          throw new Error(`No se puede crear matricula automatica: ${guardianValidationError}`);
-        }
+        if (!guardianValidationError) {
+          await tx.enrollment.create({
+            data: {
+              studentId,
+              classId: classForGrade.id,
+              year,
+              status: "ACTIVE",
+              admissionId: admission.id,
+              studentFullName: fullName,
+              studentBirthDate: admission.studentBirthDate ?? undefined,
+              studentBirthPlaceDept: admission.studentBirthPlaceDept,
+              studentBirthPlaceCity: admission.studentBirthPlaceCity,
+              studentGender: admission.studentGender,
+              studentDocType: admission.studentDocType,
+              studentDocNumber: admission.studentDocNumber,
+              studentGradeLevel: admission.gradeLevel,
+              studentAddress: admission.studentAddress,
+              guardianFullName: admission.guardianFullName || "Sin registrar",
+              guardianDocType: admission.guardianDocType,
+              guardianDocNumber: admission.guardianDocNumber || "N/A",
+              guardianRelation: admission.guardianRelation || "ACUDIENTE_LEGAL",
+              contactPhone: admission.contactPhone || "N/A",
+              contactEmail: admission.contactEmail
+            }
+          });
 
-        await tx.enrollment.create({
-          data: {
+          await linkParentToStudent(tx, {
             studentId,
-            classId: classForGrade.id,
-            year,
-            status: "ACTIVE",
-            admissionId: admission.id,
-            studentFullName: fullName,
-            studentBirthDate: admission.studentBirthDate ?? undefined,
-            studentBirthPlaceDept: admission.studentBirthPlaceDept,
-            studentBirthPlaceCity: admission.studentBirthPlaceCity,
-            studentGender: admission.studentGender,
-            studentDocType: admission.studentDocType,
-            studentDocNumber: admission.studentDocNumber,
-            studentGradeLevel: admission.gradeLevel,
-            studentAddress: admission.studentAddress,
-            guardianFullName: admission.guardianFullName || "Sin registrar",
-            guardianDocType: admission.guardianDocType,
-            guardianDocNumber: admission.guardianDocNumber || "N/A",
-            guardianRelation: admission.guardianRelation || "ACUDIENTE_LEGAL",
-            contactPhone: admission.contactPhone || "N/A",
-            contactEmail: admission.contactEmail
-          }
-        });
+            guardianRelation: admission.guardianRelation,
+            contactEmail: admission.contactEmail,
+            guardianFullName: admission.guardianFullName
+          });
+        }
       }
 
       return tx.admission.findUnique({
@@ -304,6 +368,23 @@ router.patch("/:id/status", requireAuth, requireRole(["ADMIN"]), validate(update
   } catch (error: any) {
     res.status(400).json({ message: error?.message || "No fue posible actualizar el estado de admision" });
   }
+});
+
+router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
+  const id = String(req.params.id || "").trim();
+  if (!id) return res.status(400).json({ message: "Admision invalida" });
+
+  const admission = await prisma.admission.findUnique({
+    where: { id },
+    include: { enrollment: true }
+  });
+  if (!admission) return res.status(404).json({ message: "Admision no encontrada" });
+  if (admission.enrollment) {
+    return res.status(400).json({ message: "No se puede eliminar una admision con matricula" });
+  }
+
+  await prisma.admission.delete({ where: { id } });
+  return res.json({ ok: true });
 });
 
 export default router;

@@ -8,12 +8,13 @@ import { gradeLabel } from "../services/grades";
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
-  const [students, setStudents] = useState<Array<{ id: string; fullName: string; gradeLevel: string }>>([]);
+  const [students, setStudents] = useState<Array<{ id: string; fullName: string; gradeLevel: string; studentGroup?: string | null; latestYear?: number | null }>>([]);
   const [studentId, setStudentId] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
+  const [recentGrades, setRecentGrades] = useState<Array<any>>([]);
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileMsg, setProfileMsg] = useState("");
   const [profileForm, setProfileForm] = useState({
@@ -25,6 +26,9 @@ export default function TeacherDashboard() {
     apiGet("/students/simple")
       .then((res) => setStudents(res))
       .catch(() => undefined);
+    apiGet("/teacher/grades?page=1&pageSize=5")
+      .then((res) => setRecentGrades(res.data || []))
+      .catch(() => setRecentGrades([]));
     apiGet("/teacher/profile")
       .then((res) =>
         setProfileForm({
@@ -83,7 +87,9 @@ export default function TeacherDashboard() {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="button secondary" onClick={() => navigate("/teacher/asistencia")}>Asistencia por grado</button>
-            <button className="button">Agregar nota</button>
+            <button className="button" onClick={() => navigate("/teacher/tareas-calificaciones")}>
+              Tareas y calificaciones
+            </button>
           </div>
         </div>
       </div>
@@ -124,22 +130,28 @@ export default function TeacherDashboard() {
           </form>
         </Section>
 
-        <Section title="Calificaciones recientes" action={<button className="button secondary">Agregar nota</button>}>
+        <Section
+          title="Calificaciones recientes"
+          action={
+            <button className="button secondary" onClick={() => navigate("/teacher/tareas-calificaciones")}>
+              Tareas y calificaciones
+            </button>
+          }
+        >
           <DataTable
             enableSearch
             pageSize={5}
+            suggestionsEndpoint="/suggestions?type=teacher-grades"
             columns={[
               { key: "assessment", label: "Evaluacion" },
               { key: "grade", label: "Grado" },
               { key: "score", label: "Promedio" }
             ]}
-            rows={[
-              { assessment: "Examen 1", grade: "QUINTO", score: "16.5" },
-              { assessment: "Tarea 3", grade: "CUARTO", score: "18.0" },
-              { assessment: "Proyecto", grade: "QUINTO", score: "17.2" },
-              { assessment: "Examen 2", grade: "QUINTO", score: "15.8" },
-              { assessment: "Quiz", grade: "CUARTO", score: "17.9" }
-            ]}
+            rows={recentGrades.map((g: any) => ({
+              assessment: g.name,
+              grade: gradeLabel(g.grade || g.enrollment?.class?.gradeLevel || ""),
+              score: Number(g.maxScore || 0) > 0 ? (Number(g.score || 0) / Number(g.maxScore || 0) * 20).toFixed(1) : String(g.score || "")
+            }))}
           />
         </Section>
 
@@ -154,7 +166,7 @@ export default function TeacherDashboard() {
                 <option value="">Todos</option>
                 {students.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.fullName} - {gradeLabel(s.gradeLevel)}
+                  {s.fullName} - {gradeLabel(s.gradeLevel)}{s.studentGroup ? `${s.studentGroup}` : ""}{s.latestYear ? ` (${s.latestYear})` : ""}
                   </option>
                 ))}
               </select>

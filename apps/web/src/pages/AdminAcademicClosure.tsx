@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
+import Autocomplete from "../components/Autocomplete";
 import { apiDownload, apiGet, apiPost, apiPut } from "../services/api";
 import { gradeLabel, gradeOptions } from "../services/grades";
+import useSuggestions from "../hooks/useSuggestions";
 
 export default function AdminAcademicClosure() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
@@ -23,6 +25,11 @@ export default function AdminAcademicClosure() {
   const [gradeFilter, setGradeFilter] = useState("");
   const [groupFilter, setGroupFilter] = useState("");
   const [search, setSearch] = useState("");
+
+  const searchOptions = useSuggestions({
+    endpoint: "/suggestions?type=academic-closure",
+    query: search
+  });
 
   const query = useMemo(
     () =>
@@ -201,7 +208,16 @@ export default function AdminAcademicClosure() {
             ))}
           </select>
           <input className="input" placeholder="Grupo" value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }} />
-          <input className="input" placeholder="Buscar estudiante" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+          <Autocomplete
+            className="input"
+            placeholder="Buscar estudiante"
+            value={search}
+            options={searchOptions}
+            onChange={(value) => {
+              setSearch(value);
+              setPage(1);
+            }}
+          />
           <button className="button" type="button" onClick={runClosure}>Ejecutar cierre</button>
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>

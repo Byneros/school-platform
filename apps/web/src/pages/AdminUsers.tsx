@@ -2,8 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
+import Autocomplete from "../components/Autocomplete";
 import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
 import useDebounce from "../hooks/useDebounce";
+import useSuggestions from "../hooks/useSuggestions";
+import { useAuth } from "../context/AuthContext";
 
 function isStrongPassword(password: string) {
   return (
@@ -55,6 +58,7 @@ function PasswordChecklist({ password }: { password: string }) {
 }
 
 export default function AdminUsers() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [users, setUsers] = useState<
     Array<{
@@ -104,6 +108,7 @@ export default function AdminUsers() {
       students: Array<{ studentId: string; studentName: string; grade: string; group: string }>;
     }>
   >([]);
+  const [pendingParentLoading, setPendingParentLoading] = useState(false);
   const [form, setForm] = useState({ fullName: "", email: "", role: "ADMIN", password: "", teacherSubjects: [] as string[] });
   const [actionError, setActionError] = useState("");
   const [editingId, setEditingId] = useState("");
@@ -116,6 +121,13 @@ export default function AdminUsers() {
     TEACHER: false,
     PARENT: false
   });
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importMode, setImportMode] = useState<"validate" | "import">("validate");
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState<any>(null);
+  const [importHistory, setImportHistory] = useState<Array<any>>([]);
+  const [importHistoryLoading, setImportHistoryLoading] = useState(false);
   const [expandedParentById, setExpandedParentById] = useState<Record<string, boolean>>({});
   const teacherSubjectOptions = [
     "Ciencias Naturales",
@@ -147,12 +159,19 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState(initialRole);
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search, 350);
+  const [savedFilters, setSavedFilters] = useState<Array<{ id: string; name: string; roleFilter: string; search: string }>>([]);
+  const [filterName, setFilterName] = useState("");
+  const [selectedFilterId, setSelectedFilterId] = useState("");
   const [canDeleteUsers, setCanDeleteUsers] = useState(false);
   const [loadError, setLoadError] = useState("");
   const createPanelRef = useRef<HTMLFormElement | null>(null);
   const createNameInputRef = useRef<HTMLInputElement | null>(null);
   const editPanelRef = useRef<HTMLFormElement | null>(null);
   const editNameInputRef = useRef<HTMLInputElement | null>(null);
+  const userSearchOptions = useSuggestions({
+    endpoint: "/suggestions?type=users",
+    query: search
+  });
 
   useEffect(() => {
     const next = new URLSearchParams();
@@ -161,6 +180,54 @@ export default function AdminUsers() {
     if (search) next.set("search", search);
     setSearchParams(next, { replace: true });
   }, [page, roleFilter, search, setSearchParams]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem("admin_users_filters");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setSavedFilters(parsed);
+      }
+    } catch {
+      setSavedFilters([]);
+    }
+  }, []);
+
+  const persistFilters = (next: Array<{ id: string; name: string; roleFilter: string; search: string }>) => {
+    setSavedFilters(next);
+    localStorage.setItem("admin_users_filters", JSON.stringify(next));
+  };
+
+  const saveCurrentFilter = () => {
+    const trimmed = filterName.trim();
+    const name = trimmed || `Filtro ${new Date().toLocaleDateString("es-CO")} ${new Date().toLocaleTimeString("es-CO")}`;
+    const id = trimmed ? trimmed.toLowerCase().replace(/\s+/g, "-") : `f-${Date.now()}`;
+    const next = savedFilters.filter((f) => f.id !== id);
+    const updated = [
+      { id, name, roleFilter, search },
+      ...next
+    ];
+    persistFilters(updated.slice(0, 10));
+    setSelectedFilterId(id);
+    setFilterName("");
+  };
+
+  const applySavedFilter = (id: string) => {
+    setSelectedFilterId(id);
+    const selected = savedFilters.find((f) => f.id === id);
+    if (!selected) return;
+    setRoleFilter(selected.roleFilter);
+    setSearch(selected.search);
+    setPage(1);
+  };
+
+  const deleteSavedFilter = () => {
+    if (!selectedFilterId) return;
+    const next = savedFilters.filter((f) => f.id !== selectedFilterId);
+    persistFilters(next);
+    setSelectedFilterId("");
+  };
 
   const load = () =>
     apiGet(`/users?page=${page}&pageSize=10${roleFilter ? `&role=${roleFilter}` : ""}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`)
@@ -183,14 +250,29 @@ export default function AdminUsers() {
       .catch(() => undefined);
 
   const loadPendingParentUsers = () =>
+    (setPendingParentLoading(true),
     apiGet("/users/parents/pending-account")
       .then((res) => setPendingParentUsers(res.data || []))
-      .catch(() => setPendingParentUsers([]));
+      .catch(() => setPendingParentUsers([]))
+      .finally(() => setPendingParentLoading(false)));
+
+  const loadImportHistory = async () => {
+    setImportHistoryLoading(true);
+    try {
+      const res = await apiGet("/reports/import-template/history");
+      setImportHistory(res?.data || []);
+    } catch {
+      setImportHistory([]);
+    } finally {
+      setImportHistoryLoading(false);
+    }
+  };
 
   useEffect(() => {
     load();
     loadAllForSections();
     loadPendingParentUsers();
+    loadImportHistory();
   }, [page, roleFilter, debouncedSearch]);
 
   useEffect(() => {
@@ -226,6 +308,7 @@ export default function AdminUsers() {
       await apiPost("/users", payload);
       setForm({ fullName: "", email: "", role: "ADMIN", password: "", teacherSubjects: [] });
       load();
+      loadPendingParentUsers();
     } catch (error: any) {
       setActionError(error?.message || "No se pudo crear el usuario.");
     }
@@ -293,6 +376,7 @@ export default function AdminUsers() {
       setUsers((prev) => prev.map((u) => (u.id === editingId ? { ...u, ...updated } : u)));
       setEditingId("");
       setEditForm({ fullName: "", email: "", role: "ADMIN", password: "" });
+      loadPendingParentUsers();
     } catch (error: any) {
       setActionError(error?.message || "No se pudo editar el usuario");
     } finally {
@@ -316,6 +400,7 @@ export default function AdminUsers() {
       } else {
         setUsers((prev) => prev.filter((u) => u.id !== id));
       }
+      loadPendingParentUsers();
     } catch (error: any) {
       setActionError(error?.message || "No se pudo eliminar el usuario");
     }
@@ -329,6 +414,42 @@ export default function AdminUsers() {
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const runImport = async () => {
+    if (!importFile) {
+      setImportError("Selecciona un archivo .xlsx.");
+      return;
+    }
+    setImportBusy(true);
+    setImportError("");
+    setImportResult(null);
+    try {
+      const fileBase64 = await fileToBase64(importFile);
+      const result = await apiPost("/reports/import-template/import", {
+        fileBase64,
+        mode: importMode
+      });
+      setImportResult(result);
+      if (importMode === "import") {
+        load();
+        loadAllForSections();
+        loadPendingParentUsers();
+      }
+      await loadImportHistory();
+    } catch (error: any) {
+      setImportError(error?.message || "No se pudo procesar la importacion.");
+    } finally {
+      setImportBusy(false);
+    }
   };
 
   const roleSections: Array<{ key: "ADMIN" | "TEACHER" | "PARENT"; label: string }> = [
@@ -425,6 +546,12 @@ export default function AdminUsers() {
         <div className="section-title" style={{ marginBottom: 8 }}>
           Acudientes con estudiantes matriculados sin usuario ({pendingParentUsers.length})
         </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          {pendingParentLoading && <span style={{ color: "#64748b", fontSize: 12 }}>Actualizando...</span>}
+          <button className="button secondary" type="button" onClick={loadPendingParentUsers} disabled={pendingParentLoading}>
+            {pendingParentLoading ? "Actualizando..." : "Actualizar lista"}
+          </button>
+        </div>
         {pendingParentUsers.length === 0 ? (
           <div style={{ color: "#64748b" }}>No hay acudientes pendientes de crear usuario.</div>
         ) : (
@@ -474,12 +601,13 @@ export default function AdminUsers() {
         )}
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <input
+        <Autocomplete
           className="input input-search"
           placeholder="Buscar por nombre o correo"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
+          options={userSearchOptions}
+          onChange={(value) => {
+            setSearch(value);
             setPage(1);
           }}
         />
@@ -494,6 +622,122 @@ export default function AdminUsers() {
         </button>
         <button className="button secondary" type="button" onClick={() => downloadFile("/users/export/pdf", "users.pdf")}>
           Exportar PDF
+        </button>
+        <button className="button secondary" type="button" onClick={() => downloadFile("/reports/import-template/excel", "plantilla-importacion.xlsx")}>
+          Plantilla importacion
+        </button>
+      </div>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="section-title">Importar datos desde Excel</div>
+        <div style={{ color: "#64748b", marginBottom: 8 }}>
+          Usa la plantilla oficial. Primero valida y luego importa si todo esta correcto.
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            type="file"
+            accept=".xlsx"
+            onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+          />
+          <select className="input" value={importMode} onChange={(e) => setImportMode(e.target.value as "validate" | "import")}>
+            <option value="validate">Solo validar</option>
+            <option value="import">Importar</option>
+          </select>
+          <button className="button" type="button" onClick={runImport} disabled={importBusy}>
+            {importBusy ? "Procesando..." : importMode === "import" ? "Importar" : "Validar"}
+          </button>
+        </div>
+        {importError && <div style={{ color: "#b91c1c", marginTop: 8 }}>{importError}</div>}
+        {importResult && (
+          <div style={{ marginTop: 8, color: "#334155" }}>
+            <div>Modo: {importResult.mode}</div>
+            <div>
+              Creados: usuarios {importResult.created?.users || 0}, docentes {importResult.created?.teachers || 0}, padres {importResult.created?.parents || 0}, estudiantes {importResult.created?.students || 0}, clases {importResult.created?.classes || 0}, matriculas {importResult.created?.enrollments || 0}
+            </div>
+            <div>
+              Actualizados: usuarios {importResult.updated?.users || 0}, docentes {importResult.updated?.teachers || 0}, estudiantes {importResult.updated?.students || 0}, clases {importResult.updated?.classes || 0}, matriculas {importResult.updated?.enrollments || 0}
+            </div>
+            <div>Omitidos: {importResult.skipped || 0}</div>
+            {importResult.defaultPasswordUsed && (
+              <div style={{ color: "#9a3412" }}>Se uso contrasena temporal para algunos usuarios.</div>
+            )}
+            {Array.isArray(importResult.errors) && importResult.errors.length > 0 && (
+              <div style={{ marginTop: 6 }}>
+                <strong>Errores:</strong>
+                <ul style={{ margin: "6px 0 0 16px", color: "#b91c1c" }}>
+                  {importResult.errors.slice(0, 10).map((err: any, idx: number) => (
+                    <li key={`${err.sheet}-${err.row}-${idx}`}>
+                      {err.sheet} fila {err.row}: {err.message}
+                    </li>
+                  ))}
+                </ul>
+                {importResult.errors.length > 10 && (
+                  <div style={{ color: "#b91c1c" }}>...{importResult.errors.length - 10} errores mas.</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div className="section-title" style={{ fontSize: 16 }}>Historial de importaciones</div>
+            <button className="button secondary" type="button" onClick={loadImportHistory} disabled={importHistoryLoading}>
+              {importHistoryLoading ? "Actualizando..." : "Actualizar historial"}
+            </button>
+          </div>
+          {importHistory.length === 0 ? (
+            <div style={{ color: "#64748b", marginTop: 6 }}>
+              No hay importaciones registradas.
+            </div>
+          ) : (
+            <div className="table-wrap" style={{ marginTop: 6 }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Modo</th>
+                    <th>Usuario</th>
+                    <th>Creados</th>
+                    <th>Actualizados</th>
+                    <th>Omitidos</th>
+                    <th>Errores</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importHistory.slice(0, 10).map((row) => (
+                    <tr key={row.id}>
+                      <td>{String(row.createdAt || "").slice(0, 19).replace("T", " ")}</td>
+                      <td>{row.mode}</td>
+                      <td>{row.createdByName || "-"}</td>
+                      <td>{row.summary?.created ? Object.values(row.summary.created).reduce((s: any, v: any) => s + Number(v || 0), 0) : 0}</td>
+                      <td>{row.summary?.updated ? Object.values(row.summary.updated).reduce((s: any, v: any) => s + Number(v || 0), 0) : 0}</td>
+                      <td>{row.summary?.skipped || 0}</td>
+                      <td>{row.summary?.errorsCount || 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <input
+          className="input"
+          placeholder="Nombre del filtro"
+          value={filterName}
+          onChange={(e) => setFilterName(e.target.value)}
+        />
+        <button className="button secondary" type="button" onClick={saveCurrentFilter}>
+          Guardar filtro
+        </button>
+        <select className="input" value={selectedFilterId} onChange={(e) => applySavedFilter(e.target.value)}>
+          <option value="">Filtros guardados</option>
+          {savedFilters.map((f) => (
+            <option key={f.id} value={f.id}>{f.name}</option>
+          ))}
+        </select>
+        <button className="button secondary" type="button" disabled={!selectedFilterId} onClick={deleteSavedFilter}>
+          Eliminar filtro
         </button>
       </div>
       {actionError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{actionError}</div>}
@@ -659,17 +903,22 @@ export default function AdminUsers() {
                           )}
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "stretch" }}>
-                          <button className="button secondary" onClick={() => startEdit(u)}>
-                            Editar
-                          </button>
                           <button
                             className="button secondary"
-                            onClick={() => toggleActive(u.id, u.isActive)}
-                            disabled={!!u.isPrincipal}
-                            title={u.isPrincipal ? "El administrador principal no se puede desactivar" : ""}
+                            onClick={() => startEdit(u)}
+                            disabled={!!u.isPrincipal && user?.id !== u.id}
+                            title={u.isPrincipal && user?.id !== u.id ? "Solo el administrador principal puede editarse" : ""}
                           >
-                            {u.isPrincipal ? "Administrador principal" : u.isActive ? "Desactivar" : "Activar"}
+                            Editar
                           </button>
+                          {!u.isPrincipal && (
+                            <button
+                              className="button secondary"
+                              onClick={() => toggleActive(u.id, u.isActive)}
+                            >
+                              {u.isActive ? "Desactivar" : "Activar"}
+                            </button>
+                          )}
                           <button
                             className="button danger"
                             onClick={() => deleteUser(u.id, u.fullName, u.isPrincipal)}

@@ -100,10 +100,28 @@ router.get("/", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_req, res
 
 router.get("/simple", requireAuth, requireRole(["TEACHER", "ADMIN"]), async (_req, res) => {
   const students = await prisma.student.findMany({
-    select: { id: true, fullName: true, gradeLevel: true },
+    select: {
+      id: true,
+      fullName: true,
+      gradeLevel: true,
+      studentGroup: true,
+      enrollments: {
+        select: { year: true },
+        orderBy: [{ year: "desc" }, { id: "desc" }],
+        take: 1
+      }
+    },
     orderBy: { fullName: "asc" }
   });
-  res.json(students);
+  res.json(
+    students.map((s) => ({
+      id: s.id,
+      fullName: s.fullName,
+      gradeLevel: s.gradeLevel,
+      studentGroup: s.studentGroup,
+      latestYear: s.enrollments?.[0]?.year || null
+    }))
+  );
 });
 
 router.get("/:id/profile", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (req, res) => {

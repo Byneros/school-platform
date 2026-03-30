@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import KpiCard from "../components/KpiCard";
 import Section from "../components/Section";
+import Autocomplete from "../components/Autocomplete";
 import { apiDelete, apiDownload, apiGet, apiPatch } from "../services/api";
 import { gradeLabel, gradeOptions } from "../services/grades";
+import useSuggestions from "../hooks/useSuggestions";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ export default function AdminDashboard() {
   const [pendingAdmissions, setPendingAdmissions] = useState(0);
   const [pendingInvoices, setPendingInvoices] = useState(0);
   const [pendingNotifications, setPendingNotifications] = useState(0);
+  const [pendingCertificateRequests, setPendingCertificateRequests] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(5);
   const [search, setSearch] = useState("");
@@ -32,6 +35,11 @@ export default function AdminDashboard() {
   const preschoolGrades = new Set(["PRE_JARDIN", "JARDIN", "TRANSICION"]);
   const groupOptionsForGrade = (gradeLevel: string) =>
     preschoolGrades.has(gradeLevel) ? ["A", "B", "C"] : ["1", "2", "3"];
+
+  const studentSearchOptions = useSuggestions({
+    endpoint: "/suggestions?type=students",
+    query: search
+  });
 
   const query = useMemo(() => new URLSearchParams({
     page: String(page),
@@ -71,15 +79,17 @@ export default function AdminDashboard() {
       apiGet("/users?page=1&pageSize=1"),
       apiGet("/admissions?page=1&pageSize=1&status=PENDING"),
       apiGet("/invoices?page=1&pageSize=1&status=PENDING"),
-      apiGet("/notifications?page=1&pageSize=1&status=PENDING")
+      apiGet("/notifications?page=1&pageSize=1&status=PENDING"),
+      apiGet("/reports/certificate/requests?page=1&pageSize=1&status=PENDING")
     ])
-      .then(([studentsRes, usersRes, admissionsRes, invoicesRes, notificationsRes]) => {
+      .then(([studentsRes, usersRes, admissionsRes, invoicesRes, notificationsRes, certificateRes]) => {
         if (!active) return;
         setGlobalStudents(Number(studentsRes?.total || 0));
         setUsersTotal(Number(usersRes?.total || 0));
         setPendingAdmissions(Number(admissionsRes?.total || 0));
         setPendingInvoices(Number(invoicesRes?.total || 0));
         setPendingNotifications(Number(notificationsRes?.total || 0));
+        setPendingCertificateRequests(Number(certificateRes?.total || 0));
       })
       .catch(() => undefined);
 
@@ -165,9 +175,11 @@ export default function AdminDashboard() {
             <div style={{ color: "#6b7280" }}>Accesos rapidos a gestion academica, personal y finanzas.</div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            <button className="button secondary" onClick={() => navigate("/admin/alertas")}>Alertas</button>
             <button className="button secondary" onClick={() => navigate("/admin/admisiones")}>Nueva admision</button>
             <button className="button" onClick={() => navigate("/admin/usuarios")}>Crear usuario</button>
             <button className="button secondary" onClick={() => navigate("/admin/notificaciones")}>Notificaciones</button>
+            <button className="button secondary" onClick={() => navigate("/admin/certificados")}>Certificados</button>
             <button className="button secondary" onClick={() => navigate("/admin/finanzas")}>Finanzas</button>
           </div>
         </div>
@@ -177,7 +189,19 @@ export default function AdminDashboard() {
         <KpiCard title="Estudiantes registrados" value={String(globalStudents)} trend="Total del sistema" tone="primary" />
         <KpiCard title="Usuarios" value={String(usersTotal)} trend="Activos e inactivos" tone="success" />
         <KpiCard title="Admisiones pendientes" value={String(pendingAdmissions)} trend="Por aprobar" tone="warning" />
-        <KpiCard title="Pendientes (finanzas y avisos)" value={String(pendingInvoices + pendingNotifications)} trend={`${pendingInvoices} facturas, ${pendingNotifications} notificaciones`} tone="danger" />
+        <KpiCard
+          title="Pendientes (finanzas y avisos)"
+          value={String(pendingInvoices + pendingNotifications)}
+          trend={`${pendingInvoices} facturas, ${pendingNotifications} notificaciones`}
+          tone="danger"
+        />
+        <KpiCard
+          title="Certificados pendientes"
+          value={String(pendingCertificateRequests)}
+          trend="Solicitudes por aprobar"
+          tone="warning"
+          onClick={() => navigate("/admin/certificados")}
+        />
       </div>
 
       <Section title="Estudiantes (paginacion server-side)">
@@ -185,12 +209,13 @@ export default function AdminDashboard() {
           Consejo: usa la busqueda por nombre o grado para ubicar rapido a un estudiante.
         </div>
         <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-          <input
+          <Autocomplete
             className="input"
             placeholder="Buscar por nombre o grado"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
+            options={studentSearchOptions}
+            onChange={(value) => {
+              setSearch(value);
               setPage(1);
             }}
           />

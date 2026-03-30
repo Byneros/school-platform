@@ -3,6 +3,8 @@ import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import Autocomplete from "../components/Autocomplete";
 import { apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
+import { gradeLabel } from "../services/grades";
+import useSuggestions from "../hooks/useSuggestions";
 
 export default function AdminFinance() {
   const [invoices, setInvoices] = useState<Array<{ id: string; amount: number; status: string; dueDate: string; student: { fullName: string } }>>([]);
@@ -16,11 +18,21 @@ export default function AdminFinance() {
   const [invSearch, setInvSearch] = useState("");
   const [paySearch, setPaySearch] = useState("");
   const [invoiceForm, setInvoiceForm] = useState({ studentId: "", amount: "", dueDate: "" });
-  const [students, setStudents] = useState<Array<{ id: string; fullName: string }>>([]);
+  const [students, setStudents] = useState<Array<{ id: string; fullName: string; gradeLevel?: string; studentGroup?: string | null; latestYear?: number | null }>>([]);
   const [editingInvoiceId, setEditingInvoiceId] = useState("");
   const [editInvoiceBusy, setEditInvoiceBusy] = useState(false);
   const [editInvoiceError, setEditInvoiceError] = useState("");
   const [editInvoiceForm, setEditInvoiceForm] = useState({ amount: "", dueDate: "", status: "PENDING" });
+
+  const invoiceSearchOptions = useSuggestions({
+    endpoint: "/suggestions?type=invoices",
+    query: invSearch
+  });
+
+  const paymentSearchOptions = useSuggestions({
+    endpoint: "/suggestions?type=payments",
+    query: paySearch
+  });
 
   const load = () => {
     apiGet(`/invoices?page=${invPage}&pageSize=10${invStatus ? `&status=${invStatus}` : ""}${invSearch ? `&search=${encodeURIComponent(invSearch)}` : ""}`)
@@ -132,12 +144,13 @@ export default function AdminFinance() {
         <button className="button secondary" onClick={downloadPdf}>Exportar PDF</button>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <input
+        <Autocomplete
           className="input input-search"
           placeholder="Buscar factura por estudiante"
           value={invSearch}
-          onChange={(e) => {
-            setInvSearch(e.target.value);
+          options={invoiceSearchOptions}
+          onChange={(value) => {
+            setInvSearch(value);
             setInvPage(1);
           }}
         />
@@ -147,12 +160,13 @@ export default function AdminFinance() {
           <option value="PAID">Pagada</option>
           <option value="OVERDUE">Vencida</option>
         </select>
-        <input
+        <Autocomplete
           className="input input-search"
           placeholder="Buscar pagos por estudiante"
           value={paySearch}
-          onChange={(e) => {
-            setPaySearch(e.target.value);
+          options={paymentSearchOptions}
+          onChange={(value) => {
+            setPaySearch(value);
             setPayPage(1);
           }}
         />
@@ -170,7 +184,10 @@ export default function AdminFinance() {
           <Autocomplete
             value={invoiceForm.studentId}
             onChange={(v) => setInvoiceForm({ ...invoiceForm, studentId: v })}
-            options={students.map((s) => ({ value: s.id, label: s.fullName }))}
+            options={students.map((s) => ({
+              value: s.id,
+              label: `${s.fullName}${s.gradeLevel ? ` - ${gradeLabel(s.gradeLevel)}${s.studentGroup ? s.studentGroup : ""}` : ""}${s.latestYear ? ` (${s.latestYear})` : ""}`
+            }))}
             placeholder="Busca por nombre"
           />
         </label>

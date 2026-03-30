@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
@@ -6,6 +6,7 @@ import Autocomplete from "../components/Autocomplete";
 import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
 import { gradeLabel, gradeOptions } from "../services/grades";
 import useDebounce from "../hooks/useDebounce";
+import useSuggestions from "../hooks/useSuggestions";
 
 function getClassGradeLevel(classData: any) {
   return String(classData?.gradeLevel || "").trim();
@@ -74,6 +75,9 @@ export default function AdminAdmissions() {
   const [enrollmentsTotal, setEnrollmentsTotal] = useState(0);
   const [enrollmentsSearch, setEnrollmentsSearch] = useState("");
   const debouncedEnrollmentsSearch = useDebounce(enrollmentsSearch, 350);
+  const [savedFilters, setSavedFilters] = useState<Array<{ id: string; name: string; statusFilter: string; gradeFilter: string; search: string }>>([]);
+  const [filterName, setFilterName] = useState("");
+  const [selectedFilterId, setSelectedFilterId] = useState("");
   const initialPage = Number(searchParams.get("page") || "1");
   const initialStatus = searchParams.get("status") || "";
   const initialGrade = searchParams.get("grade") || "";
@@ -186,6 +190,15 @@ export default function AdminAdmissions() {
   const editNameInputRef = useRef<HTMLInputElement | null>(null);
   const editEnrollmentPanelRef = useRef<HTMLFormElement | null>(null);
   const editEnrollmentNameInputRef = useRef<HTMLInputElement | null>(null);
+  const admissionsSearchOptions = useSuggestions({
+    endpoint: "/suggestions?type=admissions",
+    query: search
+  });
+
+  const enrollmentsSearchOptions = useSuggestions({
+    endpoint: "/suggestions?type=enrollments",
+    query: enrollmentsSearch
+  });
   const enrollmentFeedback = (() => {
     if (enrollmentMessage) {
       return {
@@ -256,6 +269,55 @@ export default function AdminAdmissions() {
     if (search) next.set("search", search);
     setSearchParams(next, { replace: true });
   }, [page, statusFilter, gradeFilter, search, setSearchParams]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem("admin_admissions_filters");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setSavedFilters(parsed);
+      }
+    } catch {
+      setSavedFilters([]);
+    }
+  }, []);
+
+  const persistFilters = (next: Array<{ id: string; name: string; statusFilter: string; gradeFilter: string; search: string }>) => {
+    setSavedFilters(next);
+    localStorage.setItem("admin_admissions_filters", JSON.stringify(next));
+  };
+
+  const saveCurrentFilter = () => {
+    const trimmed = filterName.trim();
+    const name = trimmed || `Filtro ${new Date().toLocaleDateString("es-CO")} ${new Date().toLocaleTimeString("es-CO")}`;
+    const id = trimmed ? trimmed.toLowerCase().replace(/\s+/g, "-") : `f-${Date.now()}`;
+    const next = savedFilters.filter((f) => f.id !== id);
+    const updated = [
+      { id, name, statusFilter, gradeFilter, search },
+      ...next
+    ];
+    persistFilters(updated.slice(0, 10));
+    setSelectedFilterId(id);
+    setFilterName("");
+  };
+
+  const applySavedFilter = (id: string) => {
+    setSelectedFilterId(id);
+    const selected = savedFilters.find((f) => f.id === id);
+    if (!selected) return;
+    setStatusFilter(selected.statusFilter);
+    setGradeFilter(selected.gradeFilter);
+    setSearch(selected.search);
+    setPage(1);
+  };
+
+  const deleteSavedFilter = () => {
+    if (!selectedFilterId) return;
+    const next = savedFilters.filter((f) => f.id !== selectedFilterId);
+    persistFilters(next);
+    setSelectedFilterId("");
+  };
 
   const load = () =>
     apiGet(
@@ -370,9 +432,27 @@ export default function AdminAdmissions() {
   };
 
   const setStatus = async (id: string, status: string) => {
-    const updated = await apiPatch(`/admissions/${id}/status`, { status });
-    setAdmissions(admissions.map((a) => (a.id === id ? updated : a)));
-    loadApprovedAdmissions();
+    try {
+      setLoadError("");
+      if (status === "REJECTED") {
+        await apiDelete(`/admissions/${id}`);
+        setAdmissions((prev) => prev.filter((a) => a.id !== id));
+        return;
+      }
+      const updated = await apiPatch(`/admissions/${id}/status`, { status });
+      if (status === "APPROVED") {
+        setAdmissions((prev) => prev.filter((a) => a.id !== id));
+        setApprovedAdmissions((prev) => {
+          const without = prev.filter((a) => a.id !== updated.id);
+          return [updated, ...without];
+        });
+      } else {
+        setAdmissions((prev) => prev.map((a) => (a.id === id ? updated : a)));
+      }
+      loadApprovedAdmissions();
+    } catch (error: any) {
+      setLoadError(error?.message || "No se pudo actualizar el estado de la admision.");
+    }
   };
 
   const startEdit = (admission: {
@@ -1050,12 +1130,13 @@ export default function AdminAdmissions() {
         <div className="section-title">Consultar matriculas</div>
         {enrollmentsError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{enrollmentsError}</div>}
         <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-          <input
+          <Autocomplete
             className="input input-search"
             placeholder="Buscar matricula por estudiante, acudiente o grado"
             value={enrollmentsSearch}
-            onChange={(e) => {
-              setEnrollmentsSearch(e.target.value);
+            options={enrollmentsSearchOptions}
+            onChange={(value) => {
+              setEnrollmentsSearch(value);
               setEnrollmentsPage(1);
             }}
           />
@@ -1343,12 +1424,13 @@ export default function AdminAdmissions() {
         </form>
       )}
       <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <input
+        <Autocomplete
           className="input input-search"
           placeholder="Buscar por estudiante"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
+          options={admissionsSearchOptions}
+          onChange={(value) => {
+            setSearch(value);
             setPage(1);
           }}
         />
@@ -1372,6 +1454,26 @@ export default function AdminAdmissions() {
         </button>
         <button className="button secondary" type="button" onClick={() => downloadFile("/enrollments/export/pdf", "matriculas-estudiantes.pdf")}>
           Exportar matriculas PDF
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <input
+          className="input"
+          placeholder="Nombre del filtro"
+          value={filterName}
+          onChange={(e) => setFilterName(e.target.value)}
+        />
+        <button className="button secondary" type="button" onClick={saveCurrentFilter}>
+          Guardar filtro
+        </button>
+        <select className="input" value={selectedFilterId} onChange={(e) => applySavedFilter(e.target.value)}>
+          <option value="">Filtros guardados</option>
+          {savedFilters.map((f) => (
+            <option key={f.id} value={f.id}>{f.name}</option>
+          ))}
+        </select>
+        <button className="button secondary" type="button" disabled={!selectedFilterId} onClick={deleteSavedFilter}>
+          Eliminar filtro
         </button>
       </div>
       {loadError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{loadError}</div>}

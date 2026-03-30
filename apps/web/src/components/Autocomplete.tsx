@@ -1,15 +1,17 @@
 import React, { useMemo, useState } from "react";
 
-type Option = { value: string; label: string };
+type Option = { value: string; label: string; [key: string]: any };
 
 type Props = {
   value: string;
   options: Option[];
   placeholder?: string;
+  className?: string;
   onChange: (value: string) => void;
+  onSelectOption?: (option: Option) => void;
 };
 
-export default function Autocomplete({ value, options, placeholder, onChange }: Props) {
+export default function Autocomplete({ value, options, placeholder, className, onChange, onSelectOption }: Props) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
 
@@ -22,7 +24,7 @@ export default function Autocomplete({ value, options, placeholder, onChange }: 
   return (
     <div style={{ position: "relative" }}>
       <input
-        className="input"
+        className={className || "input"}
         value={value}
         placeholder={placeholder}
         onChange={(e) => {
@@ -47,6 +49,7 @@ export default function Autocomplete({ value, options, placeholder, onChange }: 
             const item = filtered[active];
             if (item) {
               onChange(item.value);
+              onSelectOption?.(item);
               setOpen(false);
             }
           }
@@ -73,6 +76,7 @@ export default function Autocomplete({ value, options, placeholder, onChange }: 
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 onChange(o.value);
+                onSelectOption?.(o);
                 setOpen(false);
               }}
             >

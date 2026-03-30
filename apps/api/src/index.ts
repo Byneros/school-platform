@@ -5,7 +5,12 @@ import app from "./app.js";
 import { startNotificationWorker } from "./workers/notificationWorker.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: resolve(__dirname, "..", ".env") });
+const envFromCwd = resolve(process.cwd(), ".env");
+const envFromSrc = resolve(__dirname, "..", ".env");
+const cwdResult = dotenv.config({ path: envFromCwd });
+if (cwdResult.error) {
+  dotenv.config({ path: envFromSrc });
+}
 
 const port = Number(process.env.PORT || 4000);
 app.listen(port, () => {

@@ -17,6 +17,27 @@ const corsOrigins = String(process.env.CORS_ORIGINS || "")
 const rateLimitWindowMs = Math.max(1000, Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000));
 const rateLimitMax = Math.max(10, Number(process.env.RATE_LIMIT_MAX || 300));
 const loginRateLimitMax = Math.max(3, Number(process.env.LOGIN_RATE_LIMIT_MAX || 10));
+const writeRateLimitWindowMs = Math.max(1000, Number(process.env.WRITE_RATE_LIMIT_WINDOW_MS || 60 * 1000));
+const writeRateLimitMax = Math.max(10, Number(process.env.WRITE_RATE_LIMIT_MAX || 120));
+const notificationsRateLimitWindowMs = Math.max(
+  1000,
+  Number(process.env.NOTIFICATIONS_RATE_LIMIT_WINDOW_MS || 60 * 1000)
+);
+const notificationsRateLimitMax = Math.max(10, Number(process.env.NOTIFICATIONS_RATE_LIMIT_MAX || 120));
+const reportsRateLimitWindowMs = Math.max(
+  1000,
+  Number(process.env.REPORTS_RATE_LIMIT_WINDOW_MS || 60 * 1000)
+);
+const reportsRateLimitMax = Math.max(5, Number(process.env.REPORTS_RATE_LIMIT_MAX || 30));
+const twoFactorRateLimitWindowMs = Math.max(
+  60_000,
+  Number(process.env.TWO_FACTOR_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000)
+);
+const twoFactorRateLimitMax = Math.max(3, Number(process.env.TWO_FACTOR_RATE_LIMIT_MAX || 10));
+const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "1mb";
+const trustProxyEnv = String(process.env.TRUST_PROXY || "").toLowerCase();
+const trustProxy =
+  trustProxyEnv === "true" || trustProxyEnv === "1" || trustProxyEnv === "yes";
 
 function logInfo(message: string, details: Record<string, unknown> = {}) {
   console.log(
@@ -40,6 +61,10 @@ function logError(message: string, details: Record<string, unknown> = {}) {
   );
 }
 
+app.disable("x-powered-by");
+if (trustProxy) {
+  app.set("trust proxy", 1);
+}
 app.use(helmet());
 const corsOrigin = (
   origin: string | undefined,
@@ -59,7 +84,8 @@ app.use(
     credentials: true
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: jsonBodyLimit }));
+app.use(express.urlencoded({ extended: false, limit: jsonBodyLimit }));
 app.use(
   createRateLimit({
     windowMs: rateLimitWindowMs,
@@ -81,6 +107,50 @@ app.use(
     }
   })
 );
+app.use(
+  "/api/auth/2fa",
+  createRateLimit({
+    windowMs: twoFactorRateLimitWindowMs,
+    max: twoFactorRateLimitMax,
+    keyPrefix: "2fa"
+  })
+);
+app.use(
+  "/api/notifications",
+  createRateLimit({
+    windowMs: notificationsRateLimitWindowMs,
+    max: notificationsRateLimitMax,
+    keyPrefix: "notifications"
+  })
+);
+app.use(
+  "/api/reports",
+  createRateLimit({
+    windowMs: reportsRateLimitWindowMs,
+    max: reportsRateLimitMax,
+    keyPrefix: "reports"
+  })
+);
+const writeRateLimiter = createRateLimit({
+  windowMs: writeRateLimitWindowMs,
+  max: writeRateLimitMax,
+  keyPrefix: "write",
+  skip: (req) => ["GET", "HEAD", "OPTIONS"].includes(req.method)
+});
+[
+  "/api/users",
+  "/api/notifications",
+  "/api/reports",
+  "/api/admissions",
+  "/api/enrollments",
+  "/api/invoices",
+  "/api/payments",
+  "/api/student-observations",
+  "/api/teacher",
+  "/api/classes",
+  "/api/grades",
+  "/api/attendance"
+].forEach((path) => app.use(path, writeRateLimiter));
 app.use((req, res, next) => {
   const requestIdHeader = req.headers["x-request-id"];
   const requestId = typeof requestIdHeader === "string" && requestIdHeader.trim() ? requestIdHeader : randomUUID();

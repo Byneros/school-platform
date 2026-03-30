@@ -169,6 +169,11 @@ a { color: inherit; text-decoration: none; }
   color: #1d4ed8;
   font-weight: 600;
 }
+.badge-warning {
+  background: #fff7ed;
+  color: #b45309;
+  border: 1px solid #fed7aa;
+}
 
 .kpi {
   display: flex;

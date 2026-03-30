@@ -1,10 +1,32 @@
+import React, { useEffect, useMemo, useState } from "react";
 import KpiCard from "../components/KpiCard";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
-import { apiDownload } from "../services/api";
-import { gradeOptions } from "../services/grades";
+import { apiDownload, apiGet } from "../services/api";
+import { gradeLabel } from "../services/grades";
+import { isDueProcessNotification } from "../utils/notificationPriority";
 
 export default function ParentDashboard() {
+  const [grades, setGrades] = useState<Array<any>>([]);
+  const [invoices, setInvoices] = useState<Array<any>>([]);
+  const [notifications, setNotifications] = useState<Array<any>>([]);
+  const prioritizedNotifications = useMemo(
+    () => [...notifications].sort((a, b) => Number(isDueProcessNotification(b?.notification)) - Number(isDueProcessNotification(a?.notification))),
+    [notifications]
+  );
+
+  useEffect(() => {
+    apiGet("/parent/boletines?page=1&pageSize=5")
+      .then((res) => setGrades(res.data || []))
+      .catch(() => setGrades([]));
+    apiGet("/parent/invoices?page=1&pageSize=4")
+      .then((res) => setInvoices(res.data || []))
+      .catch(() => setInvoices([]));
+    apiGet("/parent/notifications?page=1&pageSize=5")
+      .then((res) => setNotifications(res.data || []))
+      .catch(() => setNotifications([]));
+  }, []);
+
   const downloadReportCard = async () => {
     const blob = await apiDownload("/reports/report-card/student-1");
     const url = URL.createObjectURL(blob);
@@ -50,18 +72,35 @@ export default function ParentDashboard() {
           <DataTable
             enableSearch
             pageSize={5}
+            suggestionsEndpoint="/suggestions?type=parent-grades"
             columns={[
               { key: "grade", label: "Grado" },
+              { key: "group", label: "Grupo" },
               { key: "period", label: "Periodo" },
-              { key: "score", label: "Nota" }
+              { key: "subject", label: "Asignatura" },
+              { key: "score", label: "Nota definitiva" }
             ]}
-            rows={[
-              { grade: gradeOptions.find((g) => g.value === "QUINTO")?.label || "Quinto", period: "P1", score: "17" },
-              { grade: gradeOptions.find((g) => g.value === "QUINTO")?.label || "Quinto", period: "P1", score: "18" },
-              { grade: gradeOptions.find((g) => g.value === "QUINTO")?.label || "Quinto", period: "P1", score: "16" },
-              { grade: gradeOptions.find((g) => g.value === "QUINTO")?.label || "Quinto", period: "P1", score: "17" },
-              { grade: gradeOptions.find((g) => g.value === "QUINTO")?.label || "Quinto", period: "P1", score: "19" }
-            ]}
+            rows={grades.map((g: any) => ({
+              grade: gradeLabel(g.grade || ""),
+              group: g.group || "Sin grupo",
+              period: g.period,
+              subject: g.subject,
+              score: `${Number(g.finalScore || 0).toFixed(2)}/${g.maxScore ?? 0}`
+            })).sort((a, b) => {
+              const gradeA = String(a.grade || "");
+              const gradeB = String(b.grade || "");
+              if (gradeA !== gradeB) return gradeA.localeCompare(gradeB, "es");
+              const groupA = String(a.group || "");
+              const groupB = String(b.group || "");
+              if (groupA !== groupB) return groupA.localeCompare(groupB, "es");
+              const periodA = String(a.period || "");
+              const periodB = String(b.period || "");
+              if (periodA !== periodB) return periodA.localeCompare(periodB, "es");
+              const subjectA = String(a.subject || "");
+              const subjectB = String(b.subject || "");
+              if (subjectA !== subjectB) return subjectA.localeCompare(subjectB, "es");
+              return String(a.score || "").localeCompare(String(b.score || ""), "es");
+            })}
           />
         </Section>
 
@@ -69,17 +108,17 @@ export default function ParentDashboard() {
           <DataTable
             enableSearch
             pageSize={4}
+            suggestionsEndpoint="/suggestions?type=parent-invoices"
             columns={[
               { key: "invoice", label: "Factura" },
               { key: "amount", label: "Monto" },
               { key: "status", label: "Estado" }
             ]}
-            rows={[
-              { invoice: "INV-2031", amount: "$ 260", status: "Pendiente" },
-              { invoice: "INV-2029", amount: "$ 260", status: "Pagada" },
-              { invoice: "INV-2028", amount: "$ 260", status: "Pagada" },
-              { invoice: "INV-2027", amount: "$ 260", status: "Vencida" }
-            ]}
+            rows={invoices.map((i: any) => ({
+              invoice: i.id,
+              amount: `$ ${i.amount}`,
+              status: i.status
+            }))}
           />
         </Section>
       </div>
@@ -88,18 +127,35 @@ export default function ParentDashboard() {
         <DataTable
           enableSearch
           pageSize={5}
+          suggestionsEndpoint="/suggestions?type=parent-notifications"
           columns={[
             { key: "title", label: "Titulo" },
             { key: "date", label: "Fecha" },
             { key: "status", label: "Estado" }
           ]}
-          rows={[
-            { title: "Bienvenidos al ciclo 2026", date: "2026-02-06", status: "Enviado" },
-            { title: "Reunion de padres", date: "2026-02-02", status: "Enviado" },
-            { title: "Recordatorio de pagos", date: "2026-01-28", status: "Enviado" },
-            { title: "Entrega de boletines", date: "2026-01-24", status: "Enviado" },
-            { title: "Actividades culturales", date: "2026-01-20", status: "Enviado" }
-          ]}
+          rowStyle={(row) =>
+            (row as any).__priority
+              ? { background: "#fef2f2", borderLeft: "4px solid #ef4444" }
+              : undefined
+          }
+          rows={prioritizedNotifications.map((n: any) => {
+            const dueProcess = isDueProcessNotification(n.notification);
+            return {
+              __priority: dueProcess,
+              title: (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span>{n.notification?.title || ""}</span>
+                  {dueProcess && (
+                    <span style={{ padding: "2px 8px", borderRadius: 999, background: "#fee2e2", color: "#b91c1c", fontSize: 12 }}>
+                      Prioridad
+                    </span>
+                  )}
+                </div>
+              ),
+              date: n.notification?.createdAt?.slice(0, 10) || "",
+              status: n.notification?.status || "SENT"
+            };
+          })}
         />
       </Section>
     </div>

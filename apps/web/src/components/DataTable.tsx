@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import Autocomplete from "./Autocomplete";
+import useSuggestions from "../hooks/useSuggestions";
 
-type Column = { key: string; label: string };
+type Column = { key: string; label: string; sticky?: boolean };
 
 type Props = {
   columns: Column[];
@@ -10,6 +12,8 @@ type Props = {
   pageSize?: number;
   rowKey?: string;
   rowStyle?: (row: Record<string, React.ReactNode>) => React.CSSProperties | undefined;
+  suggestionsEndpoint?: string;
+  suggestionsLimit?: number;
 };
 
 export default function DataTable({
@@ -19,7 +23,9 @@ export default function DataTable({
   enableSearch = false,
   pageSize = 5,
   rowKey,
-  rowStyle
+  rowStyle,
+  suggestionsEndpoint,
+  suggestionsLimit
 }: Props) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -38,6 +44,34 @@ export default function DataTable({
     );
   }, [rows, query, enableSearch, columns]);
 
+  const localSuggestionOptions = useMemo(() => {
+    if (!enableSearch) return [];
+    const map = new Map<string, { value: string; label: string }>();
+    rows.forEach((row) => {
+      columns.forEach((col) => {
+        const value = row[col.key];
+        if (typeof value === "string" || typeof value === "number") {
+          const text = String(value).trim();
+          if (!text) return;
+          const key = `${col.key}:${text}`;
+          if (!map.has(key)) {
+            map.set(key, { value: text, label: col.label ? `${col.label}: ${text}` : text });
+          }
+        }
+      });
+    });
+    return Array.from(map.values());
+  }, [rows, columns, enableSearch]);
+
+  const remoteSuggestionOptions = useSuggestions({
+    endpoint: suggestionsEndpoint || "",
+    query,
+    enabled: Boolean(enableSearch && suggestionsEndpoint),
+    limit: suggestionsLimit
+  });
+
+  const suggestionOptions = suggestionsEndpoint ? remoteSuggestionOptions : localSuggestionOptions;
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * pageSize;
@@ -51,12 +85,13 @@ export default function DataTable({
     <div>
       {enableSearch && (
         <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-          <input
+          <Autocomplete
             className="input"
             placeholder="Buscar..."
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
+            options={suggestionOptions}
+            onChange={(value) => {
+              setQuery(value);
               setPage(1);
             }}
           />
@@ -70,7 +105,22 @@ export default function DataTable({
           <thead>
             <tr>
               {columns.map((c) => (
-                <th key={c.key}>{c.label}</th>
+                <th
+                  key={c.key}
+                  style={
+                    c.sticky
+                      ? {
+                          position: "sticky",
+                          left: 0,
+                          zIndex: 2,
+                          background: "#fff",
+                          boxShadow: "2px 0 0 rgba(226,232,240,0.9)"
+                        }
+                      : undefined
+                  }
+                >
+                  {c.label}
+                </th>
               ))}
             </tr>
           </thead>
@@ -87,19 +137,62 @@ export default function DataTable({
                   if (c.key === "status" && typeof value === "string") {
                     const norm = value.toLowerCase();
                     return (
-                      <td key={c.key}>
+                      <td
+                        key={c.key}
+                        style={
+                          c.sticky
+                            ? {
+                                position: "sticky",
+                                left: 0,
+                                zIndex: 1,
+                                background: "#fff",
+                                boxShadow: "2px 0 0 rgba(226,232,240,0.9)"
+                              }
+                            : undefined
+                        }
+                      >
                         <span className={`status-badge status-${norm}`}>{value}</span>
                       </td>
                     );
                   }
                   if ((c.key === "grade" || c.key === "course") && typeof value === "string") {
                     return (
-                      <td key={c.key}>
+                      <td
+                        key={c.key}
+                        style={
+                          c.sticky
+                            ? {
+                                position: "sticky",
+                                left: 0,
+                                zIndex: 1,
+                                background: "#fff",
+                                boxShadow: "2px 0 0 rgba(226,232,240,0.9)"
+                              }
+                            : undefined
+                        }
+                      >
                         <span className="tag">{value}</span>
                       </td>
                     );
                   }
-                  return <td key={c.key}>{value}</td>;
+                  return (
+                    <td
+                      key={c.key}
+                      style={
+                        c.sticky
+                          ? {
+                              position: "sticky",
+                              left: 0,
+                              zIndex: 1,
+                              background: "#fff",
+                              boxShadow: "2px 0 0 rgba(226,232,240,0.9)"
+                            }
+                          : undefined
+                      }
+                    >
+                      {value}
+                    </td>
+                  );
                 })}
               </tr>
             ))}

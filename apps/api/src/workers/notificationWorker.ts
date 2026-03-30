@@ -65,10 +65,15 @@ export function startNotificationWorker() {
       }
 
       const teacherEmails = sendToTeachers
-        ? await prisma.user.findMany({
-            where: { role: "TEACHER", isActive: true },
-            select: { email: true }
-          })
+        ? notification.targetUserId
+          ? await prisma.user.findMany({
+              where: { id: notification.targetUserId, role: "TEACHER", isActive: true },
+              select: { email: true }
+            })
+          : await prisma.user.findMany({
+              where: { role: "TEACHER", isActive: true },
+              select: { email: true }
+            })
         : [];
 
       await prisma.notification.update({

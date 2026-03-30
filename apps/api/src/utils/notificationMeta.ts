@@ -1,4 +1,4 @@
-export type NotificationAudience = "PARENTS" | "TEACHERS" | "BOTH";
+export type NotificationAudience = "PARENTS" | "TEACHERS" | "BOTH" | "ADMINS";
 export type NotificationLegalReference =
   | "LEY_1620_2013"
   | "DECRETO_1965_2013"
@@ -18,7 +18,7 @@ export function composeNotificationBodyWithMeta(
 
 export function extractNotificationAudience(body: unknown): NotificationAudience | null {
   const text = String(body || "");
-  const match = text.match(/\[\[audience:(PARENTS|TEACHERS|BOTH)\]\]/);
+  const match = text.match(/\[\[audience:(PARENTS|TEACHERS|BOTH|ADMINS)\]\]/);
   if (!match?.[1]) return null;
   return match[1] as NotificationAudience;
 }
@@ -32,7 +32,7 @@ export function extractNotificationLegalReference(body: unknown): NotificationLe
 
 export function stripNotificationMeta(body: unknown) {
   return String(body || "")
-    .replace(/\[\[audience:(PARENTS|TEACHERS|BOTH)\]\]\s*/g, "")
+    .replace(/\[\[audience:(PARENTS|TEACHERS|BOTH|ADMINS)\]\]\s*/g, "")
     .replace(/\[\[legalRef:(LEY_1620_2013|DECRETO_1965_2013|LEY_115_1994|LEY_1098_2006)\]\]\s*/g, "")
     .trim();
 }

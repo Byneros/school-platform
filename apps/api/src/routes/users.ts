@@ -116,7 +116,7 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
 });
 
 router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
-  const [enrollments, parentUsers] = await Promise.all([
+  const [enrollments, admissions, parentUsers] = await Promise.all([
     prisma.enrollment.findMany({
       where: { status: { not: "INACTIVE" } },
       select: {
@@ -128,6 +128,19 @@ router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), asyn
         class: { select: { gradeLevel: true } }
       },
       orderBy: [{ year: "desc" }, { studentFullName: "asc" }]
+    }),
+    prisma.admission.findMany({
+      where: { status: { not: "REJECTED" } },
+      select: {
+        id: true,
+        studentName: true,
+        gradeLevel: true,
+        guardianFullName: true,
+        guardianDocNumber: true,
+        guardianRelation: true,
+        contactEmail: true
+      },
+      orderBy: [{ createdAt: "desc" }]
     }),
     prisma.user.findMany({
       where: { role: "PARENT" },
@@ -190,8 +203,39 @@ router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), asyn
     bucketByKey.set(key, current);
   }
 
+  for (const a of admissions) {
+    const name = String(a.guardianFullName || "").trim();
+    const doc = String(a.guardianDocNumber || "").trim();
+    const email = String(a.contactEmail || "").trim().toLowerCase();
+    if (!name && !doc && !email) continue;
+
+    const key = doc
+      ? `doc:${doc.toLowerCase()}`
+      : email
+      ? `email:${email}`
+      : `name:${name.toLowerCase()}`;
+
+    const current = bucketByKey.get(key) || {
+      guardianFullName: name || "Sin nombre",
+      guardianDocNumber: doc || "",
+      contactEmail: email || "",
+      relation: String(a.guardianRelation || "").trim() || "Acudiente",
+      students: []
+    };
+
+    const studentId = `admission:${a.id}`;
+    if (studentId && !current.students.some((s) => s.studentId === studentId)) {
+      current.students.push({
+        studentId,
+        studentName: String(a.studentName || ""),
+        grade: String(a.gradeLevel || ""),
+        group: ""
+      });
+    }
+    bucketByKey.set(key, current);
+  }
+
   const parentEmails = new Set(parentUsers.map((p) => normalizeText(p.email)).filter(Boolean));
-  const parentNames = new Set(parentUsers.map((p) => normalizeText(p.fullName)).filter(Boolean));
   const parentStudentIds = new Set(
     parentUsers.flatMap((p) => (p.parent?.guardians || []).map((g) => g.studentId)).filter(Boolean)
   );
@@ -199,9 +243,8 @@ router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), asyn
   const pending = Array.from(bucketByKey.values())
     .filter((entry) => {
       const byEmail = entry.contactEmail ? parentEmails.has(normalizeText(entry.contactEmail)) : false;
-      const byName = entry.guardianFullName ? parentNames.has(normalizeText(entry.guardianFullName)) : false;
       const byStudentLink = entry.students.some((s) => parentStudentIds.has(s.studentId));
-      return !byEmail && !byName && !byStudentLink;
+      return !byEmail && !byStudentLink;
     })
     .map((entry) => ({
       guardianFullName: entry.guardianFullName,
@@ -392,6 +435,9 @@ router.patch("/:id", requireAuth, requireRole(["ADMIN"]), validate(updateUserSch
   });
 
   if (principalAdmin && params.id === principalAdmin.id) {
+    if (auth.userId !== principalAdmin.id) {
+      return res.status(403).json({ message: "Solo el administrador principal puede editar este usuario" });
+    }
     if (body.isActive === false) {
       return res.status(400).json({ message: "El administrador principal no se puede desactivar" });
     }
@@ -448,6 +494,10 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
     await tx.notification.updateMany({
       where: { approvedById: userId },
       data: { approvedById: principalAdmin.id }
+    });
+    await tx.notification.updateMany({
+      where: { targetUserId: userId },
+      data: { targetUserId: null }
     });
 
     if (target.teacher) {
