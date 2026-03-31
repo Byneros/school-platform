@@ -325,12 +325,13 @@ async function loadAlertsReportData(params: { status?: string; from?: Date | nul
     });
   });
 
-  const subtitleParts = [];
-  if (status) subtitleParts.push(`Estado: ${status}`);
-  if (params.from) subtitleParts.push(`Desde: ${params.from.toISOString().slice(0, 10)}`);
-  if (params.to) subtitleParts.push(`Hasta: ${params.to.toISOString().slice(0, 10)}`);
+const subtitleParts: string[] = [];
 
-  return {
+if (status) subtitleParts.push(`Estado: ${status}`);
+if (params.from) subtitleParts.push(`Desde: ${params.from.toISOString().slice(0, 10)}`);
+if (params.to) subtitleParts.push(`Hasta: ${params.to.toISOString().slice(0, 10)}`);
+  
+return {
     rows,
     branding,
     subtitle: subtitleParts.length ? subtitleParts.join(" | ") : undefined
