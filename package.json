@@ -6,7 +6,6 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "prisma generate",
     "dev:web": "npm --workspace apps/web run dev",
     "dev:web:lan": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-web-lan.ps1 -Port 5173",
     "dev:api": "npm --workspace apps/api run dev",
@@ -41,7 +40,8 @@
     "pm2:status": "npx pm2 status",
     "pm2:logs": "npx pm2 logs --lines 200",
     "pm2:save": "npx pm2 save",
-    "pm2:startup": "npx pm2 startup"
+    "pm2:startup": "npx pm2 startup",
+     "postinstall": "npm --workspace apps/api run prisma:generate"
   },
   "devDependencies": {
     "@types/node": "^25.2.2",
