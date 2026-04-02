@@ -6,7 +6,6 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "npm --workspace apps/api run prisma:generate",
     "dev:web": "npm --workspace apps/web run dev",
     "dev:web:lan": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-web-lan.ps1 -Port 5173",
     "dev:api": "npm --workspace apps/api run dev",
