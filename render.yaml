@@ -19,7 +19,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        value: https://school-web.onrender.com
+        value: https://school-platform-web.onrender.com
       - key: NOTIFICATION_WORKER_ENABLED
         value: "false"
       - key: ADMIN_2FA_ENABLED
@@ -45,7 +45,7 @@ services:
     staticPublishPath: apps/web/dist
     envVars:
       - key: VITE_API_URL
-        value: https://school-api.onrender.com/api
+        value: https://school-platform-z8f4.onrender.com/api
 
 databases:
   - name: school-db
