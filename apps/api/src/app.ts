@@ -268,12 +268,13 @@ app.use((req, res, next) => {
 });
 
 // ================= HEALTH =================
+app.get("/", (req, res) => {
+  res.send("API funcionando correctamente 🚀");
+});
+
 
 app.get("/health", (req, res) => {
-  res.json({
-    ok: true,
-    requestId: (req as any).requestId || null,
-  });
+  res.json({ ok: true });
 });
 
 app.get("/ready", async (req, res) => {
