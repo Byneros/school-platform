@@ -1,17 +1,16 @@
 import { Worker } from "bullmq";
-import { Redis } from "ioredis";
 import prisma from "../utils/prisma.js";
 import { sendEmail } from "../utils/mailer.js";
 import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { extractNotificationAudience, stripNotificationMeta } from "../utils/notificationMeta.js";
+import { createRedisClient } from "../utils/redisClient.js";
 
 export function startNotificationWorker() {
-  const connection = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
-    maxRetriesPerRequest: null
-  });
-  connection.on("error", (err) => {
-    console.error("Redis connection error (notifications worker):", err?.message || err);
-  });
+  const connection = createRedisClient();
+  if (!connection) {
+    console.warn("Redis no configurado. Worker de notificaciones deshabilitado.");
+    return null;
+  }
 
   const worker = new Worker(
     "notifications",

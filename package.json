@@ -41,10 +41,12 @@
     "pm2:logs": "npx pm2 logs --lines 200",
     "pm2:save": "npx pm2 save",
     "pm2:startup": "npx pm2 startup"
-     
   },
   "devDependencies": {
     "@types/node": "^25.2.2",
     "tsx": "^4.21.0"
+  },
+  "dependencies": {
+    "ioredis": "^5.10.1"
   }
 }
