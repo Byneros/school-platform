@@ -5,11 +5,14 @@ import app from "./app.js";
 import { startNotificationWorker } from "./workers/notificationWorker.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const envFromCwd = resolve(process.cwd(), ".env");
-const envFromSrc = resolve(__dirname, "..", ".env");
-const cwdResult = dotenv.config({ path: envFromCwd });
-if (cwdResult.error) {
-  dotenv.config({ path: envFromSrc });
+const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+if (!isProd) {
+  const envFromCwd = resolve(process.cwd(), ".env");
+  const envFromSrc = resolve(__dirname, "..", ".env");
+  const cwdResult = dotenv.config({ path: envFromCwd });
+  if (cwdResult.error) {
+    dotenv.config({ path: envFromSrc });
+  }
 }
 
 const PORT = Number(process.env.PORT || 3000);
