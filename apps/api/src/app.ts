@@ -1,31 +1,19 @@
-import express from "express";
+﻿import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import type { ErrorRequestHandler } from "express";
 import { randomUUID } from "crypto";
-import { Redis } from "ioredis";
+import { createRedisClient } from "./utils/redisClient.js";
 import routes from "./routes/index.js";
 import prisma from "./utils/prisma.js";
 import { createRateLimit } from "./middlewares/rateLimit.js";
 
 const app = express();
 
-// 🔥 REDIS SEGURO (CORRECCIÓN CLAVE)
-const redisUrl = process.env.REDIS_URL;
-let redis: Redis | null = null;
-
-if (redisUrl) {
-  redis = new Redis(redisUrl, {
-    maxRetriesPerRequest: 2,
-    connectTimeout: 5000,
-  });
-
-  redis.on("connect", () => console.log("✅ Redis conectado"));
-  redis.on("error", (err) =>
-    console.error("❌ Redis error:", err.message)
-  );
-} else {
-  console.log("⚠️ Redis no configurado (modo sin cache/colas)");
+// Redis client
+const redis = createRedisClient();
+if (!redis) {
+  console.log("Redis not configured (cache/queue disabled).");
 }
 
 // ================= CONFIG =================
@@ -355,3 +343,5 @@ const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
 app.use(errorHandler);
 
 export default app;
+
+

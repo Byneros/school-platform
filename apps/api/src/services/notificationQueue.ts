@@ -1,19 +1,14 @@
 import { Queue } from "bullmq";
-import { createRedisClient } from "../utils/redisClient.js";
+import { getRedisConnectionOptions } from "../utils/redisClient.js";
 
-const connection = createRedisClient();
-const notificationQueue = connection
-  ? new Queue("notifications", { connection })
-  : null;
+const connection = getRedisConnectionOptions();
+const notificationQueue = connection ? new Queue("notifications", { connection }) : null;
 
 export async function enqueueNotification(notificationId: string) {
   try {
-    if (!connection || !notificationQueue) {
+    if (!notificationQueue) {
       console.warn("Redis no configurado. Notificacion no encolada.");
       return { queued: false };
-    }
-    if (connection.status !== "ready") {
-      await connection.connect();
     }
     await notificationQueue.add("send", { notificationId });
     return { queued: true };

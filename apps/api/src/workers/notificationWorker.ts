@@ -3,10 +3,10 @@ import prisma from "../utils/prisma.js";
 import { sendEmail } from "../utils/mailer.js";
 import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { extractNotificationAudience, stripNotificationMeta } from "../utils/notificationMeta.js";
-import { createRedisClient } from "../utils/redisClient.js";
+import { getRedisConnectionOptions } from "../utils/redisClient.js";
 
 export function startNotificationWorker() {
-  const connection = createRedisClient();
+  const connection = getRedisConnectionOptions();
   if (!connection) {
     console.warn("Redis no configurado. Worker de notificaciones deshabilitado.");
     return null;

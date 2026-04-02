@@ -23,3 +23,16 @@ export function createRedisClient() {
 
   return client;
 }
+
+export function getRedisConnectionOptions() {
+  if (!redisUrl) {
+    return null;
+  }
+
+  return {
+    url: redisUrl,
+    maxRetriesPerRequest: null,
+    lazyConnect: true,
+    connectTimeout: 1500
+  };
+}
