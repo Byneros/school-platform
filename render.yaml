@@ -6,7 +6,7 @@ services:
     autoDeployTrigger: commit
     # preDeployCommand solo disponible en planes pagos (ver docs Render)
     # preDeployCommand: npm --workspace apps/api run prisma:migrate:deploy
-    buildCommand: npm install && npm --workspace apps/api run prisma:generate && npm --workspace apps/api run prisma:migrate:deploy && npm --workspace apps/api run build
+    buildCommand: npm install && npm --workspace apps/api run prisma:generate && npm --workspace apps/api run prisma:migrate:deploy && npm --workspace apps/api run prisma:seed && npm --workspace apps/api run build
     startCommand: npm --workspace apps/api run start
     healthCheckPath: /ready
     envVars:
