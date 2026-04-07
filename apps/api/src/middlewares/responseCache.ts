@@ -40,10 +40,13 @@ export function cacheResponse(options: CacheMiddlewareOptions) {
       if (cached) {
         res.setHeader("X-Cache", "HIT");
         res.setHeader("Content-Type", "application/json; charset=utf-8");
+        console.log(`Cache HIT ${keyPrefix} ${req.originalUrl}`);
         return res.send(cached);
       }
+      console.log(`Cache MISS ${keyPrefix} ${req.originalUrl}`);
     } catch (error) {
       console.warn("Cache read failed:", (error as any)?.message || error);
+      res.setHeader("X-Cache", "BYPASS");
     }
 
     const originalJson = res.json.bind(res);
@@ -53,7 +56,13 @@ export function cacheResponse(options: CacheMiddlewareOptions) {
           const payload = JSON.stringify(body);
           client
             .set(key, payload, "EX", ttlSeconds)
-            .catch(() => undefined);
+            .then(() => {
+              console.log(`Cache SET ${keyPrefix} ${req.originalUrl} ttl=${ttlSeconds}`);
+            })
+            .catch((error) => {
+              console.warn("Cache write failed:", (error as any)?.message || error);
+              res.setHeader("X-Cache", "BYPASS");
+            });
           res.setHeader("X-Cache", "MISS");
         }
       } catch {
