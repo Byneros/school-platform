@@ -7,6 +7,7 @@ import { createRedisClient } from "./utils/redisClient.js";
 import routes from "./routes/index.js";
 import prisma from "./utils/prisma.js";
 import { createRateLimit } from "./middlewares/rateLimit.js";
+import { cacheResponse } from "./middlewares/responseCache.js";
 
 const app = express();
 
@@ -79,6 +80,7 @@ const twoFactorRateLimitMax = Math.max(
 );
 
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "1mb";
+const cacheTtlSeconds = Math.max(5, Number(process.env.REDIS_CACHE_TTL_SECONDS || 60));
 
 const trustProxyEnv = String(process.env.TRUST_PROXY || "").toLowerCase();
 
@@ -145,6 +147,13 @@ app.use(
 
 app.use(express.json({ limit: jsonBodyLimit }));
 app.use(express.urlencoded({ extended: false, limit: jsonBodyLimit }));
+
+app.use(
+  "/api",
+  cacheResponse({
+    ttlSeconds: cacheTtlSeconds
+  })
+);
 
 // ================= RATE LIMIT =================
 

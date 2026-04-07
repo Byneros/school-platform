@@ -1,48 +1,45 @@
-import { Redis } from "ioredis";
+﻿import { Redis } from "ioredis";
 
 let redisInstance: Redis | null = null;
+
+function buildRedisOptions(redisUrl: string) {
+  const useTls = redisUrl.startsWith("rediss://");
+  return {
+    maxRetriesPerRequest: null,
+    lazyConnect: true,
+    connectTimeout: 1500,
+    ...(useTls ? { tls: {} } : {})
+  };
+}
 
 export function createRedisClient(): Redis | null {
   const redisUrl = process.env.REDIS_URL;
 
   if (!redisUrl) {
-    console.log("⚠️ REDIS_URL no definida");
+    console.log("REDIS_URL not defined.");
     return null;
   }
 
-  // ✅ Evita múltiples conexiones
   if (redisInstance) {
     return redisInstance;
   }
 
-  const client = new Redis(redisUrl, {
-    maxRetriesPerRequest: 2,
-    connectTimeout: 5000,
-
-    // 🔥 CLAVE PARA UPSTASH
-    tls: {},
-
-    // Reintentos controlados
-    retryStrategy: (times) => {
-      if (times > 5) return null;
-      return Math.min(times * 200, 2000);
-    },
-  });
+  const client = new Redis(redisUrl, buildRedisOptions(redisUrl));
 
   client.on("connect", () => {
-    console.log("✅ Redis conectado");
+    console.log("Redis connected");
   });
 
   client.on("ready", () => {
-    console.log("🚀 Redis listo");
+    console.log("Redis ready");
   });
 
   client.on("error", (err) => {
-    console.error("❌ Error Redis:", err?.message || err);
+    console.error("Redis error:", err?.message || err);
   });
 
   client.on("close", () => {
-    console.warn("⚠️ Redis cerrado");
+    console.warn("Redis connection closed");
   });
 
   redisInstance = client;
@@ -59,10 +56,6 @@ export function getRedisConnectionOptions() {
 
   return {
     url: redisUrl,
-    maxRetriesPerRequest: 2,
-    connectTimeout: 5000,
-
-    // 🔥 IMPORTANTE
-    tls: {},
+    ...buildRedisOptions(redisUrl)
   };
 }
