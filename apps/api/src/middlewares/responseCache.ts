@@ -97,8 +97,10 @@ export function cacheResponse(options: CacheMiddlewareOptions) {
     };
 
     if (logEvery > 0 && total % logEvery === 0) {
+      const hitRate = total ? Math.round((hits / total) * 100) : 0;
+      const missRate = total ? Math.round((misses / total) * 100) : 0;
       console.log(
-        `Cache summary total=${total} hit=${hits} miss=${misses} bypass=${bypasses} set=${sets} readErr=${readErrors} writeErr=${writeErrors}`
+        `Cache summary total=${total} hit=${hits} miss=${misses} bypass=${bypasses} set=${sets} readErr=${readErrors} writeErr=${writeErrors} hitRate=${hitRate}% missRate=${missRate}%`
       );
     }
 

@@ -80,13 +80,13 @@ const twoFactorRateLimitMax = Math.max(
 );
 
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "1mb";
-const cacheTtlSeconds = Math.max(5, Number(process.env.REDIS_CACHE_TTL_SECONDS || 120));
+const cacheTtlSeconds = Math.max(5, Number(process.env.REDIS_CACHE_TTL_SECONDS || 300));
 const cacheExcludePaths = String(process.env.REDIS_CACHE_EXCLUDE_PATHS || "")
   .split(",")
   .map((v) => v.trim())
   .filter(Boolean)
   .map((v) => (v.startsWith("/") ? v : `/${v}`));
-const cacheLogEvery = Math.max(0, Number(process.env.REDIS_CACHE_LOG_EVERY || 50));
+const cacheLogEvery = Math.max(0, Number(process.env.REDIS_CACHE_LOG_EVERY || 25));
 
 const trustProxyEnv = String(process.env.TRUST_PROXY || "").toLowerCase();
 
@@ -158,7 +158,13 @@ app.use(
   "/api",
   cacheResponse({
     ttlSeconds: cacheTtlSeconds,
-    excludePaths: ["/api/auth", "/api/reports/export", "/api/notifications/export", ...cacheExcludePaths],
+    excludePaths: [
+      "/api/auth",
+      "/api/reports/export",
+      "/api/notifications/export",
+      "/api/certificates/export",
+      ...cacheExcludePaths
+    ],
     logEvery: cacheLogEvery
   })
 );
