@@ -154,21 +154,6 @@ app.use(
 app.use(express.json({ limit: jsonBodyLimit }));
 app.use(express.urlencoded({ extended: false, limit: jsonBodyLimit }));
 
-app.use(
-  "/api",
-  cacheResponse({
-    ttlSeconds: cacheTtlSeconds,
-    excludePaths: [
-      "/api/auth",
-      "/api/reports/export",
-      "/api/notifications/export",
-      "/api/certificates/export",
-      ...cacheExcludePaths
-    ],
-    logEvery: cacheLogEvery
-  })
-);
-
 // ================= RATE LIMIT =================
 
 app.use(
@@ -323,6 +308,21 @@ app.get("/ready", async (req, res) => {
 });
 
 // ================= ROUTES =================
+
+app.use(
+  "/api",
+  cacheResponse({
+    ttlSeconds: cacheTtlSeconds,
+    excludePaths: [
+      "/api/auth",
+      "/api/reports/export",
+      "/api/notifications/export",
+      "/api/certificates/export",
+      ...cacheExcludePaths
+    ],
+    logEvery: cacheLogEvery
+  })
+);
 
 app.use("/api", routes);
 
