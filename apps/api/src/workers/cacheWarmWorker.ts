@@ -18,27 +18,17 @@ async function warmUrl(url: string, config: ReturnType<typeof getWarmConfig>) {
     console.warn("CACHE_WARM_TOKEN no configurado. Omitiendo warm para:", url);
     return;
   }
-  if (url.startsWith("http")) {
-    return await fetch(url, {
-      method: "GET",
-      headers: {
-        ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}),
-        "X-Cache-Warm": "1"
-      },
-      signal: controller.signal
-    }).then((res) => {
-      if (!res.ok) throw new Error(`Warm failed ${res.status}`);
-      return res.text();
-    }).finally(() => clearTimeout(timeout));
-  }
-  const base = config.baseUrl.replace(/\/+$/, "");
-  let path = url.startsWith("/") ? url : `/${url}`;
-  if (base.endsWith("/api") && path.startsWith("/api")) {
-    path = path.slice(4);
-  }
-  const fullUrl = `${base}${path}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  let fullUrl = url;
+  if (!url.startsWith("http")) {
+    const base = config.baseUrl.replace(/\/+$/, "");
+    let path = url.startsWith("/") ? url : `/${url}`;
+    if (base.endsWith("/api") && path.startsWith("/api")) {
+      path = path.slice(4);
+    }
+    fullUrl = `${base}${path}`;
+  }
   try {
     const res = await fetch(fullUrl, {
       method: "GET",
