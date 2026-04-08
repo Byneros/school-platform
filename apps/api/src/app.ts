@@ -139,9 +139,12 @@ function cacheScopeForPath(req: express.Request) {
 function cacheTagsForPath(req: express.Request) {
   const path = req.path || "";
   const tags = new Set<string>();
+  if (path.startsWith("/auth") || path.startsWith("/ops")) {
+    return [];
+  }
   const segments = path.split("/").filter(Boolean);
-  const base = segments[1] || "";
-  const idCandidate = segments[2] || "";
+  const base = segments[0] || "";
+  const idCandidate = segments[1] || "";
   const statusRaw = String(req.query?.status || "").toUpperCase().trim();
   const typeRaw = String(req.query?.type || "").toLowerCase().trim();
   const isIdCandidate =
