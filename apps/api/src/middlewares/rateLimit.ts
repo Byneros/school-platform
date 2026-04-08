@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import jwt from "jsonwebtoken";
 import { createRedisClient } from "../utils/redisClient.js";
 
 type RateLimitOptions = {
@@ -7,6 +8,7 @@ type RateLimitOptions = {
   keyPrefix: string;
   keyFn?: (req: Request) => string;
   skip?: (req: Request) => boolean;
+  roleKey?: boolean;
 };
 
 type Bucket = {
@@ -26,6 +28,51 @@ local ttl = redis.call("PTTL", KEYS[1])
 return {current, ttl}
 `;
 
+type MetricBucket = { total: number; blocked: number };
+const metrics = {
+  total: 0,
+  blocked: 0,
+  redisErrors: 0,
+  byRole: new Map<string, MetricBucket>(),
+  byPrefix: new Map<string, MetricBucket>()
+};
+
+function bumpMetric(map: Map<string, MetricBucket>, key: string, blocked: boolean) {
+  const bucket = map.get(key) || { total: 0, blocked: 0 };
+  bucket.total += 1;
+  if (blocked) bucket.blocked += 1;
+  map.set(key, bucket);
+}
+
+function getRoleFromRequest(req: Request) {
+  const auth = (req as any).auth;
+  if (auth?.role) return String(auth.role);
+  const header = String(req.headers.authorization || "");
+  if (!header.toLowerCase().startsWith("bearer ")) return "ANON";
+  const token = header.slice(7).trim();
+  if (!token) return "ANON";
+  const secret = process.env.JWT_SECRET || "";
+  if (!secret) return "ANON";
+  try {
+    const payload = jwt.verify(token, secret) as any;
+    return String(payload?.role || "ANON");
+  } catch {
+    return "ANON";
+  }
+}
+
+export function getRateLimitMetrics() {
+  const mapToObj = (map: Map<string, MetricBucket>) =>
+    Object.fromEntries(Array.from(map.entries()));
+  return {
+    total: metrics.total,
+    blocked: metrics.blocked,
+    redisErrors: metrics.redisErrors,
+    byRole: mapToObj(metrics.byRole),
+    byPrefix: mapToObj(metrics.byPrefix)
+  };
+}
+
 function cleanupExpired(now: number) {
   for (const [key, bucket] of buckets.entries()) {
     if (bucket.resetAt <= now) {
@@ -40,7 +87,8 @@ export function createRateLimit(options: RateLimitOptions) {
 
     const now = Date.now();
     const keyPart = options.keyFn ? options.keyFn(req) : req.ip || "unknown";
-    const key = `${options.keyPrefix}:${keyPart}`;
+    const role = options.roleKey ? getRoleFromRequest(req) : "";
+    const key = `${options.keyPrefix}:${role ? `${role}:` : ""}${keyPart}`;
 
     if (redisClient) {
       try {
@@ -63,7 +111,13 @@ export function createRateLimit(options: RateLimitOptions) {
         res.setHeader("X-RateLimit-Remaining", String(remaining));
         res.setHeader("X-RateLimit-Reset", String(Math.floor(resetAt / 1000)));
 
-        if (count > options.max) {
+        const blocked = count > options.max;
+        metrics.total += 1;
+        if (blocked) metrics.blocked += 1;
+        bumpMetric(metrics.byPrefix, options.keyPrefix, blocked);
+        if (options.roleKey) bumpMetric(metrics.byRole, role || "ANON", blocked);
+
+        if (blocked) {
           res.setHeader("Retry-After", String(retryAfterSec));
           return res.status(429).json({
             error: "Too many requests",
@@ -73,6 +127,7 @@ export function createRateLimit(options: RateLimitOptions) {
 
         return next();
       } catch (error) {
+        metrics.redisErrors += 1;
         console.warn("Rate limit redis failed, falling back to memory:", (error as any)?.message || error);
       }
     }
@@ -96,7 +151,13 @@ export function createRateLimit(options: RateLimitOptions) {
     res.setHeader("X-RateLimit-Remaining", String(remaining));
     res.setHeader("X-RateLimit-Reset", String(Math.floor(bucket.resetAt / 1000)));
 
-    if (bucket.count > options.max) {
+    const blocked = bucket.count > options.max;
+    metrics.total += 1;
+    if (blocked) metrics.blocked += 1;
+    bumpMetric(metrics.byPrefix, options.keyPrefix, blocked);
+    if (options.roleKey) bumpMetric(metrics.byRole, role || "ANON", blocked);
+
+    if (blocked) {
       res.setHeader("Retry-After", String(retryAfterSec));
       return res.status(429).json({
         error: "Too many requests",

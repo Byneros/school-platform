@@ -17,6 +17,10 @@ const transporter = canSend
     })
   : null;
 
+export function canSendEmail() {
+  return Boolean(transporter);
+}
+
 export async function sendEmail(opts: { to: string; subject: string; text: string; html?: string }) {
   if (!transporter) return false;
   await transporter.sendMail({

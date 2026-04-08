@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { buildCsvReport, buildXlsxReportBuffer, sendTabularPdf } from "../utils/reportExport.js";
 import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { sendEmail } from "../utils/mailer.js";
+import { enqueueEmail } from "../services/emailQueue.js";
 
 const router = Router();
 
@@ -392,8 +393,8 @@ router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createUserSchema)
   }
   // Enviar correo con credenciales (no bloqueante)
   getBrandingSettings()
-    .then((branding) =>
-      sendEmail({
+    .then((branding) => {
+      const payload = {
         to: user.email,
         subject: `Credenciales de acceso - ${branding.schoolName}`,
         text: `Hola ${user.fullName},\n\nTu usuario ha sido creado.\nCorreo: ${user.email}\nContrasena: ${plainPassword}\n\nPor favor cambia la contrasena al ingresar.`,
@@ -420,8 +421,16 @@ router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createUserSchema)
             <div style="margin-top: 12px; font-size: 12px; color: #64748b;">${branding.footerText || ""}</div>
           </div>
         `
-      })
-    )
+      };
+      enqueueEmail(payload)
+        .then((queued) => {
+          if (!queued) {
+            return sendEmail(payload);
+          }
+          return undefined;
+        })
+        .catch(() => undefined);
+    })
     .catch(() => undefined);
   res.json(user);
 });

@@ -7,6 +7,7 @@ import { validate } from "../utils/validate.js";
 import { loginSchema, twoFactorResendSchema, twoFactorVerifySchema } from "../schemas/auth.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { sendEmail } from "../utils/mailer.js";
+import { enqueueEmail } from "../services/emailQueue.js";
 
 const router = Router();
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "8h";
@@ -33,6 +34,7 @@ const twoFactorResendCooldownMs = Math.max(
   Number(process.env.ADMIN_2FA_RESEND_COOLDOWN_MS || 60 * 1000)
 );
 const twoFactorPepper = process.env.ADMIN_2FA_CODE_SECRET || "";
+const queueTwoFactorEmail = String(process.env.EMAIL_QUEUE_2FA || "").toLowerCase() === "true";
 const loginLockoutWindowMs = Math.max(
   60_000,
   Number(process.env.LOGIN_LOCKOUT_WINDOW_MS || 15 * 60 * 1000)
@@ -92,6 +94,10 @@ async function sendTwoFactorCodeEmail(email: string, code: string) {
       <p style="color:#64748b;">Este codigo expira en 10 minutos.</p>
     </div>
   `;
+  if (queueTwoFactorEmail) {
+    const queued = await enqueueEmail({ to: email, subject, text, html });
+    if (queued) return true;
+  }
   return sendEmail({ to: email, subject, text, html });
 }
 

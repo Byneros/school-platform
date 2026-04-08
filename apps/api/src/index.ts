@@ -3,6 +3,7 @@ import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import app from "./app.js";
 import { startNotificationWorker } from "./workers/notificationWorker.js";
+import { startEmailWorker } from "./workers/emailWorker.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
@@ -20,13 +21,13 @@ app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);
 });
 
-const workerEnabledEnv = String(
-  process.env.NOTIFICATION_WORKER_ENABLED ||
-    (process.env.NODE_ENV === "production" ? "true" : "false")
-).toLowerCase();
-const shouldStartWorker = workerEnabledEnv === "true";
+function shouldStartWorker(envKey: string) {
+  const raw = process.env[envKey];
+  const fallback = process.env.NODE_ENV === "production" ? "true" : "false";
+  return String(raw ?? fallback).toLowerCase() === "true";
+}
 
-if (shouldStartWorker) {
+if (shouldStartWorker("NOTIFICATION_WORKER_ENABLED")) {
   try {
     startNotificationWorker();
   } catch (error) {
@@ -34,4 +35,14 @@ if (shouldStartWorker) {
   }
 } else {
   console.log("Notification worker deshabilitado (NOTIFICATION_WORKER_ENABLED!=true).");
+}
+
+if (shouldStartWorker("EMAIL_WORKER_ENABLED")) {
+  try {
+    startEmailWorker();
+  } catch (error) {
+    console.error("No se pudo iniciar el worker de emails:", error);
+  }
+} else {
+  console.log("Email worker deshabilitado (EMAIL_WORKER_ENABLED!=true).");
 }

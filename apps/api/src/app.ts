@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 import { createRedisClient } from "./utils/redisClient.js";
 import routes from "./routes/index.js";
 import prisma from "./utils/prisma.js";
-import { createRateLimit } from "./middlewares/rateLimit.js";
+import { createRateLimit, getRateLimitMetrics } from "./middlewares/rateLimit.js";
 import { cacheResponse } from "./middlewares/responseCache.js";
 
 const app = express();
@@ -87,6 +87,7 @@ const cacheExcludePaths = String(process.env.REDIS_CACHE_EXCLUDE_PATHS || "")
   .filter(Boolean)
   .map((v) => (v.startsWith("/") ? v : `/${v}`));
 const cacheLogEvery = Math.max(0, Number(process.env.REDIS_CACHE_LOG_EVERY || 25));
+const rateLimitMetricsToken = String(process.env.RATE_LIMIT_METRICS_TOKEN || "").trim();
 
 const trustProxyEnv = String(process.env.TRUST_PROXY || "").toLowerCase();
 
@@ -161,6 +162,7 @@ app.use(
     windowMs: rateLimitWindowMs,
     max: rateLimitMax,
     keyPrefix: "global",
+    roleKey: true,
     skip: (req) => req.path === "/health" || req.path === "/ready",
   })
 );
@@ -196,6 +198,7 @@ app.use(
     windowMs: notificationsRateLimitWindowMs,
     max: notificationsRateLimitMax,
     keyPrefix: "notifications",
+    roleKey: true,
   })
 );
 
@@ -205,6 +208,7 @@ app.use(
     windowMs: reportsRateLimitWindowMs,
     max: reportsRateLimitMax,
     keyPrefix: "reports",
+    roleKey: true,
   })
 );
 
@@ -212,6 +216,7 @@ const writeRateLimiter = createRateLimit({
   windowMs: writeRateLimitWindowMs,
   max: writeRateLimitMax,
   keyPrefix: "write",
+  roleKey: true,
   skip: (req) => ["GET", "HEAD", "OPTIONS"].includes(req.method),
 });
 
@@ -306,6 +311,16 @@ app.get("/ready", async (req, res) => {
     },
   });
 });
+
+if (rateLimitMetricsToken) {
+  app.get("/ops/ratelimit", (req, res) => {
+    const token = String(req.headers["x-metrics-token"] || "");
+    if (!token || token !== rateLimitMetricsToken) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    return res.json(getRateLimitMetrics());
+  });
+}
 
 // ================= ROUTES =================
 
