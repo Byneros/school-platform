@@ -66,6 +66,7 @@ async function request(path: string, method: RequestMethod, body?: unknown) {
       method,
       headers: buildHeaders(withJson),
       signal: controller.signal,
+      credentials: "include",
       ...(withJson ? { body: JSON.stringify(body) } : {})
     });
   } catch {

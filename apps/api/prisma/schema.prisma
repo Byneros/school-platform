@@ -113,8 +113,25 @@ model User {
   certificateRequestsRequested CertificateRequest[] @relation("CertificateRequester")
   certificateRequestsReviewed CertificateRequest[] @relation("CertificateReviewer")
   academicClosures AcademicClosureResult[] @relation("AcademicClosureExecutor")
+  refreshSessions RefreshSession[]
 
   @@index([role, isActive])
+}
+
+model RefreshSession {
+  id                   String   @id @default(cuid())
+  userId               String
+  tokenHash            String   @unique
+  createdAt            DateTime @default(now())
+  expiresAt            DateTime
+  revokedAt            DateTime?
+  replacedByTokenHash  String?
+  ip                   String?
+  userAgent            String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
 }
 
 model Teacher {

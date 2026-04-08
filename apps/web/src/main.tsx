@@ -24,6 +24,7 @@ import ParentBoletines from "./pages/ParentBoletines";
 import ParentPagos from "./pages/ParentPagos";
 import ParentComunicados from "./pages/ParentComunicados";
 import StudentFollowup from "./pages/StudentFollowup";
+import SessionsPage from "./pages/SessionsPage";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -139,6 +140,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               }
             />
             <Route
+              path="admin/sesiones"
+              element={
+                <ProtectedRoute roles={["ADMIN"]}>
+                  <SessionsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="teacher"
               element={
                 <ProtectedRoute roles={["TEACHER"]}>
@@ -175,6 +184,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               element={
                 <ProtectedRoute roles={["TEACHER"]}>
                   <TeacherComms />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="teacher/sesiones"
+              element={
+                <ProtectedRoute roles={["TEACHER"]}>
+                  <SessionsPage />
                 </ProtectedRoute>
               }
             />
@@ -223,6 +240,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               element={
                 <ProtectedRoute roles={["PARENT"]}>
                   <ParentComunicados />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="parent/sesiones"
+              element={
+                <ProtectedRoute roles={["PARENT"]}>
+                  <SessionsPage />
                 </ProtectedRoute>
               }
             />

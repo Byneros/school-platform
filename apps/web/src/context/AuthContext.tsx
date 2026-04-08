@@ -168,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     apiPost("/auth/2fa/resend", { token });
 
   const logout = () => {
+    apiPost("/auth/logout", {}).catch(() => undefined);
     clearAuth();
     setUser(null);
     setInactivityWarning(false);

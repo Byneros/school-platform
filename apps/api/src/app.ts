@@ -1,6 +1,7 @@
 ﻿import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import type { ErrorRequestHandler } from "express";
 import { randomUUID } from "crypto";
 import { createRedisClient } from "./utils/redisClient.js";
@@ -129,6 +130,7 @@ if (trustProxy) {
 }
 
 app.use(helmet());
+app.use(cookieParser());
 
 const corsOrigin = (
   origin: string | undefined,

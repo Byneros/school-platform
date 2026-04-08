@@ -20,6 +20,8 @@ services:
         generateValue: true
       - key: REDIS_URL
         sync: false
+      - key: REFRESH_TOKEN_PEPPER
+        sync: false
       - key: RATE_LIMIT_METRICS_TOKEN
         sync: false
       - key: CORS_ORIGINS
@@ -51,6 +53,10 @@ services:
     autoDeployTrigger: commit
     buildCommand: npm install && npm --workspace apps/web run build
     staticPublishPath: apps/web/dist
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: "/index.html"
     envVars:
       - key: VITE_API_URL
         value: https://school-platform-z8f4.onrender.com/api

@@ -4,4 +4,3 @@ dist
 .env
 .env.local
 coverage
-apps/api/prisma/migrations

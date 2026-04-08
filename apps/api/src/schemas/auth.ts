@@ -19,3 +19,15 @@ export const twoFactorResendSchema = z.object({
     token: z.string().min(10)
   })
 });
+
+export const revokeRoleSessionsSchema = z.object({
+  body: z.object({
+    role: z.enum(["ADMIN", "TEACHER", "PARENT"])
+  })
+});
+
+export const revokeSessionSchema = z.object({
+  body: z.object({
+    sessionId: z.string().min(6)
+  })
+});

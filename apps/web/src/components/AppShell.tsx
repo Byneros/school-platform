@@ -202,6 +202,7 @@ export default function AppShell() {
                       )}
                     </span>
                   </NavLink>
+                  <NavLink to="/admin/sesiones">Sesiones</NavLink>
                   {canEditBranding && <NavLink to="/admin/personalizacion">Personalizacion</NavLink>}
                 </>
               )}
@@ -212,6 +213,7 @@ export default function AppShell() {
                   <NavLink to="/teacher/tareas-calificaciones">Tareas y Calificaciones</NavLink>
                   <NavLink to="/teacher/observador">Observador</NavLink>
                   <NavLink to="/teacher/comunicaciones">Comunicaciones</NavLink>
+                  <NavLink to="/teacher/sesiones">Sesiones</NavLink>
                 </>
               )}
               {user.role === "PARENT" && (
@@ -221,6 +223,7 @@ export default function AppShell() {
                   <NavLink to="/parent/observador">Observador</NavLink>
                   <NavLink to="/parent/pagos">Pagos</NavLink>
                   <NavLink to="/parent/comunicados">Comunicados</NavLink>
+                  <NavLink to="/parent/sesiones">Sesiones</NavLink>
                 </>
               )}
               <div className="sidebar-title" style={{ marginTop: 16 }}>Acciones rapidas</div>

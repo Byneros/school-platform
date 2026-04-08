@@ -4,13 +4,29 @@ import jwt from "jsonwebtoken";
 import { createHash, randomInt, randomUUID } from "crypto";
 import prisma from "../utils/prisma.js";
 import { validate } from "../utils/validate.js";
-import { loginSchema, twoFactorResendSchema, twoFactorVerifySchema } from "../schemas/auth.js";
-import { requireAuth } from "../middlewares/auth.js";
+import {
+  loginSchema,
+  revokeRoleSessionsSchema,
+  revokeSessionSchema,
+  twoFactorResendSchema,
+  twoFactorVerifySchema
+} from "../schemas/auth.js";
+import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { sendEmail } from "../utils/mailer.js";
 import { enqueueEmail } from "../services/emailQueue.js";
+import {
+  clearRefreshCookie,
+  createRefreshSession,
+  getAccessTokenTtl,
+  getRefreshTokenFromRequest,
+  hashRefreshToken,
+  revokeAllSessionsForUser,
+  revokeRefreshSession,
+  rotateRefreshSession
+} from "../utils/refreshTokens.js";
 
 const router = Router();
-const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "8h";
+const jwtExpiresIn = getAccessTokenTtl();
 const twoFactorEnabledEnv = String(process.env.ADMIN_2FA_ENABLED || "").toLowerCase();
 const twoFactorRolesEnv = String(process.env.TWO_FACTOR_ROLES || "ADMIN,TEACHER,PARENT");
 const isProd = process.env.NODE_ENV === "production";
@@ -114,6 +130,12 @@ function signToken(payload: { userId: string; role: "ADMIN" | "TEACHER" | "PAREN
   };
 }
 
+async function issueSessionTokens(res: any, req: any, user: { id: string; role: any }) {
+  const signed = signToken({ userId: user.id, role: user.role });
+  await createRefreshSession(user.id, req, res);
+  return signed;
+}
+
 router.post("/login", validate(loginSchema), async (req, res) => {
   const { email, password } = (req as any).validated.body;
   const normalizedEmail = email.trim().toLowerCase();
@@ -193,7 +215,7 @@ router.post("/login", validate(loginSchema), async (req, res) => {
     });
   }
 
-  const signed = signToken({ userId: user.id, role: user.role });
+  const signed = await issueSessionTokens(res, req, user);
   loginAttempts.delete(attemptKey);
 
   return res.json({
@@ -232,7 +254,7 @@ router.post("/2fa/verify", validate(twoFactorVerifySchema), async (req, res) => 
   }
 
   twoFactorSessions.delete(token);
-  const signed = signToken({ userId: session.userId, role: session.role });
+  const signed = await issueSessionTokens(res, req, { id: session.userId, role: session.role });
   const userInfo = await prisma.user.findUnique({
     where: { id: session.userId },
     select: { fullName: true, role: true }
@@ -296,16 +318,72 @@ router.get("/session", requireAuth, async (req, res) => {
   return res.json({ email: user.email, role: user.role, fullName: user.fullName });
 });
 
-router.post("/refresh", requireAuth, async (req, res) => {
+router.get("/sessions", requireAuth, async (req, res) => {
   const auth = (req as any).auth;
+  const token = getRefreshTokenFromRequest(req);
+  const currentHash = token ? hashRefreshToken(token) : "";
+  const now = new Date();
+  const sessions = await prisma.refreshSession.findMany({
+    where: {
+      userId: auth.userId,
+      revokedAt: null,
+      expiresAt: { gt: now }
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      createdAt: true,
+      expiresAt: true,
+      ip: true,
+      userAgent: true,
+      tokenHash: true
+    }
+  });
+
+  const data = sessions.map((s) => ({
+    id: s.id,
+    createdAt: s.createdAt,
+    expiresAt: s.expiresAt,
+    ip: s.ip,
+    userAgent: s.userAgent,
+    current: currentHash ? s.tokenHash === currentHash : false
+  }));
+
+  return res.json({ data });
+});
+
+router.post("/refresh", async (req, res) => {
+  const token = getRefreshTokenFromRequest(req);
+  if (!token) {
+    clearRefreshCookie(res);
+    return res.status(401).json({ error: "Missing refresh token" });
+  }
+  const tokenHash = hashRefreshToken(token);
+  const session = await prisma.refreshSession.findUnique({
+    where: { tokenHash }
+  });
+  if (!session) {
+    clearRefreshCookie(res);
+    return res.status(401).json({ error: "Invalid refresh token" });
+  }
+  if (session.revokedAt) {
+    await revokeAllSessionsForUser(session.userId);
+    clearRefreshCookie(res);
+    return res.status(401).json({ error: "Refresh token reuse detected" });
+  }
+  if (session.expiresAt <= new Date()) {
+    await revokeRefreshSession(tokenHash);
+    clearRefreshCookie(res);
+    return res.status(401).json({ error: "Refresh token expired" });
+  }
+  await rotateRefreshSession(session, req, res);
   const user = await prisma.user.findUnique({
-    where: { id: auth.userId },
+    where: { id: session.userId },
     select: { id: true, role: true, fullName: true, isActive: true }
   });
   if (!user || !user.isActive) {
     return res.status(401).json({ error: "Invalid session" });
   }
-
   const signed = signToken({ userId: user.id, role: user.role });
   return res.json({
     token: signed.token,
@@ -314,5 +392,72 @@ router.post("/refresh", requireAuth, async (req, res) => {
     expiresAt: signed.expiresAt
   });
 });
+
+router.post("/logout", async (req, res) => {
+  const token = getRefreshTokenFromRequest(req);
+  if (token) {
+    const tokenHash = hashRefreshToken(token);
+    await revokeRefreshSession(tokenHash);
+  }
+  clearRefreshCookie(res);
+  return res.json({ ok: true });
+});
+
+router.post("/logout-all", requireAuth, async (req, res) => {
+  const auth = (req as any).auth;
+  await revokeAllSessionsForUser(auth.userId);
+  clearRefreshCookie(res);
+  return res.json({ ok: true });
+});
+
+router.post(
+  "/logout-role",
+  requireAuth,
+  requireRole(["ADMIN"]),
+  validate(revokeRoleSessionsSchema),
+  async (req, res) => {
+    const { role } = (req as any).validated.body;
+    const users = await prisma.user.findMany({
+      where: { role },
+      select: { id: true }
+    });
+    const ids = users.map((u) => u.id);
+    if (ids.length === 0) {
+      return res.json({ ok: true, revoked: 0 });
+    }
+    const result = await prisma.refreshSession.updateMany({
+      where: { userId: { in: ids }, revokedAt: null },
+      data: { revokedAt: new Date() }
+    });
+    return res.json({ ok: true, revoked: result.count });
+  }
+);
+
+router.post(
+  "/logout-session",
+  requireAuth,
+  validate(revokeSessionSchema),
+  async (req, res) => {
+    const auth = (req as any).auth;
+    const { sessionId } = (req as any).validated.body;
+    const session = await prisma.refreshSession.findUnique({
+      where: { id: sessionId },
+      select: { id: true, userId: true, tokenHash: true, revokedAt: true }
+    });
+    if (!session || session.userId !== auth.userId) {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+    if (session.revokedAt) {
+      return res.json({ ok: true, revoked: false });
+    }
+    await revokeRefreshSession(session.tokenHash);
+    const currentToken = getRefreshTokenFromRequest(req);
+    const currentHash = currentToken ? hashRefreshToken(currentToken) : "";
+    if (currentHash && currentHash === session.tokenHash) {
+      clearRefreshCookie(res);
+    }
+    return res.json({ ok: true, revoked: true });
+  }
+);
 
 export default router;
