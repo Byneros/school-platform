@@ -128,6 +128,12 @@ model RefreshSession {
   replacedByTokenHash  String?
   ip                   String?
   userAgent            String?
+  deviceLabel          String?
+  geoCity              String?
+  geoRegion            String?
+  geoCountry           String?
+  geoCountryCode       String?
+  geoTimezone          String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -8,6 +8,7 @@ import {
   loginSchema,
   revokeRoleSessionsSchema,
   revokeSessionSchema,
+  updateSessionLabelSchema,
   twoFactorResendSchema,
   twoFactorVerifySchema
 } from "../schemas/auth.js";
@@ -336,7 +337,13 @@ router.get("/sessions", requireAuth, async (req, res) => {
       expiresAt: true,
       ip: true,
       userAgent: true,
-      tokenHash: true
+      tokenHash: true,
+      deviceLabel: true,
+      geoCity: true,
+      geoRegion: true,
+      geoCountry: true,
+      geoCountryCode: true,
+      geoTimezone: true
     }
   });
 
@@ -346,11 +353,39 @@ router.get("/sessions", requireAuth, async (req, res) => {
     expiresAt: s.expiresAt,
     ip: s.ip,
     userAgent: s.userAgent,
+    deviceLabel: s.deviceLabel,
+    geoCity: s.geoCity,
+    geoRegion: s.geoRegion,
+    geoCountry: s.geoCountry,
+    geoCountryCode: s.geoCountryCode,
+    geoTimezone: s.geoTimezone,
     current: currentHash ? s.tokenHash === currentHash : false
   }));
 
   return res.json({ data });
 });
+
+router.post(
+  "/sessions/label",
+  requireAuth,
+  validate(updateSessionLabelSchema),
+  async (req, res) => {
+    const auth = (req as any).auth;
+    const { sessionId, label } = (req as any).validated.body;
+    const session = await prisma.refreshSession.findUnique({
+      where: { id: sessionId },
+      select: { id: true, userId: true }
+    });
+    if (!session || session.userId !== auth.userId) {
+      return res.status(403).json({ error: "No autorizado" });
+    }
+    await prisma.refreshSession.update({
+      where: { id: sessionId },
+      data: { deviceLabel: label }
+    });
+    return res.json({ ok: true });
+  }
+);
 
 router.post("/refresh", async (req, res) => {
   const token = getRefreshTokenFromRequest(req);

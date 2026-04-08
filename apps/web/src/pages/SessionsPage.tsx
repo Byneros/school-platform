@@ -8,6 +8,12 @@ type SessionItem = {
   expiresAt: string;
   ip?: string | null;
   userAgent?: string | null;
+  deviceLabel?: string | null;
+  geoCity?: string | null;
+  geoRegion?: string | null;
+  geoCountry?: string | null;
+  geoCountryCode?: string | null;
+  geoTimezone?: string | null;
   current: boolean;
 };
 
@@ -25,6 +31,51 @@ export default function SessionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [revoking, setRevoking] = useState<string | null>(null);
   const [roleToRevoke, setRoleToRevoke] = useState("TEACHER");
+
+  const getDeviceLabel = (session: SessionItem) => {
+    if (session.deviceLabel) return session.deviceLabel;
+    const ua = (session.userAgent || "").toLowerCase();
+    const os =
+      ua.includes("windows") ? "Windows" :
+      ua.includes("android") ? "Android" :
+      ua.includes("iphone") ? "iPhone" :
+      ua.includes("ipad") ? "iPad" :
+      ua.includes("mac os x") ? "macOS" :
+      ua.includes("linux") ? "Linux" :
+      "Dispositivo";
+    const browser =
+      ua.includes("edg") ? "Edge" :
+      ua.includes("chrome") && !ua.includes("edg") ? "Chrome" :
+      ua.includes("safari") && !ua.includes("chrome") ? "Safari" :
+      ua.includes("firefox") ? "Firefox" :
+      ua.includes("opera") || ua.includes("opr/") ? "Opera" :
+      "";
+    return browser ? `${browser} en ${os}` : os;
+  };
+
+  const getDeviceIcon = (session: SessionItem) => {
+    const ua = (session.userAgent || "").toLowerCase();
+    if (ua.includes("iphone") || ua.includes("android") && ua.includes("mobile")) return "📱";
+    if (ua.includes("ipad") || ua.includes("tablet")) return "📲";
+    if (ua.includes("android")) return "📱";
+    if (ua.includes("mac os x") || ua.includes("windows") || ua.includes("linux")) return "🖥️";
+    return "💻";
+  };
+
+  const getCountryFlag = (codeRaw?: string | null) => {
+    const code = (codeRaw || "").trim().toUpperCase();
+    if (code.length !== 2) return "";
+    const A = 0x1f1e6;
+    const chars = [...code].map((c) => String.fromCodePoint(A + c.charCodeAt(0) - 65));
+    return chars.join("");
+  };
+
+  const getLocationLabel = (session: SessionItem) => {
+    const parts = [session.geoCity, session.geoRegion, session.geoCountry].filter(Boolean);
+    if (parts.length === 0) return "-";
+    const flag = getCountryFlag(session.geoCountryCode);
+    return `${flag ? `${flag} ` : ""}${parts.join(", ")}`;
+  };
 
   const sortedSessions = useMemo(
     () => [...sessions].sort((a, b) => (a.current === b.current ? 0 : a.current ? -1 : 1)),
@@ -60,9 +111,24 @@ export default function SessionsPage() {
     }
   };
 
+  const renameSession = async (session: SessionItem) => {
+    const current = session.deviceLabel || getDeviceLabel(session);
+    const next = window.prompt("Nombre del dispositivo:", current);
+    if (!next) return;
+    const label = next.trim();
+    if (!label) return;
+    try {
+      await apiPost("/auth/sessions/label", { sessionId: session.id, label });
+      setMsg("Nombre actualizado.");
+      loadSessions();
+    } catch {
+      setError("No se pudo actualizar el nombre.");
+    }
+  };
+
   const logoutAll = async () => {
     setMsg(null);
-    if (!window.confirm("Esto cerrara tu sesion actual y todas las demas. ¿Continuar?")) return;
+    if (!window.confirm("Esto cerrara tu sesion actual y todas las demas. Continuar?")) return;
     try {
       await apiPost("/auth/logout-all", {});
       logout();
@@ -74,7 +140,7 @@ export default function SessionsPage() {
   const revokeRole = async () => {
     setMsg(null);
     const label = roleLabels[roleToRevoke] || roleToRevoke;
-    if (!window.confirm(`Esto cerrara TODAS las sesiones de ${label}. ¿Continuar?`)) return;
+    if (!window.confirm(`Esto cerrara TODAS las sesiones de ${label}. Continuar?`)) return;
     try {
       const res = await apiPost("/auth/logout-role", { role: roleToRevoke });
       setMsg(`Sesiones revocadas: ${res?.revoked ?? 0}.`);
@@ -101,7 +167,9 @@ export default function SessionsPage() {
             <thead>
               <tr>
                 <th>Sesion</th>
+                <th>Nombre</th>
                 <th>IP</th>
+                <th>Ubicacion</th>
                 <th>Dispositivo</th>
                 <th>Creada</th>
                 <th>Expira</th>
@@ -111,7 +179,7 @@ export default function SessionsPage() {
             <tbody>
               {sortedSessions.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ color: "#6b7280" }}>
+                  <td colSpan={8} style={{ color: "#6b7280" }}>
                     No hay sesiones activas.
                   </td>
                 </tr>
@@ -119,11 +187,20 @@ export default function SessionsPage() {
               {sortedSessions.map((s) => (
                 <tr key={s.id}>
                   <td>{s.current ? "Actual" : "Otra"}</td>
+                  <td>{`${getDeviceIcon(s)} ${getDeviceLabel(s)}`}</td>
                   <td>{s.ip || "-"}</td>
+                  <td>{getLocationLabel(s)}</td>
                   <td style={{ maxWidth: 260 }}>{s.userAgent || "-"}</td>
                   <td>{new Date(s.createdAt).toLocaleString()}</td>
                   <td>{new Date(s.expiresAt).toLocaleString()}</td>
-                  <td style={{ textAlign: "right" }}>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <button
+                      className="button secondary"
+                      onClick={() => renameSession(s)}
+                      style={{ marginRight: 6 }}
+                    >
+                      Renombrar
+                    </button>
                     {!s.current && (
                       <button
                         className="button warning"

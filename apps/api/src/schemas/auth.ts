@@ -31,3 +31,10 @@ export const revokeSessionSchema = z.object({
     sessionId: z.string().min(6)
   })
 });
+
+export const updateSessionLabelSchema = z.object({
+  body: z.object({
+    sessionId: z.string().min(6),
+    label: z.string().trim().min(1).max(40)
+  })
+});

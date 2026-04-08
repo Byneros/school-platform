@@ -22,6 +22,12 @@ services:
         sync: false
       - key: REFRESH_TOKEN_PEPPER
         sync: false
+      - key: IP_GEO_ENABLED
+        value: "false"
+      - key: IP_GEO_ENDPOINT
+        sync: false
+      - key: IP_GEO_TIMEOUT_MS
+        value: "800"
       - key: RATE_LIMIT_METRICS_TOKEN
         sync: false
       - key: CORS_ORIGINS
@@ -54,6 +60,29 @@ services:
     buildCommand: npm install && npm --workspace apps/web run build
     staticPublishPath: apps/web/dist
     routes:
+      - type: header
+        source: "/assets/*"
+        headers:
+          - key: Cache-Control
+            value: "public, max-age=31536000, immutable"
+      - type: header
+        source: "/*"
+        headers:
+          - key: Cache-Control
+            value: "no-store, no-cache, must-revalidate, max-age=0"
+          - key: Pragma
+            value: "no-cache"
+          - key: Expires
+            value: "0"
+      - type: header
+        source: "/index.html"
+        headers:
+          - key: Cache-Control
+            value: "no-store, no-cache, must-revalidate, max-age=0"
+          - key: Pragma
+            value: "no-cache"
+          - key: Expires
+            value: "0"
       - type: rewrite
         source: "/*"
         destination: "/index.html"
