@@ -906,8 +906,6 @@ export default function AdminUsers() {
                           <button
                             className="button secondary"
                             onClick={() => startEdit(u)}
-                            disabled={!!u.isPrincipal && user?.id !== u.id}
-                            title={u.isPrincipal && user?.id !== u.id ? "Solo el administrador principal puede editarse" : ""}
                           >
                             Editar
                           </button>

@@ -445,9 +445,6 @@ router.patch("/:id", requireAuth, requireRole(["ADMIN"]), validate(updateUserSch
   });
 
   if (principalAdmin && params.id === principalAdmin.id) {
-    if (auth.userId !== principalAdmin.id) {
-      return res.status(403).json({ message: "Solo el administrador principal puede editar este usuario" });
-    }
     if (body.isActive === false) {
       return res.status(400).json({ message: "El administrador principal no se puede desactivar" });
     }
