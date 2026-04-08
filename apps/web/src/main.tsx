@@ -16,6 +16,7 @@ import AdminBranding from "./pages/AdminBranding";
 import AdminTeacherHours from "./pages/AdminTeacherHours";
 import AdminCertificates from "./pages/AdminCertificates";
 import AdminAcademicClosure from "./pages/AdminAcademicClosure";
+import AdminCacheMetrics from "./pages/AdminCacheMetrics";
 import TeacherAttendance from "./pages/TeacherAttendance";
 import TeacherComms from "./pages/TeacherComms";
 import TeacherTasks from "./pages/TeacherTasks";
@@ -136,6 +137,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               element={
                 <ProtectedRoute roles={["ADMIN"]}>
                   <AdminAcademicClosure />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin/cache"
+              element={
+                <ProtectedRoute roles={["ADMIN"]}>
+                  <AdminCacheMetrics />
                 </ProtectedRoute>
               }
             />

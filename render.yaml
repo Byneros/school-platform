@@ -28,6 +28,18 @@ services:
         sync: false
       - key: IP_GEO_TIMEOUT_MS
         value: "800"
+      - key: CACHE_METRICS_TOKEN
+        sync: false
+      - key: CACHE_WARM_ENABLED
+        value: "false"
+      - key: CACHE_WARM_BASE_URL
+        sync: false
+      - key: CACHE_WARM_TOKEN
+        sync: false
+      - key: CACHE_WARM_TIMEOUT_MS
+        value: "4000"
+      - key: CACHE_WARM_WORKER_ENABLED
+        value: "false"
       - key: RATE_LIMIT_METRICS_TOKEN
         sync: false
       - key: CORS_ORIGINS

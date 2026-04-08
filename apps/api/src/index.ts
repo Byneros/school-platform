@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import app from "./app.js";
 import { startNotificationWorker } from "./workers/notificationWorker.js";
 import { startEmailWorker } from "./workers/emailWorker.js";
+import { startCacheWarmWorker } from "./workers/cacheWarmWorker.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
@@ -45,4 +46,14 @@ if (shouldStartWorker("EMAIL_WORKER_ENABLED")) {
   }
 } else {
   console.log("Email worker deshabilitado (EMAIL_WORKER_ENABLED!=true).");
+}
+
+if (shouldStartWorker("CACHE_WARM_WORKER_ENABLED")) {
+  try {
+    startCacheWarmWorker();
+  } catch (error) {
+    console.error("No se pudo iniciar el worker de cache warm:", error);
+  }
+} else {
+  console.log("Cache warm worker deshabilitado (CACHE_WARM_WORKER_ENABLED!=true).");
 }

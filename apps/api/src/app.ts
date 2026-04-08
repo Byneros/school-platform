@@ -7,8 +7,12 @@ import { randomUUID } from "crypto";
 import { createRedisClient } from "./utils/redisClient.js";
 import routes from "./routes/index.js";
 import prisma from "./utils/prisma.js";
+import { requireAuth, requireRole } from "./middlewares/auth.js";
 import { createRateLimit, getRateLimitMetrics } from "./middlewares/rateLimit.js";
-import { cacheResponse } from "./middlewares/responseCache.js";
+import { cacheResponse, getCacheMetrics } from "./middlewares/responseCache.js";
+import { invalidateCache } from "./middlewares/cacheInvalidation.js";
+import jwt from "jsonwebtoken";
+import { enqueueCacheWarm } from "./services/cacheWarmQueue.js";
 
 const app = express();
 
@@ -82,6 +86,10 @@ const twoFactorRateLimitMax = Math.max(
 
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "1mb";
 const cacheTtlSeconds = Math.max(5, Number(process.env.REDIS_CACHE_TTL_SECONDS || 300));
+const cacheTtlCritical = Math.max(60, Number(process.env.REDIS_CACHE_TTL_CRITICAL || 600));
+const cacheTtlSuggestions = Math.max(30, Number(process.env.REDIS_CACHE_TTL_SUGGESTIONS || 120));
+const cacheTtlClasses = Math.max(300, Number(process.env.REDIS_CACHE_TTL_CLASSES || 3600));
+const cacheTtlParent = Math.max(60, Number(process.env.REDIS_CACHE_TTL_PARENT || 300));
 const cacheExcludePaths = String(process.env.REDIS_CACHE_EXCLUDE_PATHS || "")
   .split(",")
   .map((v) => v.trim())
@@ -89,6 +97,8 @@ const cacheExcludePaths = String(process.env.REDIS_CACHE_EXCLUDE_PATHS || "")
   .map((v) => (v.startsWith("/") ? v : `/${v}`));
 const cacheLogEvery = Math.max(0, Number(process.env.REDIS_CACHE_LOG_EVERY || 25));
 const rateLimitMetricsToken = String(process.env.RATE_LIMIT_METRICS_TOKEN || "").trim();
+const cacheMetricsToken = String(process.env.CACHE_METRICS_TOKEN || "").trim();
+const cacheWarmEnabled = String(process.env.CACHE_WARM_ENABLED || "").toLowerCase() === "true";
 
 const trustProxyEnv = String(process.env.TRUST_PROXY || "").toLowerCase();
 
@@ -96,6 +106,144 @@ const trustProxy =
   trustProxyEnv === "true" ||
   trustProxyEnv === "1" ||
   trustProxyEnv === "yes";
+
+type TokenScope = { role: string; userId: string };
+
+function getTokenScope(req: express.Request): TokenScope {
+  const header = String(req.headers.authorization || "");
+  if (!header.toLowerCase().startsWith("bearer ")) return { role: "ANON", userId: "" };
+  const token = header.slice(7).trim();
+  if (!token) return { role: "ANON", userId: "" };
+  const secret = process.env.JWT_SECRET || "";
+  if (!secret) return { role: "ANON", userId: "" };
+  try {
+    const payload = jwt.verify(token, secret) as any;
+    return {
+      role: String(payload?.role || "ANON"),
+      userId: String(payload?.userId || "")
+    };
+  } catch {
+    return { role: "ANON", userId: "" };
+  }
+}
+
+function cacheScopeForPath(req: express.Request) {
+  const scope = getTokenScope(req);
+  const path = req.path || "";
+  if (path.startsWith("/api/parent") || path.startsWith("/api/teacher")) {
+    return scope.userId ? `${scope.role}:${scope.userId}` : scope.role;
+  }
+  return scope.role;
+}
+
+function cacheTagsForPath(req: express.Request) {
+  const path = req.path || "";
+  const tags = new Set<string>();
+  const segments = path.split("/").filter(Boolean);
+  const base = segments[1] || "";
+  const idCandidate = segments[2] || "";
+  const statusRaw = String(req.query?.status || "").toUpperCase().trim();
+  const typeRaw = String(req.query?.type || "").toLowerCase().trim();
+  const isIdCandidate =
+    idCandidate &&
+    idCandidate.length >= 8 &&
+    !["approved", "pending", "export", "history", "simple", "access"].includes(idCandidate);
+
+  const scope = getTokenScope(req);
+  const roleTag = scope.role ? `role:${scope.role}` : "role:ANON";
+  tags.add(roleTag);
+
+  if (base) tags.add(base);
+
+  if (path.startsWith("/api/notifications")) tags.add("notifications");
+  if (path.startsWith("/api/reports/certificate/requests")) tags.add("cert-requests");
+  if (path.startsWith("/api/reports/import-template/history")) tags.add("report-history");
+  if (path.startsWith("/api/admissions")) tags.add("admissions");
+  if (path.startsWith("/api/enrollments")) tags.add("enrollments");
+  if (path.startsWith("/api/users")) tags.add("users");
+  if (path.startsWith("/api/invoices")) tags.add("invoices");
+  if (path.startsWith("/api/parent")) tags.add("parent");
+  if (path.startsWith("/api/teacher")) tags.add("teacher");
+  if (path.startsWith("/api/classes")) tags.add("classes");
+  if (path.startsWith("/api/suggestions")) tags.add("suggestions");
+  if (path.startsWith("/api/students")) tags.add("students");
+  if (path.startsWith("/api/branding")) tags.add("branding");
+
+  if (isIdCandidate && base) {
+    tags.add(`${base}:${idCandidate}`);
+  }
+
+  if (statusRaw && (base === "admissions" || base === "notifications" || base === "invoices")) {
+    tags.add(`${base}:status:${statusRaw}`);
+  }
+  if (path.startsWith("/api/reports/certificate/requests") && statusRaw) {
+    tags.add(`cert-requests:status:${statusRaw}`);
+  }
+  if (typeRaw && base === "suggestions") {
+    tags.add(`suggestions:${typeRaw}`);
+  }
+  if (base === "parent" && scope.userId) {
+    tags.add(`parent:${scope.userId}`);
+  }
+  if (base === "teacher" && scope.userId) {
+    tags.add(`teacher:${scope.userId}`);
+  }
+  return Array.from(tags);
+}
+
+function cacheTtlForPath(req: express.Request) {
+  const path = req.path || "";
+  if (path.startsWith("/api/suggestions")) return cacheTtlSuggestions;
+  if (path.startsWith("/api/classes/simple")) return cacheTtlClasses;
+  if (path.startsWith("/api/parent")) return cacheTtlParent;
+  if (
+    path.startsWith("/api/notifications") ||
+    path.startsWith("/api/reports/certificate/requests") ||
+    path.startsWith("/api/admissions") ||
+    path.startsWith("/api/enrollments") ||
+    path.startsWith("/api/users") ||
+    path.startsWith("/api/invoices")
+  ) {
+    return cacheTtlCritical;
+  }
+  return cacheTtlSeconds;
+}
+
+function cacheWarmUrlsForTags(tags: string[]) {
+  const urls = new Set<string>();
+  const has = (tag: string) => tags.includes(tag);
+  if (has("notifications")) {
+    urls.add("/api/notifications?page=1&pageSize=10&status=PENDING");
+  }
+  if (has("cert-requests")) {
+    urls.add("/api/reports/certificate/requests?page=1&pageSize=10&status=PENDING");
+  }
+  if (has("admissions")) {
+    urls.add("/api/admissions?page=1&pageSize=10&status=PENDING");
+  }
+  if (has("enrollments")) {
+    urls.add("/api/enrollments?page=1&pageSize=10");
+  }
+  if (has("users")) {
+    urls.add("/api/users?page=1&pageSize=10");
+  }
+  if (has("invoices")) {
+    urls.add("/api/invoices?page=1&pageSize=10&status=PENDING");
+  }
+  if (has("classes")) {
+    urls.add("/api/classes/simple");
+  }
+  if (has("students")) {
+    urls.add("/api/students?page=1&pageSize=10");
+  }
+  if (has("report-history")) {
+    urls.add("/api/reports/import-template/history");
+  }
+  if (has("suggestions")) {
+    urls.add("/api/suggestions?type=users&q=&limit=8");
+  }
+  return Array.from(urls);
+}
 
 // ================= LOGS =================
 
@@ -324,20 +472,51 @@ if (rateLimitMetricsToken) {
   });
 }
 
+if (cacheMetricsToken) {
+  app.get("/ops/cache", (req, res) => {
+    const token = String(req.headers["x-metrics-token"] || "");
+    if (!token || token !== cacheMetricsToken) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    return res.json(getCacheMetrics());
+  });
+}
+
+app.get("/api/ops/cache", requireAuth, requireRole(["ADMIN"]), (_req, res) => {
+  return res.json(getCacheMetrics());
+});
+
 // ================= ROUTES =================
 
 app.use(
   "/api",
   cacheResponse({
-    ttlSeconds: cacheTtlSeconds,
+    ttlSeconds: cacheTtlForPath,
     excludePaths: [
       "/api/auth",
+      "/api/ops",
       "/api/reports/export",
       "/api/notifications/export",
       "/api/certificates/export",
       ...cacheExcludePaths
     ],
-    logEvery: cacheLogEvery
+    logEvery: cacheLogEvery,
+    keyFn: cacheScopeForPath,
+    tagsFn: cacheTagsForPath
+  })
+);
+
+app.use(
+  "/api",
+  invalidateCache({
+    tagsFn: cacheTagsForPath,
+    onInvalidated: (tags) => {
+      if (!cacheWarmEnabled) return;
+      const urls = cacheWarmUrlsForTags(tags);
+      if (urls.length > 0) {
+        enqueueCacheWarm(urls).catch(() => undefined);
+      }
+    }
   })
 );
 

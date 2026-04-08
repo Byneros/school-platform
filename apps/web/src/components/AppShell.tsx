@@ -203,6 +203,7 @@ export default function AppShell() {
                     </span>
                   </NavLink>
                   <NavLink to="/admin/sesiones">Sesiones</NavLink>
+                  <NavLink to="/admin/cache">Cache</NavLink>
                   {canEditBranding && <NavLink to="/admin/personalizacion">Personalizacion</NavLink>}
                 </>
               )}
