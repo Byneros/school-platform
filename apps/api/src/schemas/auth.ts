@@ -22,7 +22,7 @@ export const twoFactorResendSchema = z.object({
 
 export const revokeRoleSessionsSchema = z.object({
   body: z.object({
-    role: z.enum(["ADMIN", "TEACHER", "PARENT"])
+    role: z.enum(["ADMIN", "TEACHER", "PARENT", "DEVELOPER"])
   })
 });
 

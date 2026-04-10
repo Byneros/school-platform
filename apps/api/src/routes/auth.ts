@@ -118,7 +118,7 @@ async function sendTwoFactorCodeEmail(email: string, code: string) {
   return sendEmail({ to: email, subject, text, html });
 }
 
-function signToken(payload: { userId: string; role: "ADMIN" | "TEACHER" | "PARENT" }) {
+function signToken(payload: { userId: string; role: "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER" }) {
   const jwtSecret = process.env.JWT_SECRET || "";
   if (!jwtSecret) {
     throw new Error("JWT_SECRET no configurado");

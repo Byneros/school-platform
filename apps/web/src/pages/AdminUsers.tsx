@@ -116,10 +116,11 @@ export default function AdminUsers() {
   const [editForm, setEditForm] = useState({ fullName: "", email: "", role: "ADMIN", password: "" });
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
-  const [collapsedByRole, setCollapsedByRole] = useState<Record<"ADMIN" | "TEACHER" | "PARENT", boolean>>({
+  const [collapsedByRole, setCollapsedByRole] = useState<Record<"ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER", boolean>>({
     ADMIN: false,
     TEACHER: false,
-    PARENT: false
+    PARENT: false,
+    DEVELOPER: false
   });
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importBusy, setImportBusy] = useState(false);
@@ -452,8 +453,9 @@ export default function AdminUsers() {
     }
   };
 
-  const roleSections: Array<{ key: "ADMIN" | "TEACHER" | "PARENT"; label: string }> = [
+  const roleSections: Array<{ key: "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER"; label: string }> = [
     { key: "ADMIN", label: "Administradores" },
+    { key: "DEVELOPER", label: "Desarrolladores" },
     { key: "TEACHER", label: "Docentes" },
     { key: "PARENT", label: "Padres de familia" }
   ];
@@ -490,6 +492,7 @@ export default function AdminUsers() {
           Rol
           <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value, teacherSubjects: e.target.value === "TEACHER" ? form.teacherSubjects : [] })}>
             <option value="ADMIN">Administrador</option>
+            <option value="DEVELOPER">Desarrollador</option>
             <option value="TEACHER">Docente</option>
             <option value="PARENT">Padre</option>
           </select>
@@ -614,6 +617,7 @@ export default function AdminUsers() {
         <select className="input" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
           <option value="">Todos los roles</option>
           <option value="ADMIN">Administrador</option>
+          <option value="DEVELOPER">Desarrollador</option>
           <option value="TEACHER">Docente</option>
           <option value="PARENT">Padre</option>
         </select>
@@ -767,12 +771,13 @@ export default function AdminUsers() {
             />
           </label>
           <label>
-            Rol
-            <select className="input" value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}>
-              <option value="ADMIN">Administrador</option>
-              <option value="TEACHER">Docente</option>
-              <option value="PARENT">Padre</option>
-            </select>
+          Rol
+          <select className="input" value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}>
+            <option value="ADMIN">Administrador</option>
+            <option value="DEVELOPER">Desarrollador</option>
+            <option value="TEACHER">Docente</option>
+            <option value="PARENT">Padre</option>
+          </select>
           </label>
           <label>
             Nueva contrasena (opcional)

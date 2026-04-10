@@ -17,6 +17,7 @@ import AdminTeacherHours from "./pages/AdminTeacherHours";
 import AdminCertificates from "./pages/AdminCertificates";
 import AdminAcademicClosure from "./pages/AdminAcademicClosure";
 import AdminCacheMetrics from "./pages/AdminCacheMetrics";
+import DeveloperZone from "./pages/DeveloperZone";
 import TeacherAttendance from "./pages/TeacherAttendance";
 import TeacherComms from "./pages/TeacherComms";
 import TeacherTasks from "./pages/TeacherTasks";
@@ -273,6 +274,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               element={
                 <ProtectedRoute roles={["PARENT"]}>
                   <StudentFollowup />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="dev"
+              element={
+                <ProtectedRoute roles={["DEVELOPER"]}>
+                  <DeveloperZone />
                 </ProtectedRoute>
               }
             />

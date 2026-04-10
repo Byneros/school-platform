@@ -13,7 +13,7 @@ export const createUserSchema = z.object({
     email: z.string().email(),
     password: strongPasswordRule,
     fullName: z.string().min(1),
-    role: z.enum(["ADMIN", "TEACHER", "PARENT"]),
+    role: z.enum(["ADMIN", "TEACHER", "PARENT", "DEVELOPER"]),
     teacherSubjects: z.array(z.string().min(1)).optional(),
     isActive: z.boolean().optional()
   }).superRefine((data, ctx) => {
@@ -34,7 +34,7 @@ export const updateUserSchema = z.object({
   body: z.object({
     email: z.string().email().optional(),
     fullName: z.string().min(1).optional(),
-    role: z.enum(["ADMIN", "TEACHER", "PARENT"]).optional(),
+    role: z.enum(["ADMIN", "TEACHER", "PARENT", "DEVELOPER"]).optional(),
     isActive: z.boolean().optional(),
     password: strongPasswordRule.optional()
   })
