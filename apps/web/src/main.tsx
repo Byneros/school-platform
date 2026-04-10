@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import "./styles.css";
 import AppShell from "./components/AppShell";
 import LoginPage from "./pages/LoginPage";
@@ -29,10 +29,25 @@ import SessionsPage from "./pages/SessionsPage";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+function RedirectRestore() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  useEffect(() => {
+    const saved = sessionStorage.getItem("redirectPath");
+    if (!saved) return;
+    sessionStorage.removeItem("redirectPath");
+    if (saved !== `${location.pathname}${location.search}`) {
+      navigate(saved, { replace: true });
+    }
+  }, [navigate, location.pathname, location.search]);
+  return null;
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>
       <BrowserRouter>
+        <RedirectRestore />
         <Routes>
           <Route path="/" element={<AppShell />}>
             <Route index element={<LoginPage />} />
