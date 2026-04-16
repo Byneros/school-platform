@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, apiGet, apiPost } from "../services/api";
+import { ApiError, apiGet, apiPost, clearDeveloperAccessToken } from "../services/api";
 import { getAuth, setAuth, clearAuth, AuthUser } from "../services/auth";
 
 type AuthContextValue = {
@@ -169,6 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     apiPost("/auth/logout", {}).catch(() => undefined);
+    clearDeveloperAccessToken();
     clearAuth();
     setUser(null);
     setInactivityWarning(false);

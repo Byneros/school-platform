@@ -14,6 +14,7 @@ import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { createCertificateRequestSchema, reviewCertificateRequestSchema } from "../schemas/certificates.js";
 import { validate } from "../utils/validate.js";
 import { composeNotificationBodyWithMeta } from "../utils/notificationMeta.js";
+import { isDeveloperRole } from "../utils/rbac.js";
 
 const router = Router();
 const CERT_REQUEST_APPROVAL_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -417,7 +418,7 @@ function gradeLabelShort(grade?: string) {
 }
 
 async function assertParentCanAccessStudent(auth: { userId: string; role: string }, studentId: string) {
-  if (auth?.role !== "PARENT") return true;
+  if (auth?.role !== "PARENT" || isDeveloperRole(auth?.role)) return true;
   const parent = await prisma.parent.findUnique({ where: { userId: auth.userId } });
   if (!parent) return false;
   const guardian = await prisma.guardian.findFirst({
@@ -431,7 +432,7 @@ async function resolveCertificateIssuer(
   studentId: string,
   type: "STUDY" | "ENROLLMENT"
 ) {
-  if (auth.role === "ADMIN") {
+  if (auth.role === "ADMIN" || isDeveloperRole(auth.role)) {
     return { allowed: true, issuedById: auth.userId };
   }
 

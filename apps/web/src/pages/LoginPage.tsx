@@ -35,6 +35,7 @@ export default function LoginPage() {
       }
       const user = result.user;
       if (user.role === "ADMIN") navigate("/admin");
+      if (user.role === "DEVELOPER") navigate("/dev");
       if (user.role === "TEACHER") navigate("/teacher");
       if (user.role === "PARENT") navigate("/parent");
     } catch (err) {
@@ -58,6 +59,7 @@ export default function LoginPage() {
     try {
       const user = await verifyTwoFactor(twoFactorToken, twoFactorCode);
       if (user.role === "ADMIN") navigate("/admin");
+      if (user.role === "DEVELOPER") navigate("/dev");
       if (user.role === "TEACHER") navigate("/teacher");
       if (user.role === "PARENT") navigate("/parent");
     } catch (err) {
@@ -109,6 +111,7 @@ export default function LoginPage() {
 
   const roleLabel = (role: string) => {
     if (role === "ADMIN") return "Administrador";
+    if (role === "DEVELOPER") return "Desarrollador";
     if (role === "TEACHER") return "Docente";
     if (role === "PARENT") return "Padre";
     return "Usuario";

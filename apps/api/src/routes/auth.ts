@@ -34,7 +34,7 @@ const jwtExpiresIn = getAccessTokenTtl();
 type Role = "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER";
 
 const twoFactorEnabledEnv = String(process.env.ADMIN_2FA_ENABLED || "").toLowerCase();
-const twoFactorRolesEnv = String(process.env.TWO_FACTOR_ROLES || "ADMIN,TEACHER,PARENT");
+const twoFactorRolesEnv = String(process.env.TWO_FACTOR_ROLES || "ADMIN,TEACHER,PARENT,DEVELOPER");
 const isProd = process.env.NODE_ENV === "production";
 
 const twoFactorEnabled =

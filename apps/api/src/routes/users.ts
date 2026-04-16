@@ -9,6 +9,7 @@ import { buildCsvReport, buildXlsxReportBuffer, sendTabularPdf } from "../utils/
 import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { sendEmail } from "../utils/mailer.js";
 import { enqueueEmail } from "../services/emailQueue.js";
+import { canManageDeveloperUsers, canViewDeveloperUsers, isDeveloperRole } from "../utils/rbac.js";
 
 const router = Router();
 
@@ -32,6 +33,7 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const role = String(req.query.role || "").trim();
   const where: Prisma.UserWhereInput = {
     email: { not: "docente.sin.asignar@colegio.edu" },
+    ...(!canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : {}),
     ...(search
       ? {
           OR: [
@@ -40,7 +42,11 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
           ]
         }
       : {}),
-    ...(role ? { role: role as any } : {})
+    ...(role
+      ? canViewDeveloperUsers(auth?.role) || role !== "DEVELOPER"
+        ? { role: role as any }
+        : { id: "__developer-hidden__" }
+      : {})
   };
   const [principalAdmin, data, total] = await Promise.all([
     prisma.user.findFirst({
@@ -112,7 +118,7 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
           })
         : []
   }));
-  const canDelete = principalAdmin ? auth.userId === principalAdmin.id : false;
+  const canDelete = isDeveloperRole(auth?.role) || (principalAdmin ? auth.userId === principalAdmin.id : false);
   res.json({ data: decorated, total, page, pageSize, canDelete });
 });
 
@@ -261,7 +267,9 @@ router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), asyn
 });
 
 router.get("/export/csv", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
+  const auth = (_req as any).auth;
   const users = await prisma.user.findMany({
+    where: !canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : undefined,
     select: { email: true, fullName: true, role: true, isActive: true }
   });
   const branding = await getBrandingSettings();
@@ -285,7 +293,9 @@ router.get("/export/csv", requireAuth, requireRole(["ADMIN"]), async (_req, res)
 });
 
 router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
+  const auth = (_req as any).auth;
   const users = await prisma.user.findMany({
+    where: !canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : undefined,
     select: { email: true, fullName: true, role: true, isActive: true }
   });
   const branding = await getBrandingSettings();
@@ -309,7 +319,9 @@ router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (_req, re
 });
 
 router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
+  const auth = (_req as any).auth;
   const users = await prisma.user.findMany({
+    where: !canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : undefined,
     select: { email: true, fullName: true, role: true, isActive: true }
   });
   const branding = await getBrandingSettings();
@@ -331,7 +343,11 @@ router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (_req, res)
 });
 
 router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createUserSchema), async (req, res) => {
+  const auth = (req as any).auth;
   const { body } = (req as any).validated;
+  if (body.role === "DEVELOPER" && !canManageDeveloperUsers(auth?.role)) {
+    return res.status(404).json({ message: "Usuario no encontrado" });
+  }
   const normalizedEmail = String(body.email || "").trim().toLowerCase();
   const plainPassword = body.password;
   const passwordHash = await bcrypt.hash(body.password, 10);
@@ -438,13 +454,26 @@ router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createUserSchema)
 router.patch("/:id", requireAuth, requireRole(["ADMIN"]), validate(updateUserSchema), async (req, res) => {
   const auth = (req as any).auth;
   const { params, body } = (req as any).validated;
+  const existingTarget = await prisma.user.findUnique({
+    where: { id: params.id },
+    select: { id: true, role: true }
+  });
+  if (!existingTarget) {
+    return res.status(404).json({ message: "Usuario no encontrado" });
+  }
+  if (isDeveloperRole(existingTarget.role) && !canManageDeveloperUsers(auth?.role)) {
+    return res.status(404).json({ message: "Usuario no encontrado" });
+  }
+  if (body.role === "DEVELOPER" && !canManageDeveloperUsers(auth?.role)) {
+    return res.status(404).json({ message: "Usuario no encontrado" });
+  }
   const principalAdmin = await prisma.user.findFirst({
     where: { role: "ADMIN" },
     orderBy: { createdAt: "asc" },
     select: { id: true }
   });
 
-  if (principalAdmin && params.id === principalAdmin.id) {
+  if (!isDeveloperRole(auth?.role) && principalAdmin && params.id === principalAdmin.id) {
     if (body.isActive === false) {
       return res.status(400).json({ message: "El administrador principal no se puede desactivar" });
     }
@@ -479,10 +508,10 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
     orderBy: { createdAt: "asc" },
     select: { id: true }
   });
-  if (principalAdmin && userId === principalAdmin.id) {
+  if (!isDeveloperRole(auth?.role) && principalAdmin && userId === principalAdmin.id) {
     return res.status(400).json({ message: "El administrador principal no se puede eliminar" });
   }
-  if (!principalAdmin || auth.userId !== principalAdmin.id) {
+  if (!isDeveloperRole(auth?.role) && (!principalAdmin || auth.userId !== principalAdmin.id)) {
     return res.status(403).json({ message: "Solo el administrador principal puede eliminar usuarios" });
   }
 
@@ -491,16 +520,23 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
     include: { teacher: true, parent: true }
   });
   if (!target) return res.status(404).json({ message: "Usuario no encontrado" });
+  if (isDeveloperRole(target.role) && !canManageDeveloperUsers(auth?.role)) {
+    return res.status(404).json({ message: "Usuario no encontrado" });
+  }
+  const reassignmentUserId = isDeveloperRole(auth?.role) ? auth.userId : principalAdmin?.id;
+  if (!reassignmentUserId) {
+    return res.status(500).json({ message: "No se pudo determinar el usuario de reasignacion" });
+  }
 
   await prisma.$transaction(async (tx) => {
     // Reasignar notificaciones al admin principal para conservar trazabilidad
     await tx.notification.updateMany({
       where: { createdById: userId },
-      data: { createdById: principalAdmin.id }
+      data: { createdById: reassignmentUserId }
     });
     await tx.notification.updateMany({
       where: { approvedById: userId },
-      data: { approvedById: principalAdmin.id }
+      data: { approvedById: reassignmentUserId }
     });
     await tx.notification.updateMany({
       where: { targetUserId: userId },

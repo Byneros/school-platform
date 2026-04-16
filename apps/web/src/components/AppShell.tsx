@@ -13,6 +13,8 @@ type BrandingSettings = {
 
 export default function AppShell() {
   const { user, logout, initializing, inactivityWarning, extendSession } = useAuth();
+  const isDeveloper = user?.role === "DEVELOPER";
+  const isAdminLike = user?.role === "ADMIN" || isDeveloper;
   const [branding, setBranding] = useState<BrandingSettings>({
     schoolName: "School Platform",
     logoDataUrl: null,
@@ -46,7 +48,7 @@ export default function AppShell() {
   }, []);
 
   useEffect(() => {
-    if (!user || user.role !== "ADMIN") {
+    if (!user || !isAdminLike) {
       setCanEditBranding(false);
       setPendingCertificateRequests(0);
       setPendingNotifications(0);
@@ -55,10 +57,10 @@ export default function AppShell() {
     apiGet("/branding/access")
       .then((res) => setCanEditBranding(Boolean(res?.canEdit)))
       .catch(() => setCanEditBranding(false));
-  }, [user]);
+  }, [user, isAdminLike]);
 
   useEffect(() => {
-    if (!user || user.role !== "ADMIN") return;
+    if (!user || !isAdminLike) return;
     const loadPendingRequests = () => {
       apiGet("/reports/certificate/requests?page=1&pageSize=1&status=PENDING")
         .then((res) => setPendingCertificateRequests(Number(res?.total || 0)))
@@ -79,10 +81,10 @@ export default function AppShell() {
       document.removeEventListener("visibilitychange", visibilityHandler);
       window.clearInterval(intervalId);
     };
-  }, [user]);
+  }, [user, isAdminLike]);
 
   useEffect(() => {
-    if (!user || user.role !== "TEACHER") {
+    if (!user || (user.role !== "TEACHER" && !isDeveloper)) {
       setTeacherHasObserverAccess(true);
       return;
     }
@@ -92,10 +94,10 @@ export default function AppShell() {
         setTeacherHasObserverAccess(list.length > 0);
       })
       .catch(() => setTeacherHasObserverAccess(true));
-  }, [user]);
+  }, [user, isDeveloper]);
 
   useEffect(() => {
-    if (!user || user.role !== "ADMIN") return;
+    if (!user || !isAdminLike) return;
     const loadPending = () => {
       apiGet("/notifications?page=1&pageSize=1&status=PENDING")
         .then((res) => setPendingNotifications(Number(res?.total || 0)))
@@ -116,7 +118,7 @@ export default function AppShell() {
       document.removeEventListener("visibilitychange", visibilityHandler);
       window.clearInterval(intervalId);
     };
-  }, [user]);
+  }, [user, isAdminLike]);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--brand", branding.primaryColor);
@@ -136,9 +138,11 @@ export default function AppShell() {
           </div>
           {!initializing && user && (
             <div className="nav-links">
-              <Link to="/admin">Admin</Link>
-              <Link to="/teacher">Docente</Link>
-              <Link to="/parent">Padre</Link>
+              {isAdminLike && <Link to="/admin">Admin</Link>}
+              {user.role === "TEACHER" && <Link to="/teacher">Docente</Link>}
+              {user.role === "PARENT" && <Link to="/parent">Padre</Link>}
+              {isDeveloper && <Link to="/dev">Developer</Link>}
+              <Link to="/feedback">Feedback</Link>
               <button className="button warning" onClick={logout}>Salir</button>
             </div>
           )}
@@ -175,7 +179,7 @@ export default function AppShell() {
           <div className="app-shell">
             <aside className="sidebar">
               <div className="sidebar-title">Navegacion</div>
-              {user.role === "ADMIN" && (
+              {isAdminLike && (
                 <>
                   <NavLink to="/admin">Dashboard</NavLink>
                   <NavLink to="/admin/alertas">Alertas</NavLink>
@@ -207,7 +211,7 @@ export default function AppShell() {
                   {canEditBranding && <NavLink to="/admin/personalizacion">Personalizacion</NavLink>}
                 </>
               )}
-              {user.role === "TEACHER" && (
+              {user.role === "TEACHER" && !isDeveloper && (
                 <>
                   <NavLink to="/teacher">Dashboard</NavLink>
                   <NavLink to="/teacher/asistencia">Asistencia por grado</NavLink>
@@ -217,7 +221,7 @@ export default function AppShell() {
                   <NavLink to="/teacher/sesiones">Sesiones</NavLink>
                 </>
               )}
-              {user.role === "PARENT" && (
+              {user.role === "PARENT" && !isDeveloper && (
                 <>
                   <NavLink to="/parent">Dashboard</NavLink>
                   <NavLink to="/parent/boletines">Boletines</NavLink>
@@ -227,30 +231,40 @@ export default function AppShell() {
                   <NavLink to="/parent/sesiones">Sesiones</NavLink>
                 </>
               )}
+              {user.role === "DEVELOPER" && (
+                <>
+                  <NavLink to="/dev">Zona developer</NavLink>
+                  <NavLink to="/feedback">Feedback</NavLink>
+                </>
+              )}
               <div className="sidebar-title" style={{ marginTop: 16 }}>Acciones rapidas</div>
-              {user.role === "ADMIN" && (
+              {isAdminLike && (
                 <div style={{ display: "grid", gap: 6 }}>
                   <Link className="button secondary" to="/admin/alertas">Ver alertas</Link>
                   <Link className="button secondary" to="/admin/admisiones">Nueva admision</Link>
                   <Link className="button secondary" to="/admin/usuarios">Crear usuario</Link>
                   <Link className="button secondary" to="/admin/notificaciones">Crear notificacion</Link>
                   <Link className="button secondary" to="/admin/observador">Registrar observacion</Link>
+                  {isDeveloper && <Link className="button secondary" to="/dev">Abrir consola developer</Link>}
+                  <Link className="button secondary" to="/feedback">Ver feedback</Link>
                 </div>
               )}
-              {user.role === "TEACHER" && (
+              {user.role === "TEACHER" && !isDeveloper && (
                 <div style={{ display: "grid", gap: 6 }}>
                   <Link className="button secondary" to="/teacher/asistencia">Registrar asistencia</Link>
                   <Link className="button secondary" to="/teacher/tareas-calificaciones">Tareas y calificaciones</Link>
                   {teacherHasObserverAccess && (
                     <Link className="button secondary" to="/teacher/observador">Registrar observacion</Link>
                   )}
+                  <Link className="button secondary" to="/feedback">Enviar feedback</Link>
                 </div>
               )}
-              {user.role === "PARENT" && (
+              {user.role === "PARENT" && !isDeveloper && (
                 <div style={{ display: "grid", gap: 6 }}>
                   <Link className="button secondary" to="/parent/boletines">Ver boletines</Link>
                   <Link className="button secondary" to="/parent/pagos">Ver pagos</Link>
                   <Link className="button secondary" to="/parent/comunicados">Ver comunicados</Link>
+                  <Link className="button secondary" to="/feedback">Enviar feedback</Link>
                 </div>
               )}
             </aside>

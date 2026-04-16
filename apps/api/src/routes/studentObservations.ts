@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { validate } from "../utils/validate.js";
 import { createStudentObservationSchema, updateStudentObservationSchema } from "../schemas/studentObservations.js";
 import { composeNotificationBodyWithMeta, type NotificationLegalReference } from "../utils/notificationMeta.js";
+import { isDeveloperRole } from "../utils/rbac.js";
 
 const router = Router();
 
@@ -494,8 +495,8 @@ async function notifyDisciplinaryProcessIfNeeded(params: {
   }
 }
 
-async function resolveAllowedStudentIdsByRole(auth: { userId: string; role: "ADMIN" | "TEACHER" | "PARENT" }) {
-  if (auth.role === "ADMIN") return null;
+async function resolveAllowedStudentIdsByRole(auth: { userId: string; role: string }) {
+  if (auth.role === "ADMIN" || isDeveloperRole(auth.role)) return null;
   if (auth.role === "TEACHER") {
     const classRows = await prisma.enrollment.findMany({
       where: { class: { teacher: { userId: auth.userId } } },
@@ -818,7 +819,7 @@ router.patch("/:id", requireAuth, requireRole(["ADMIN", "TEACHER"]), validate(up
   });
   if (!current) return res.status(404).json({ message: "Observacion no encontrada" });
 
-  if (auth.role !== "ADMIN" && current.createdById !== auth.userId) {
+  if (auth.role !== "ADMIN" && !isDeveloperRole(auth.role) && current.createdById !== auth.userId) {
     return res.status(403).json({ message: "Solo puedes editar tus propias observaciones" });
   }
 

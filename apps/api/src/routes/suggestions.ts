@@ -1,6 +1,7 @@
 import { Router } from "express";
 import prisma from "../utils/prisma.js";
 import { requireAuth } from "../middlewares/auth.js";
+import { isDeveloperRole } from "../utils/rbac.js";
 
 const router = Router();
 const suggestionsCache = new Map<string, { expiresAt: number; data: any }>();
@@ -141,6 +142,8 @@ function getEnrollmentGradeLevel(enrollment: any) {
 
 router.get("/", requireAuth, async (req, res) => {
   const auth = (req as any).auth;
+  const isDeveloper = isDeveloperRole(auth?.role);
+  const isAdminLike = auth?.role === "ADMIN" || isDeveloper;
   const type = String(req.query.type || "").trim();
   const q = String(req.query.q || "").trim();
   const limit = Math.min(20, Math.max(1, Number(req.query.limit || 8)));
@@ -158,7 +161,7 @@ router.get("/", requireAuth, async (req, res) => {
   if (!type) return res.status(400).json({ message: "Tipo de sugerencia requerido" });
 
   if (type === "students") {
-    if (!["ADMIN", "TEACHER"].includes(auth?.role)) {
+    if (!["ADMIN", "TEACHER", "DEVELOPER"].includes(auth?.role)) {
       return res.status(403).json({ message: "Sin permisos" });
     }
     const students = await prisma.student.findMany({
@@ -182,13 +185,13 @@ router.get("/", requireAuth, async (req, res) => {
   }
 
   if (type === "global") {
-    if (!["ADMIN", "TEACHER", "PARENT"].includes(auth?.role)) {
+    if (!["ADMIN", "TEACHER", "PARENT", "DEVELOPER"].includes(auth?.role)) {
       return res.status(403).json({ message: "Sin permisos" });
     }
     const results: Array<{ value: string; label: string; route: string }> = [];
     const normalizedLimit = Math.max(limit, 8);
 
-    if (auth.role === "ADMIN") {
+    if (isAdminLike) {
       const [students, users, admissions] = await Promise.all([
         prisma.student.findMany({
           where: q ? { fullName: { contains: q, mode: "insensitive" } } : {},
@@ -202,8 +205,11 @@ router.get("/", requireAuth, async (req, res) => {
                 OR: [
                   { fullName: { contains: q, mode: "insensitive" } },
                   { email: { contains: q, mode: "insensitive" } }
-                ]
+                ],
+                ...(!isDeveloper ? { role: { not: "DEVELOPER" } } : {})
               }
+            : !isDeveloper
+            ? { role: { not: "DEVELOPER" } }
             : {},
           select: { id: true, fullName: true, email: true, role: true },
           orderBy: { fullName: "asc" },
@@ -304,15 +310,18 @@ router.get("/", requireAuth, async (req, res) => {
   }
 
   if (type === "users") {
-    if (auth?.role !== "ADMIN") return res.status(403).json({ message: "Sin permisos" });
+    if (!isAdminLike) return res.status(403).json({ message: "Sin permisos" });
     const users = await prisma.user.findMany({
       where: q
         ? {
             OR: [
               { fullName: { contains: q, mode: "insensitive" } },
               { email: { contains: q, mode: "insensitive" } }
-            ]
+            ],
+            ...(!isDeveloper ? { role: { not: "DEVELOPER" } } : {})
           }
+        : !isDeveloper
+        ? { role: { not: "DEVELOPER" } }
         : {},
       select: { id: true, fullName: true, email: true, role: true },
       orderBy: { fullName: "asc" },
@@ -326,7 +335,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 
   if (type === "teachers") {
-    if (auth?.role !== "ADMIN") return res.status(403).json({ message: "Sin permisos" });
+    if (!isAdminLike) return res.status(403).json({ message: "Sin permisos" });
     const teachers = await prisma.user.findMany({
       where: {
         role: "TEACHER",
@@ -353,7 +362,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 
   if (type === "admissions") {
-    if (auth?.role !== "ADMIN") return res.status(403).json({ message: "Sin permisos" });
+    if (!isAdminLike) return res.status(403).json({ message: "Sin permisos" });
     const admissions = await prisma.admission.findMany({
       where: q ? { studentName: { contains: q, mode: "insensitive" } } : {},
       select: { id: true, studentName: true, gradeLevel: true },
@@ -369,7 +378,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 
   if (type === "enrollments") {
-    if (auth?.role !== "ADMIN") return res.status(403).json({ message: "Sin permisos" });
+    if (!isAdminLike) return res.status(403).json({ message: "Sin permisos" });
     const enrollments = await prisma.enrollment.findMany({
       where: q
         ? {
@@ -413,7 +422,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 
   if (type === "invoices") {
-    if (auth?.role !== "ADMIN") return res.status(403).json({ message: "Sin permisos" });
+    if (!isAdminLike) return res.status(403).json({ message: "Sin permisos" });
     const invoices = await prisma.invoice.findMany({
       where: q ? { student: { is: { fullName: { contains: q, mode: "insensitive" } } } } : {},
       select: { id: true, status: true, dueDate: true, student: { select: { fullName: true } } },
@@ -434,7 +443,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 
   if (type === "payments") {
-    if (auth?.role !== "ADMIN") return res.status(403).json({ message: "Sin permisos" });
+    if (!isAdminLike) return res.status(403).json({ message: "Sin permisos" });
     const payments = await prisma.payment.findMany({
       where: q
         ? {
@@ -459,7 +468,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 
   if (type === "academic-closure") {
-    if (auth?.role !== "ADMIN") return res.status(403).json({ message: "Sin permisos" });
+    if (!isAdminLike) return res.status(403).json({ message: "Sin permisos" });
     const enrollments = await prisma.enrollment.findMany({
       where: q ? { studentFullName: { contains: q, mode: "insensitive" } } : {},
       select: { id: true, studentFullName: true, studentGradeLevel: true, student: { select: { studentGroup: true } } },

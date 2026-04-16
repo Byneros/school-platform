@@ -1,5 +1,6 @@
 const API_URL = "https://school-platform-z8f4.onrender.com/api";
 const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
+const DEVELOPER_ACCESS_TOKEN_KEY = "school.developer.access-token";
 
 export class ApiError extends Error {
   status: number;
@@ -45,13 +46,44 @@ function getToken() {
   }
 }
 
+export function getDeveloperAccessToken() {
+  try {
+    return sessionStorage.getItem(DEVELOPER_ACCESS_TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setDeveloperAccessToken(token: string) {
+  try {
+    const normalized = token.trim();
+    if (!normalized) {
+      sessionStorage.removeItem(DEVELOPER_ACCESS_TOKEN_KEY);
+      return;
+    }
+    sessionStorage.setItem(DEVELOPER_ACCESS_TOKEN_KEY, normalized);
+  } catch {
+    // ignore storage failures
+  }
+}
+
+export function clearDeveloperAccessToken() {
+  try {
+    sessionStorage.removeItem(DEVELOPER_ACCESS_TOKEN_KEY);
+  } catch {
+    // ignore storage failures
+  }
+}
+
 type RequestMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
-function buildHeaders(withJson: boolean) {
+function buildHeaders(withJson: boolean, normalizedPath: string) {
   const token = getToken();
+  const developerAccessToken = normalizedPath.startsWith("/dev") ? getDeveloperAccessToken() : "";
   return {
     ...(withJson ? { "Content-Type": "application/json" } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(developerAccessToken ? { "X-Developer-Access-Token": developerAccessToken } : {})
   };
 }
 
@@ -64,7 +96,7 @@ async function request(path: string, method: RequestMethod, body?: unknown) {
   try {
     res = await fetch(`${API_URL}${normalizedPath}`, {
       method,
-      headers: buildHeaders(withJson),
+      headers: buildHeaders(withJson, normalizedPath),
       signal: controller.signal,
       credentials: "include",
       ...(withJson ? { body: JSON.stringify(body) } : {})

@@ -18,6 +18,7 @@ import studentObservationRoutes from "./studentObservations.js";
 import academicClosureRoutes from "./academicClosure.js";
 import suggestionRoutes from "./suggestions.js";
 import devRoutes from "./dev.js";
+import feedbackRoutes from "./feedback.js";
 
 const router = Router();
 
@@ -40,5 +41,6 @@ router.use("/student-observations", studentObservationRoutes);
 router.use("/academic-closure", academicClosureRoutes);
 router.use("/suggestions", suggestionRoutes);
 router.use("/dev", devRoutes);
+router.use("/feedback", feedbackRoutes);
 
 export default router;

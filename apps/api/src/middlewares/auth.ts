@@ -1,9 +1,10 @@
 ﻿import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { hasRequiredRole, type AppRole } from "../utils/rbac.js";
 
 export interface AuthPayload {
   userId: string;
-  role: "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER";
+  role: AppRole;
 }
 
 export interface AuthedRequest extends Request {
@@ -27,7 +28,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 export function requireRole(roles: AuthPayload["role"][]) {
   return (req: Request, res: Response, next: NextFunction) => {
     const auth = (req as any).auth as AuthPayload | undefined;
-    if (!auth || !roles.includes(auth.role)) {
+    if (!auth || !hasRequiredRole(auth.role, roles)) {
       return res.status(403).json({ error: "Forbidden" });
     }
     next();

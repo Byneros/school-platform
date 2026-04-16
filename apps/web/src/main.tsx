@@ -18,6 +18,7 @@ import AdminCertificates from "./pages/AdminCertificates";
 import AdminAcademicClosure from "./pages/AdminAcademicClosure";
 import AdminCacheMetrics from "./pages/AdminCacheMetrics";
 import DeveloperZone from "./pages/DeveloperZone";
+import FeedbackCenter from "./pages/FeedbackCenter";
 import TeacherAttendance from "./pages/TeacherAttendance";
 import TeacherComms from "./pages/TeacherComms";
 import TeacherTasks from "./pages/TeacherTasks";
@@ -258,6 +259,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               element={
                 <ProtectedRoute roles={["PARENT"]}>
                   <SessionsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="feedback"
+              element={
+                <ProtectedRoute roles={["ADMIN", "TEACHER", "PARENT", "DEVELOPER"]}>
+                  <FeedbackCenter />
                 </ProtectedRoute>
               }
             />

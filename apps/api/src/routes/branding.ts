@@ -4,6 +4,7 @@ import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { getBrandingSettings, saveBrandingSettings } from "../utils/brandingSettings.js";
 import { sendTabularPdf } from "../utils/reportExport.js";
+import { isDeveloperRole } from "../utils/rbac.js";
 
 const router = Router();
 
@@ -19,6 +20,11 @@ const updateBrandingSchema = z.object({
 });
 
 async function isPrincipalAdmin(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true }
+  });
+  if (isDeveloperRole(user?.role)) return true;
   const principalAdmin = await prisma.user.findFirst({
     where: { role: "ADMIN" },
     orderBy: { createdAt: "asc" },

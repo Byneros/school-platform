@@ -71,6 +71,18 @@ enum CertificateRequestStatus {
   REJECTED
 }
 
+enum FeedbackCategory {
+  OPINION
+  BUG
+  SUGGESTION
+}
+
+enum FeedbackStatus {
+  OPEN
+  REVIEWED
+  CLOSED
+}
+
 enum PromotionStatus {
   PROMOTED
   NOT_PROMOTED
@@ -115,8 +127,31 @@ model User {
   certificateRequestsReviewed CertificateRequest[] @relation("CertificateReviewer")
   academicClosures AcademicClosureResult[] @relation("AcademicClosureExecutor")
   refreshSessions RefreshSession[]
+  feedbackEntries Feedback[] @relation("FeedbackAuthor")
+  feedbackResponses Feedback[] @relation("FeedbackResponder")
 
   @@index([role, isActive])
+}
+
+model Feedback {
+  id            String           @id @default(cuid())
+  userId        String
+  category      FeedbackCategory
+  title         String
+  message       String
+  status        FeedbackStatus   @default(OPEN)
+  response      String?
+  respondedById String?
+  respondedAt   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  user        User  @relation("FeedbackAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  respondedBy User? @relation("FeedbackResponder", fields: [respondedById], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([category, createdAt])
 }
 
 model RefreshSession {

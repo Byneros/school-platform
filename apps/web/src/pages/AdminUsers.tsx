@@ -59,6 +59,7 @@ function PasswordChecklist({ password }: { password: string }) {
 
 export default function AdminUsers() {
   const { user } = useAuth();
+  const canManageDeveloperUsers = user?.role === "DEVELOPER";
   const [searchParams, setSearchParams] = useSearchParams();
   const [users, setUsers] = useState<
     Array<{
@@ -455,7 +456,7 @@ export default function AdminUsers() {
 
   const roleSections: Array<{ key: "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER"; label: string }> = [
     { key: "ADMIN", label: "Administradores" },
-    { key: "DEVELOPER", label: "Desarrolladores" },
+    ...(canManageDeveloperUsers ? [{ key: "DEVELOPER" as const, label: "Desarrolladores" }] : []),
     { key: "TEACHER", label: "Docentes" },
     { key: "PARENT", label: "Padres de familia" }
   ];
@@ -492,7 +493,7 @@ export default function AdminUsers() {
           Rol
           <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value, teacherSubjects: e.target.value === "TEACHER" ? form.teacherSubjects : [] })}>
             <option value="ADMIN">Administrador</option>
-            <option value="DEVELOPER">Desarrollador</option>
+            {canManageDeveloperUsers && <option value="DEVELOPER">Desarrollador</option>}
             <option value="TEACHER">Docente</option>
             <option value="PARENT">Padre</option>
           </select>
@@ -617,7 +618,7 @@ export default function AdminUsers() {
         <select className="input" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
           <option value="">Todos los roles</option>
           <option value="ADMIN">Administrador</option>
-          <option value="DEVELOPER">Desarrollador</option>
+          {canManageDeveloperUsers && <option value="DEVELOPER">Desarrollador</option>}
           <option value="TEACHER">Docente</option>
           <option value="PARENT">Padre</option>
         </select>
@@ -774,7 +775,7 @@ export default function AdminUsers() {
           Rol
           <select className="input" value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}>
             <option value="ADMIN">Administrador</option>
-            <option value="DEVELOPER">Desarrollador</option>
+            {canManageDeveloperUsers && <option value="DEVELOPER">Desarrollador</option>}
             <option value="TEACHER">Docente</option>
             <option value="PARENT">Padre</option>
           </select>
