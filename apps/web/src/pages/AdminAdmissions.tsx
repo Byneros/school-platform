@@ -89,6 +89,8 @@ export default function AdminAdmissions() {
   const [gradeFilter, setGradeFilter] = useState(initialGrade);
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search, 350);
+  const [admissionMessage, setAdmissionMessage] = useState("");
+  const [admissionError, setAdmissionError] = useState("");
   const [form, setForm] = useState({
     studentName: "",
     gradeLevel: "PRE_JARDIN",
@@ -190,6 +192,7 @@ export default function AdminAdmissions() {
   const editNameInputRef = useRef<HTMLInputElement | null>(null);
   const editEnrollmentPanelRef = useRef<HTMLFormElement | null>(null);
   const editEnrollmentNameInputRef = useRef<HTMLInputElement | null>(null);
+  const admissionFeedbackRef = useRef<HTMLDivElement | null>(null);
   const admissionsSearchOptions = useSuggestions({
     endpoint: "/suggestions?type=admissions",
     query: search
@@ -383,6 +386,13 @@ export default function AdminAdmissions() {
     });
   }, [editingEnrollmentId]);
 
+  useEffect(() => {
+    if (!admissionMessage && !admissionError) return;
+    requestAnimationFrame(() => {
+      admissionFeedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [admissionMessage, admissionError]);
+
   const getRemainingDays = (dueAt?: string | null) => {
     if (!dueAt) return null;
     const dueDate = new Date(dueAt);
@@ -409,27 +419,54 @@ export default function AdminAdmissions() {
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
-    const admission = await apiPost("/admissions", {
-      studentName: form.studentName,
-      gradeLevel: form.gradeLevel,
-      notes: form.notes?.trim() || "",
-      documents: form.documents
-    });
-    setAdmissions([admission, ...admissions]);
-    setForm({
-      studentName: "",
-      gradeLevel: "PRE_JARDIN",
-      notes: "",
-      documents: {
-        studentIdentity: false,
-        parentsIds: false,
-        recentReportCards: false,
-        previousSchoolCertificates: false,
-        addressProof: false,
-        vaccinationCard: false
-      }
-    });
+    setAdmissionMessage("");
+    setAdmissionError("");
+    try {
+      const admission = await apiPost("/admissions", {
+        studentName: form.studentName,
+        gradeLevel: form.gradeLevel,
+        notes: form.notes?.trim() || "",
+        documents: form.documents
+      });
+      setAdmissions([admission, ...admissions]);
+      setForm({
+        studentName: "",
+        gradeLevel: "PRE_JARDIN",
+        notes: "",
+        documents: {
+          studentIdentity: false,
+          parentsIds: false,
+          recentReportCards: false,
+          previousSchoolCertificates: false,
+          addressProof: false,
+          vaccinationCard: false
+        }
+      });
+      setAdmissionMessage("Nueva admision creada satisfactoriamente.");
+    } catch (error: any) {
+      setAdmissionError(error?.message || "No fue posible crear la admision.");
+    }
   };
+
+  const admissionFeedback = (() => {
+    if (admissionMessage) {
+      return {
+        title: "Admision creada",
+        text: admissionMessage,
+        color: "#15803d",
+        background: "#f0fdf4",
+        border: "#86efac"
+      };
+    }
+    if (!admissionError) return null;
+    return {
+      title: "Error al crear admision",
+      text: admissionError,
+      color: "#b91c1c",
+      background: "#fef2f2",
+      border: "#fecaca"
+    };
+  })();
 
   const setStatus = async (id: string, status: string) => {
     try {
@@ -729,6 +766,21 @@ export default function AdminAdmissions() {
           Fecha y hora del equipo: <strong>{new Date(nowMs).toLocaleString("es-CO")}</strong>
         </div>
       </div>
+      {admissionFeedback && (
+        <div
+          ref={admissionFeedbackRef}
+          className="card"
+          style={{
+            marginBottom: 12,
+            color: admissionFeedback.color,
+            background: admissionFeedback.background,
+            border: `1px solid ${admissionFeedback.border}`
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>{admissionFeedback.title}</div>
+          <div>{admissionFeedback.text}</div>
+        </div>
+      )}
       <form className="card" onSubmit={create}>
         <div className="section-title">Nueva admision</div>
         <label>
