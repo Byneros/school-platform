@@ -485,7 +485,7 @@ if (cacheMetricsToken) {
   });
 }
 
-app.get("/api/ops/cache", requireAuth, requireRole(["ADMIN"]), (_req, res) => {
+app.get("/api/ops/cache", requireAuth, requireRole(["DEVELOPER"]), (_req, res) => {
   return res.json(getCacheMetrics());
 });
 

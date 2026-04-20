@@ -145,7 +145,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route
               path="admin/cache"
               element={
-                <ProtectedRoute roles={["ADMIN"]}>
+                <ProtectedRoute roles={["DEVELOPER"]}>
                   <AdminCacheMetrics />
                 </ProtectedRoute>
               }
