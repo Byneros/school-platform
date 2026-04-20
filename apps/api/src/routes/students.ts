@@ -223,33 +223,55 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const studentId = String(req.params.id || "");
   if (!studentId) return res.status(400).json({ message: "Estudiante invalido" });
 
-  const student = await prisma.student.findUnique({ where: { id: studentId } });
-  if (!student) return res.status(404).json({ message: "Estudiante no encontrado" });
+  try {
+    const student = await prisma.student.findUnique({ where: { id: studentId } });
+    if (!student) return res.status(404).json({ message: "Estudiante no encontrado" });
 
-  await prisma.$transaction(async (tx) => {
-    // Eliminar relaciones directas manteniendo integridad
-    await tx.guardian.deleteMany({ where: { studentId } });
-    await tx.notification.updateMany({ where: { studentId }, data: { studentId: null } });
+    await prisma.$transaction(async (tx) => {
+      await tx.guardian.deleteMany({ where: { studentId } });
+      await tx.notification.updateMany({ where: { studentId }, data: { studentId: null } });
+      await tx.studentObservation.deleteMany({ where: { studentId } });
+      await tx.certificateRequest.deleteMany({ where: { studentId } });
+      await tx.certificateIssue.deleteMany({ where: { studentId } });
 
-    const enrollments = await tx.enrollment.findMany({ where: { studentId }, select: { id: true } });
-    const enrollmentIds = enrollments.map((e) => e.id);
-    if (enrollmentIds.length) {
-      await tx.attendance.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
-      await tx.grade.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
-      await tx.enrollment.deleteMany({ where: { id: { in: enrollmentIds } } });
-    }
+      const enrollments = await tx.enrollment.findMany({
+        where: { studentId },
+        select: { id: true, admissionId: true }
+      });
+      const enrollmentIds = enrollments.map((e) => e.id);
+      const admissionIds = enrollments.map((e) => e.admissionId).filter(Boolean) as string[];
 
-    const invoices = await tx.invoice.findMany({ where: { studentId }, select: { id: true } });
-    const invoiceIds = invoices.map((i) => i.id);
-    if (invoiceIds.length) {
-      await tx.payment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
-      await tx.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
-    }
+      if (enrollmentIds.length) {
+        await tx.academicClosureResult.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
+        await tx.taskScore.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
+        await tx.attendance.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
+        await tx.grade.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
+        await tx.enrollment.deleteMany({ where: { id: { in: enrollmentIds } } });
+      }
 
-    await tx.student.delete({ where: { id: studentId } });
-  });
+      if (admissionIds.length) {
+        await tx.admission.updateMany({
+          where: { id: { in: admissionIds } },
+          data: { status: "APPROVED" }
+        });
+      }
 
-  res.json({ ok: true });
+      const invoices = await tx.invoice.findMany({ where: { studentId }, select: { id: true } });
+      const invoiceIds = invoices.map((i) => i.id);
+      if (invoiceIds.length) {
+        await tx.payment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+        await tx.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
+      }
+
+      await tx.student.delete({ where: { id: studentId } });
+    });
+
+    return res.json({ ok: true });
+  } catch (error: any) {
+    return res.status(400).json({
+      message: error?.message || "No fue posible eliminar el estudiante"
+    });
+  }
 });
 
 export default router;

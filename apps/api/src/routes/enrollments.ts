@@ -435,6 +435,8 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
       });
       if (!enrollment) throw new Error("Matricula no encontrada");
 
+      await tx.academicClosureResult.deleteMany({ where: { enrollmentId } });
+      await tx.taskScore.deleteMany({ where: { enrollmentId } });
       await tx.attendance.deleteMany({ where: { enrollmentId } });
       await tx.grade.deleteMany({ where: { enrollmentId } });
       await tx.enrollment.delete({ where: { id: enrollmentId } });
