@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import ActionFeedback from "../components/ActionFeedback";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import { apiDownload, apiGet, apiPut } from "../services/api";
@@ -418,8 +419,20 @@ export default function AdminTeacherHours() {
           </select>
         </label>
       </div>
-      {message && <div style={{ color: "#64748b", marginBottom: 8 }}>{message}</div>}
-      {loadError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{loadError}</div>}
+      <ActionFeedback
+        tone={String(message || "").toLowerCase().includes("no se pudo") ? "error" : "success"}
+        title="Horas docentes"
+        message={message}
+        onDismiss={() => setMessage("")}
+        style={{ marginBottom: 8 }}
+      />
+      <ActionFeedback
+        tone="error"
+        title="Error al cargar horas"
+        message={loadError}
+        onDismiss={() => setLoadError("")}
+        style={{ marginBottom: 8 }}
+      />
       <div style={{ display: "grid", gap: 10 }}>
         {visibleRows.map((r) => (
           <div key={r.teacherId} className="card">

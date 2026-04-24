@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPatch, apiPost } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import ActionFeedback from "../components/ActionFeedback";
 
 type FeedbackItem = {
   id: string;
@@ -143,8 +144,20 @@ export default function FeedbackCenter() {
             placeholder="Describe con detalle lo que quieres reportar"
           />
         </label>
-        {error && <div style={{ color: "#b91c1c", marginTop: 8 }}>{error}</div>}
-        {message && <div style={{ color: "#15803d", marginTop: 8 }}>{message}</div>}
+        <ActionFeedback
+          tone="error"
+          title="Error en feedback"
+          message={error}
+          onDismiss={() => setError("")}
+          style={{ marginTop: 8, marginBottom: 0 }}
+        />
+        <ActionFeedback
+          tone="success"
+          title="Feedback registrado"
+          message={message}
+          onDismiss={() => setMessage("")}
+          style={{ marginTop: 8, marginBottom: 0 }}
+        />
         <button className="button" type="submit" disabled={saving} style={{ marginTop: 12 }}>
           {saving ? "Enviando..." : "Registrar feedback"}
         </button>

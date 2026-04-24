@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import ActionFeedback from "../components/ActionFeedback";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import Autocomplete from "../components/Autocomplete";
@@ -110,6 +111,7 @@ export default function AdminAdmissions() {
   const [editingId, setEditingId] = useState("");
   const [editingBusy, setEditingBusy] = useState(false);
   const [editingError, setEditingError] = useState("");
+  const [editingMessage, setEditingMessage] = useState("");
   const [editingForm, setEditingForm] = useState({
     studentName: "",
     gradeLevel: "PRE_JARDIN",
@@ -159,6 +161,11 @@ export default function AdminAdmissions() {
   const [editingEnrollmentId, setEditingEnrollmentId] = useState("");
   const [editingEnrollmentBusy, setEditingEnrollmentBusy] = useState(false);
   const [editingEnrollmentError, setEditingEnrollmentError] = useState("");
+  const [editingEnrollmentMessage, setEditingEnrollmentMessage] = useState("");
+  const [removeEnrollmentMessage, setRemoveEnrollmentMessage] = useState("");
+  const [removeEnrollmentError, setRemoveEnrollmentError] = useState("");
+  const [admissionStatusMessage, setAdmissionStatusMessage] = useState("");
+  const [admissionStatusError, setAdmissionStatusError] = useState("");
   const [editingEnrollmentForm, setEditingEnrollmentForm] = useState({
     studentFullName: "",
     studentBirthDate: "",
@@ -192,7 +199,6 @@ export default function AdminAdmissions() {
   const editNameInputRef = useRef<HTMLInputElement | null>(null);
   const editEnrollmentPanelRef = useRef<HTMLFormElement | null>(null);
   const editEnrollmentNameInputRef = useRef<HTMLInputElement | null>(null);
-  const admissionFeedbackRef = useRef<HTMLDivElement | null>(null);
   const admissionsSearchOptions = useSuggestions({
     endpoint: "/suggestions?type=admissions",
     query: search
@@ -207,9 +213,7 @@ export default function AdminAdmissions() {
       return {
         title: "Matricula satisfactoria",
         text: enrollmentMessage,
-        color: "#15803d",
-        background: "#f0fdf4",
-        border: "#86efac"
+        tone: "success" as const
       };
     }
     if (!enrollmentError) return null;
@@ -218,9 +222,7 @@ export default function AdminAdmissions() {
       return {
         title: "Estudiante ya registrado",
         text: enrollmentError,
-        color: "#b45309",
-        background: "#fffbeb",
-        border: "#fcd34d"
+        tone: "warning" as const
       };
     }
     if (
@@ -232,17 +234,13 @@ export default function AdminAdmissions() {
       return {
         title: "Error de validacion de matricula",
         text: enrollmentError,
-        color: "#1d4ed8",
-        background: "#eff6ff",
-        border: "#93c5fd"
+        tone: "info" as const
       };
     }
     return {
       title: "Error de matricula",
       text: enrollmentError,
-      color: "#b91c1c",
-      background: "#fef2f2",
-      border: "#fecaca"
+      tone: "error" as const
     };
   })();
   const missingImportantEnrollmentFields = (() => {
@@ -386,13 +384,6 @@ export default function AdminAdmissions() {
     });
   }, [editingEnrollmentId]);
 
-  useEffect(() => {
-    if (!admissionMessage && !admissionError) return;
-    requestAnimationFrame(() => {
-      admissionFeedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-  }, [admissionMessage, admissionError]);
-
   const getRemainingDays = (dueAt?: string | null) => {
     if (!dueAt) return null;
     const dueDate = new Date(dueAt);
@@ -453,27 +444,26 @@ export default function AdminAdmissions() {
       return {
         title: "Admision creada",
         text: admissionMessage,
-        color: "#15803d",
-        background: "#f0fdf4",
-        border: "#86efac"
+        tone: "success" as const
       };
     }
     if (!admissionError) return null;
     return {
       title: "Error al crear admision",
       text: admissionError,
-      color: "#b91c1c",
-      background: "#fef2f2",
-      border: "#fecaca"
+      tone: "error" as const
     };
   })();
 
   const setStatus = async (id: string, status: string) => {
     try {
+      setAdmissionStatusMessage("");
+      setAdmissionStatusError("");
       setLoadError("");
       if (status === "REJECTED") {
         await apiDelete(`/admissions/${id}`);
         setAdmissions((prev) => prev.filter((a) => a.id !== id));
+        setAdmissionStatusMessage("Admision rechazada satisfactoriamente.");
         return;
       }
       const updated = await apiPatch(`/admissions/${id}/status`, { status });
@@ -486,9 +476,16 @@ export default function AdminAdmissions() {
       } else {
         setAdmissions((prev) => prev.map((a) => (a.id === id ? updated : a)));
       }
+      setAdmissionStatusMessage(
+        status === "APPROVED"
+          ? "Admision aprobada satisfactoriamente."
+          : "Estado de admision actualizado satisfactoriamente."
+      );
       loadApprovedAdmissions();
     } catch (error: any) {
-      setLoadError(error?.message || "No se pudo actualizar el estado de la admision.");
+      const message = error?.message || "No se pudo actualizar el estado de la admision.";
+      setAdmissionStatusError(message);
+      setLoadError(message);
     }
   };
 
@@ -507,6 +504,7 @@ export default function AdminAdmissions() {
     } | null;
   }) => {
     setEditingError("");
+    setEditingMessage("");
     setEditingId(admission.id);
     setEditingForm({
       studentName: admission.studentName,
@@ -528,6 +526,7 @@ export default function AdminAdmissions() {
     if (!editingId) return;
     setEditingBusy(true);
     setEditingError("");
+    setEditingMessage("");
     try {
       const updated = await apiPatch(`/admissions/${editingId}`, {
         studentName: editingForm.studentName,
@@ -536,7 +535,7 @@ export default function AdminAdmissions() {
         documents: editingForm.documents
       });
       setAdmissions((prev) => prev.map((a) => (a.id === editingId ? updated : a)));
-      setEditingId("");
+      setEditingMessage("Admision actualizada satisfactoriamente.");
     } catch (error: any) {
       setEditingError(error?.message || "No se pudo actualizar la admision");
     } finally {
@@ -664,6 +663,7 @@ export default function AdminAdmissions() {
 
   const startEditEnrollment = (enrollment: any) => {
     setEditingEnrollmentError("");
+    setEditingEnrollmentMessage("");
     setEditingEnrollmentId(enrollment.id);
     setEditingEnrollmentForm({
       studentFullName: enrollment.studentFullName || "",
@@ -701,6 +701,7 @@ export default function AdminAdmissions() {
     if (!editingEnrollmentId) return;
     setEditingEnrollmentBusy(true);
     setEditingEnrollmentError("");
+    setEditingEnrollmentMessage("");
     try {
       const updated = await apiPatch(`/enrollments/${editingEnrollmentId}`, {
         studentFullName: editingEnrollmentForm.studentFullName,
@@ -726,7 +727,7 @@ export default function AdminAdmissions() {
       });
       setEnrollments((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       loadEnrollments();
-      setEditingEnrollmentId("");
+      setEditingEnrollmentMessage("Matricula actualizada satisfactoriamente.");
     } catch (error: any) {
       setEditingEnrollmentError(error?.message || "No fue posible actualizar la matricula");
     } finally {
@@ -736,15 +737,20 @@ export default function AdminAdmissions() {
 
   const removeEnrollment = async (id: string) => {
     if (!window.confirm("Seguro que deseas eliminar esta matricula?")) return;
+    setRemoveEnrollmentMessage("");
+    setRemoveEnrollmentError("");
     try {
       await apiDelete(`/enrollments/${id}`);
       if (editingEnrollmentId === id) {
         setEditingEnrollmentId("");
+        setEditingEnrollmentMessage("");
+        setEditingEnrollmentError("");
       }
+      setRemoveEnrollmentMessage("Matricula eliminada satisfactoriamente.");
       loadEnrollments();
       loadApprovedAdmissions();
     } catch (error: any) {
-      setEnrollmentsError(error?.message || "No fue posible eliminar la matricula");
+      setRemoveEnrollmentError(error?.message || "No fue posible eliminar la matricula");
     }
   };
 
@@ -766,21 +772,39 @@ export default function AdminAdmissions() {
           Fecha y hora del equipo: <strong>{new Date(nowMs).toLocaleString("es-CO")}</strong>
         </div>
       </div>
-      {admissionFeedback && (
-        <div
-          ref={admissionFeedbackRef}
-          className="card"
-          style={{
-            marginBottom: 12,
-            color: admissionFeedback.color,
-            background: admissionFeedback.background,
-            border: `1px solid ${admissionFeedback.border}`
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>{admissionFeedback.title}</div>
-          <div>{admissionFeedback.text}</div>
-        </div>
-      )}
+      <ActionFeedback
+        tone="success"
+        title="Estado de admision actualizado"
+        message={admissionStatusMessage}
+        onDismiss={() => setAdmissionStatusMessage("")}
+      />
+      <ActionFeedback
+        tone="error"
+        title="Error al cambiar estado"
+        message={admissionStatusError}
+        onDismiss={() => setAdmissionStatusError("")}
+      />
+      <ActionFeedback
+        tone="success"
+        title="Matricula eliminada"
+        message={removeEnrollmentMessage}
+        onDismiss={() => setRemoveEnrollmentMessage("")}
+      />
+      <ActionFeedback
+        tone="error"
+        title="Error al eliminar matricula"
+        message={removeEnrollmentError}
+        onDismiss={() => setRemoveEnrollmentError("")}
+      />
+      <ActionFeedback
+        tone={admissionFeedback?.tone || "info"}
+        title={admissionFeedback?.title}
+        message={admissionFeedback?.text || ""}
+        onDismiss={() => {
+          setAdmissionMessage("");
+          setAdmissionError("");
+        }}
+      />
       <form className="card" onSubmit={create}>
         <div className="section-title">Nueva admision</div>
         <label>
@@ -889,21 +913,16 @@ export default function AdminAdmissions() {
       </form>
       <form className="card" onSubmit={createEnrollment}>
         <div className="section-title">Matricular estudiante</div>
-        {enrollmentFeedback && (
-          <div
-            style={{
-              marginBottom: 10,
-              fontWeight: 600,
-              color: enrollmentFeedback.color,
-              background: enrollmentFeedback.background,
-              border: `1px solid ${enrollmentFeedback.border}`,
-              padding: "8px 10px",
-              borderRadius: 8
-            }}
-          >
-            {enrollmentFeedback.title}: {enrollmentFeedback.text}
-          </div>
-        )}
+        <ActionFeedback
+          tone={enrollmentFeedback?.tone || "info"}
+          title={enrollmentFeedback?.title}
+          message={enrollmentFeedback?.text || ""}
+          onDismiss={() => {
+            setEnrollmentMessage("");
+            setEnrollmentError("");
+          }}
+          style={{ marginBottom: 10 }}
+        />
         <label>
           Admision aprobada (autocompletar)
           <select
@@ -1249,7 +1268,18 @@ export default function AdminAdmissions() {
       {editingEnrollmentId && (
         <form ref={editEnrollmentPanelRef} className="card" onSubmit={saveEnrollmentEdit} style={{ marginTop: 10 }}>
           <div className="section-title">Editar matricula</div>
-          {editingEnrollmentError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{editingEnrollmentError}</div>}
+          <ActionFeedback
+            tone="success"
+            title="Matricula actualizada"
+            message={editingEnrollmentMessage}
+            onDismiss={() => setEditingEnrollmentMessage("")}
+          />
+          <ActionFeedback
+            tone="error"
+            title="Error al editar matricula"
+            message={editingEnrollmentError}
+            onDismiss={() => setEditingEnrollmentError("")}
+          />
           <label>
             Nombre del estudiante
             <input
@@ -1469,7 +1499,15 @@ export default function AdminAdmissions() {
             <button className="button" disabled={editingEnrollmentBusy}>
               {editingEnrollmentBusy ? "Guardando..." : "Guardar cambios"}
             </button>
-            <button type="button" className="button secondary" onClick={() => setEditingEnrollmentId("")}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => {
+                setEditingEnrollmentId("");
+                setEditingEnrollmentMessage("");
+                setEditingEnrollmentError("");
+              }}
+            >
               Cancelar
             </button>
           </div>
@@ -1574,7 +1612,18 @@ export default function AdminAdmissions() {
       {editingId && (
         <form ref={editPanelRef} className="card" onSubmit={saveEdit} style={{ marginTop: 10 }}>
           <div className="section-title">Editar admision</div>
-          {editingError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{editingError}</div>}
+          <ActionFeedback
+            tone="success"
+            title="Admision actualizada"
+            message={editingMessage}
+            onDismiss={() => setEditingMessage("")}
+          />
+          <ActionFeedback
+            tone="error"
+            title="Error al editar admision"
+            message={editingError}
+            onDismiss={() => setEditingError("")}
+          />
           <label>
             Nombre del estudiante
             <input
@@ -1679,7 +1728,17 @@ export default function AdminAdmissions() {
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <button className="button" disabled={editingBusy}>{editingBusy ? "Guardando..." : "Guardar cambios"}</button>
-            <button type="button" className="button secondary" onClick={() => setEditingId("")}>Cancelar</button>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => {
+                setEditingId("");
+                setEditingMessage("");
+                setEditingError("");
+              }}
+            >
+              Cancelar
+            </button>
           </div>
         </form>
       )}

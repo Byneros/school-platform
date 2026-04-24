@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ActionFeedback from "../components/ActionFeedback";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../services/api";
 
@@ -173,7 +174,13 @@ export default function LoginPage() {
                 placeholder="********"
               />
             </label>
-            {error && <div style={{ color: "#ef4444", marginTop: 8 }}>{error}</div>}
+            <ActionFeedback
+              tone="error"
+              title="Error de acceso"
+              message={error}
+              onDismiss={() => setError("")}
+              style={{ marginTop: 8 }}
+            />
             <button className="button" style={{ marginTop: 12 }} disabled={loading}>
               {loading ? "Ingresando..." : "Iniciar sesion"}
             </button>
@@ -208,7 +215,13 @@ export default function LoginPage() {
                   placeholder="000000"
                 />
               </label>
-              {error && <div style={{ color: "#ef4444", marginTop: 8 }}>{error}</div>}
+              <ActionFeedback
+                tone="error"
+                title="Error de verificacion"
+                message={error}
+                onDismiss={() => setError("")}
+                style={{ marginTop: 8 }}
+              />
               <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
                 <button className="button" type="submit" disabled={loading}>
                   {loading ? "Validando..." : "Validar codigo"}

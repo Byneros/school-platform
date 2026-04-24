@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
+import ActionFeedback from "../components/ActionFeedback";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "../services/api";
 import { gradeLabel } from "../services/grades";
 
@@ -508,8 +509,20 @@ export default function TeacherTasks() {
           <div style={{ color: "#64748b", marginTop: 8 }}>
             Ponderacion aplicada: <strong>{getAspectWeight(taskForm.aspect)}%</strong> · Nota maxima 0–5
           </div>
-          {error && <div style={{ color: "#b91c1c", marginTop: 8 }}>{error}</div>}
-          {message && <div style={{ color: "#15803d", marginTop: 8 }}>{message}</div>}
+          <ActionFeedback
+            tone="error"
+            title="Error en tareas"
+            message={error}
+            onDismiss={() => setError("")}
+            style={{ marginTop: 8, marginBottom: 0 }}
+          />
+          <ActionFeedback
+            tone="success"
+            title="Accion completada"
+            message={message}
+            onDismiss={() => setMessage("")}
+            style={{ marginTop: 8, marginBottom: 0 }}
+          />
           <button className="button" style={{ marginTop: 10 }} disabled={!gradeLevel}>
             Crear tarea
           </button>
@@ -624,8 +637,20 @@ export default function TeacherTasks() {
               <div />
               <div />
             </div>
-            {editingError && <div style={{ color: "#b91c1c", marginTop: 8 }}>{editingError}</div>}
-            {editingMessage && <div style={{ color: "#15803d", marginTop: 8 }}>{editingMessage}</div>}
+            <ActionFeedback
+              tone="error"
+              title="Error al editar tarea"
+              message={editingError}
+              onDismiss={() => setEditingError("")}
+              style={{ marginTop: 8, marginBottom: 0 }}
+            />
+            <ActionFeedback
+              tone="success"
+              title="Tarea actualizada"
+              message={editingMessage}
+              onDismiss={() => setEditingMessage("")}
+              style={{ marginTop: 8, marginBottom: 0 }}
+            />
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
               <button className="button" type="submit">
                 Guardar cambios
@@ -748,8 +773,20 @@ export default function TeacherTasks() {
                 </tbody>
               </table>
             </div>
-            {error && <div style={{ color: "#b91c1c", marginTop: 8 }}>{error}</div>}
-            {message && <div style={{ color: "#15803d", marginTop: 8 }}>{message}</div>}
+            <ActionFeedback
+              tone="error"
+              title="Error en calificaciones"
+              message={error}
+              onDismiss={() => setError("")}
+              style={{ marginTop: 8, marginBottom: 0 }}
+            />
+            <ActionFeedback
+              tone="success"
+              title="Calificaciones actualizadas"
+              message={message}
+              onDismiss={() => setMessage("")}
+              style={{ marginTop: 8, marginBottom: 0 }}
+            />
           </div>
         )}
       </Section>

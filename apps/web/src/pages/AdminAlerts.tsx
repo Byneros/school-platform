@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ActionFeedback from "../components/ActionFeedback";
 import Section from "../components/Section";
 import KpiCard from "../components/KpiCard";
 import DataTable from "../components/DataTable";
@@ -364,7 +365,13 @@ export default function AdminAlerts() {
           <button className="button secondary" type="button" onClick={() => navigate("/admin/admisiones")}>Ir a Admisiones</button>
           <button className="button secondary" type="button" onClick={() => navigate("/admin/finanzas")}>Ir a Finanzas</button>
         </div>
-        {message && <div style={{ color: "#b91c1c", marginTop: 10 }}>{message}</div>}
+        <ActionFeedback
+          tone={String(message || "").toLowerCase().includes("no se pudo") ? "error" : "info"}
+          title="Centro de alertas"
+          message={message}
+          onDismiss={() => setMessage("")}
+          style={{ marginTop: 10 }}
+        />
       </Section>
 
       <div className="grid grid-4">

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import ActionFeedback from "../components/ActionFeedback";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import { apiDownload, apiGet, apiPost } from "../services/api";
@@ -142,7 +143,13 @@ export default function AdminCertificates() {
         <div className="help-card">
           Aprueba o rechaza las solicitudes pendientes. Pendientes: {requestTotal}.
         </div>
-        {requestError && <div style={{ color: "#b91c1c", marginTop: 8 }}>{requestError}</div>}
+        <ActionFeedback
+          tone="error"
+          title="Error en solicitudes"
+          message={requestError}
+          onDismiss={() => setRequestError("")}
+          style={{ marginTop: 8 }}
+        />
         <DataTable
           columns={[
             { key: "requestedAt", label: "Fecha" },
@@ -247,7 +254,13 @@ export default function AdminCertificates() {
           )}
         </div>
 
-        {error && <div style={{ color: "#b91c1c", marginTop: 8 }}>{error}</div>}
+        <ActionFeedback
+          tone="error"
+          title="Error en certificados"
+          message={error}
+          onDismiss={() => setError("")}
+          style={{ marginTop: 8 }}
+        />
 
         <DataTable
           columns={[

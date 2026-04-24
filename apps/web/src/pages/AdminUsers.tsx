@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import Autocomplete from "../components/Autocomplete";
+import ActionFeedback from "../components/ActionFeedback";
 import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
 import useDebounce from "../hooks/useDebounce";
 import useSuggestions from "../hooks/useSuggestions";
@@ -112,8 +113,16 @@ export default function AdminUsers() {
   const [pendingParentLoading, setPendingParentLoading] = useState(false);
   const [form, setForm] = useState({ fullName: "", email: "", role: "ADMIN", password: "", teacherSubjects: [] as string[] });
   const [actionError, setActionError] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [createMessage, setCreateMessage] = useState("");
   const [editingId, setEditingId] = useState("");
   const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editMessage, setEditMessage] = useState("");
+  const [toggleError, setToggleError] = useState("");
+  const [toggleMessage, setToggleMessage] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteMessage, setDeleteMessage] = useState("");
   const [editForm, setEditForm] = useState({ fullName: "", email: "", role: "ADMIN", password: "" });
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
@@ -287,17 +296,18 @@ export default function AdminUsers() {
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
-    setActionError("");
+    setCreateError("");
+    setCreateMessage("");
     if (!form.fullName.trim() || !form.email.trim() || !form.password.trim()) {
-      setActionError("Completa nombre, correo y contrasena.");
+      setCreateError("Completa nombre, correo y contrasena.");
       return;
     }
     if (form.role === "TEACHER" && form.teacherSubjects.length === 0) {
-      setActionError("Debes asignar al menos una asignatura al docente.");
+      setCreateError("Debes asignar al menos una asignatura al docente.");
       return;
     }
     if (!isStrongPassword(form.password.trim())) {
-      setActionError("Contrasena invalida. Usa minimo 8 caracteres, mayuscula, minuscula, numero y simbolo.");
+      setCreateError("Contrasena invalida. Usa minimo 8 caracteres, mayuscula, minuscula, numero y simbolo.");
       return;
     }
     try {
@@ -309,10 +319,11 @@ export default function AdminUsers() {
       };
       await apiPost("/users", payload);
       setForm({ fullName: "", email: "", role: "ADMIN", password: "", teacherSubjects: [] });
+      setCreateMessage("Usuario creado satisfactoriamente.");
       load();
       loadPendingParentUsers();
     } catch (error: any) {
-      setActionError(error?.message || "No se pudo crear el usuario.");
+      setCreateError(error?.message || "No se pudo crear el usuario.");
     }
   };
 
@@ -335,17 +346,22 @@ export default function AdminUsers() {
   };
 
   const toggleActive = async (id: string, isActive: boolean) => {
-    setActionError("");
+    setToggleError("");
+    setToggleMessage("");
     try {
       const updated = await apiPatch(`/users/${id}`, { isActive: !isActive });
-      setUsers(users.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+      setAllUsersForSections((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
+      setToggleMessage(isActive ? "Usuario desactivado satisfactoriamente." : "Usuario activado satisfactoriamente.");
     } catch (error: any) {
-      setActionError(error?.message || "No se pudo actualizar el usuario");
+      setToggleError(error?.message || "No se pudo actualizar el usuario");
     }
   };
 
   const startEdit = (user: { id: string; fullName: string; email: string; role: string }) => {
     setActionError("");
+    setEditError("");
+    setEditMessage("");
     setEditingId(user.id);
     setEditForm({
       fullName: user.fullName,
@@ -359,7 +375,8 @@ export default function AdminUsers() {
     e.preventDefault();
     if (!editingId) return;
     setEditBusy(true);
-    setActionError("");
+    setEditError("");
+    setEditMessage("");
     try {
       const body: Record<string, unknown> = {
         fullName: editForm.fullName,
@@ -368,7 +385,7 @@ export default function AdminUsers() {
       };
       if (editForm.password.trim()) {
         if (!isStrongPassword(editForm.password.trim())) {
-          setActionError("La nueva contrasena debe tener minimo 8 caracteres, mayuscula, minuscula, numero y simbolo.");
+          setEditError("La nueva contrasena debe tener minimo 8 caracteres, mayuscula, minuscula, numero y simbolo.");
           setEditBusy(false);
           return;
         }
@@ -376,11 +393,12 @@ export default function AdminUsers() {
       }
       const updated = await apiPatch(`/users/${editingId}`, body);
       setUsers((prev) => prev.map((u) => (u.id === editingId ? { ...u, ...updated } : u)));
-      setEditingId("");
+      setAllUsersForSections((prev) => prev.map((u) => (u.id === editingId ? { ...u, ...updated } : u)));
+      setEditMessage("Usuario actualizado satisfactoriamente.");
       setEditForm({ fullName: "", email: "", role: "ADMIN", password: "" });
       loadPendingParentUsers();
     } catch (error: any) {
-      setActionError(error?.message || "No se pudo editar el usuario");
+      setEditError(error?.message || "No se pudo editar el usuario");
     } finally {
       setEditBusy(false);
     }
@@ -388,23 +406,27 @@ export default function AdminUsers() {
 
   const deleteUser = async (id: string, fullName: string, isPrincipal?: boolean) => {
     if (isPrincipal || !canDeleteUsers) {
-      setActionError("Solo el administrador principal puede eliminar usuarios.");
+      setDeleteError("Solo el administrador principal puede eliminar usuarios.");
       return;
     }
     const confirmed = window.confirm(`Eliminar usuario ${fullName}? Esta accion no se puede deshacer.`);
     if (!confirmed) return;
-    setActionError("");
+    setDeleteError("");
+    setDeleteMessage("");
     try {
       const res = await apiDelete(`/users/${id}`);
       if (res?.deactivated && res?.user) {
         setUsers((prev) => prev.map((u) => (u.id === res.user.id ? { ...u, ...res.user } : u)));
-        setActionError(res?.message || "Usuario desactivado.");
+        setAllUsersForSections((prev) => prev.map((u) => (u.id === res.user.id ? { ...u, ...res.user } : u)));
+        setDeleteMessage(res?.message || "Usuario desactivado.");
       } else {
         setUsers((prev) => prev.filter((u) => u.id !== id));
+        setAllUsersForSections((prev) => prev.filter((u) => u.id !== id));
+        setDeleteMessage("Usuario eliminado satisfactoriamente.");
       }
       loadPendingParentUsers();
     } catch (error: any) {
-      setActionError(error?.message || "No se pudo eliminar el usuario");
+      setDeleteError(error?.message || "No se pudo eliminar el usuario");
     }
   };
 
@@ -466,6 +488,42 @@ export default function AdminUsers() {
       <div className="help-card">
         Gestiona usuarios, roles y accesos desde el panel principal.
       </div>
+      <ActionFeedback
+        tone="success"
+        title="Usuario creado"
+        message={createMessage}
+        onDismiss={() => setCreateMessage("")}
+      />
+      <ActionFeedback
+        tone="error"
+        title="Error al crear usuario"
+        message={createError}
+        onDismiss={() => setCreateError("")}
+      />
+      <ActionFeedback
+        tone="success"
+        title="Usuario eliminado"
+        message={deleteMessage}
+        onDismiss={() => setDeleteMessage("")}
+      />
+      <ActionFeedback
+        tone="error"
+        title="Error al eliminar usuario"
+        message={deleteError}
+        onDismiss={() => setDeleteError("")}
+      />
+      <ActionFeedback
+        tone="success"
+        title="Estado de usuario actualizado"
+        message={toggleMessage}
+        onDismiss={() => setToggleMessage("")}
+      />
+      <ActionFeedback
+        tone="error"
+        title="Error al cambiar estado de usuario"
+        message={toggleError}
+        onDismiss={() => setToggleError("")}
+      />
       <form ref={createPanelRef} className="card" onSubmit={create}>
         <div className="section-title">Crear usuario</div>
         <label>
@@ -745,11 +803,22 @@ export default function AdminUsers() {
           Eliminar filtro
         </button>
       </div>
-      {actionError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{actionError}</div>}
       {loadError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{loadError}</div>}
       {editingId && (
         <form ref={editPanelRef} className="card" onSubmit={saveEdit} style={{ marginBottom: 8 }}>
           <div className="section-title">Editar usuario</div>
+          <ActionFeedback
+            tone="success"
+            title="Usuario actualizado"
+            message={editMessage}
+            onDismiss={() => setEditMessage("")}
+          />
+          <ActionFeedback
+            tone="error"
+            title="Error al editar usuario"
+            message={editError}
+            onDismiss={() => setEditError("")}
+          />
           <label>
             Nombre
             <input
@@ -802,7 +871,15 @@ export default function AdminUsers() {
             <button className="button" disabled={editBusy}>
               {editBusy ? "Guardando..." : "Guardar cambios"}
             </button>
-            <button type="button" className="button secondary" onClick={() => setEditingId("")}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => {
+                setEditingId("");
+                setEditMessage("");
+                setEditError("");
+              }}
+            >
               Cancelar
             </button>
           </div>

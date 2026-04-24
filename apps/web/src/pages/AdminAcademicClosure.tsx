@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import ActionFeedback from "../components/ActionFeedback";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import Autocomplete from "../components/Autocomplete";
@@ -224,8 +225,20 @@ export default function AdminAcademicClosure() {
           <button className="button secondary" type="button" onClick={() => download("excel")}>Exportar Excel</button>
           <button className="button secondary" type="button" onClick={() => download("pdf")}>Exportar PDF</button>
         </div>
-        {message && <div style={{ color: "#166534", marginTop: 8 }}>{message}</div>}
-        {error && <div style={{ color: "#b91c1c", marginTop: 8 }}>{error}</div>}
+        <ActionFeedback
+          tone="success"
+          title="Cierre academico"
+          message={message}
+          onDismiss={() => setMessage("")}
+          style={{ marginTop: 8 }}
+        />
+        <ActionFeedback
+          tone="error"
+          title="Error en cierre academico"
+          message={error}
+          onDismiss={() => setError("")}
+          style={{ marginTop: 8 }}
+        />
       </div>
 
       <DataTable

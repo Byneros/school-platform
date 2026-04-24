@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import ActionFeedback from "../components/ActionFeedback";
 import { apiGet, apiPost } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -156,8 +157,20 @@ export default function SessionsPage() {
         Gestiona tus sesiones abiertas y cierra dispositivos que no reconozcas.
       </p>
 
-      {msg && <div className="success" style={{ marginBottom: 12 }}>{msg}</div>}
-      {error && <div className="error" style={{ marginBottom: 12 }}>{error}</div>}
+      <ActionFeedback
+        tone="success"
+        title="Sesiones"
+        message={msg || ""}
+        onDismiss={() => setMsg(null)}
+        style={{ marginBottom: 12 }}
+      />
+      <ActionFeedback
+        tone="error"
+        title="Error de sesiones"
+        message={error || ""}
+        onDismiss={() => setError(null)}
+        style={{ marginBottom: 12 }}
+      />
 
       {loading ? (
         <div style={{ color: "#6b7280" }}>Cargando sesiones...</div>

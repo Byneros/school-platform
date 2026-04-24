@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import Autocomplete from "../components/Autocomplete";
+import ActionFeedback from "../components/ActionFeedback";
 import { apiGet, apiPatch, apiPost } from "../services/api";
 import useSuggestions, { SuggestionOption } from "../hooks/useSuggestions";
 import { isDueProcessNotification, prioritizeDueProcess } from "../utils/notificationPriority";
@@ -76,6 +77,8 @@ export default function AdminNotifications() {
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createMessage, setCreateMessage] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [statusError, setStatusError] = useState("");
   const [createForm, setCreateForm] = useState({
     audience: "BOTH",
     legalReference: "LEY_1620_2013",
@@ -88,6 +91,7 @@ export default function AdminNotifications() {
   const [editingId, setEditingId] = useState("");
   const [editingBusy, setEditingBusy] = useState(false);
   const [editingError, setEditingError] = useState("");
+  const [editingMessage, setEditingMessage] = useState("");
   const [editingForm, setEditingForm] = useState({ title: "", body: "" });
   const studentSuggestions = useSuggestions({
     endpoint: "/suggestions?type=students",
@@ -119,19 +123,34 @@ export default function AdminNotifications() {
   }, [page, statusFilter]);
 
   const approve = async (id: string) => {
-    await apiPost(`/notifications/${id}/approve`, {});
-    load();
-    window.dispatchEvent(new Event("notifications-updated"));
+    setStatusMessage("");
+    setStatusError("");
+    try {
+      await apiPost(`/notifications/${id}/approve`, {});
+      setStatusMessage("Notificacion aprobada satisfactoriamente.");
+      load();
+      window.dispatchEvent(new Event("notifications-updated"));
+    } catch (error: any) {
+      setStatusError(error?.message || "No se pudo aprobar la notificacion");
+    }
   };
 
   const reject = async (id: string) => {
-    await apiPost(`/notifications/${id}/reject`, {});
-    load();
-    window.dispatchEvent(new Event("notifications-updated"));
+    setStatusMessage("");
+    setStatusError("");
+    try {
+      await apiPost(`/notifications/${id}/reject`, {});
+      setStatusMessage("Notificacion rechazada satisfactoriamente.");
+      load();
+      window.dispatchEvent(new Event("notifications-updated"));
+    } catch (error: any) {
+      setStatusError(error?.message || "No se pudo rechazar la notificacion");
+    }
   };
 
   const startEdit = (notification: { id: string; title: string; body?: string }) => {
     setEditingError("");
+    setEditingMessage("");
     setEditingId(notification.id);
     setEditingForm({ title: notification.title, body: notification.body || "" });
   };
@@ -141,10 +160,11 @@ export default function AdminNotifications() {
     if (!editingId) return;
     setEditingBusy(true);
     setEditingError("");
+    setEditingMessage("");
     try {
       const updated = await apiPatch(`/notifications/${editingId}`, editingForm);
       setNotifications((prev) => prev.map((n) => (n.id === editingId ? { ...n, ...updated } : n)));
-      setEditingId("");
+      setEditingMessage("Notificacion actualizada satisfactoriamente.");
     } catch (error: any) {
       setEditingError(error?.message || "No se pudo actualizar la notificacion");
     } finally {
@@ -205,10 +225,32 @@ export default function AdminNotifications() {
       <div className="help-card">
         Aprueba/rechaza comunicaciones docentes y crea comunicados directos para docentes, padres o ambos.
       </div>
+      <ActionFeedback
+        tone="success"
+        title="Notificacion creada"
+        message={createMessage}
+        onDismiss={() => setCreateMessage("")}
+      />
+      <ActionFeedback
+        tone="error"
+        title="Error al crear notificacion"
+        message={createError}
+        onDismiss={() => setCreateError("")}
+      />
+      <ActionFeedback
+        tone="success"
+        title="Estado de notificacion actualizado"
+        message={statusMessage}
+        onDismiss={() => setStatusMessage("")}
+      />
+      <ActionFeedback
+        tone="error"
+        title="Error al cambiar estado de notificacion"
+        message={statusError}
+        onDismiss={() => setStatusError("")}
+      />
       <form className="card" onSubmit={createByAdmin}>
         <div className="section-title">Nueva notificacion institucional (Administrador)</div>
-        {createError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{createError}</div>}
-        {createMessage && <div style={{ color: "#15803d", marginBottom: 8 }}>{createMessage}</div>}
         <label>
           Destinatarios
           <select
@@ -380,7 +422,18 @@ export default function AdminNotifications() {
       {editingId && (
         <form className="card" onSubmit={saveEdit}>
           <div className="section-title">Editar notificacion</div>
-          {editingError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{editingError}</div>}
+          <ActionFeedback
+            tone="success"
+            title="Notificacion actualizada"
+            message={editingMessage}
+            onDismiss={() => setEditingMessage("")}
+          />
+          <ActionFeedback
+            tone="error"
+            title="Error al editar notificacion"
+            message={editingError}
+            onDismiss={() => setEditingError("")}
+          />
           <label>
             Titulo
             <input className="input" value={editingForm.title} onChange={(e) => setEditingForm({ ...editingForm, title: e.target.value })} />
@@ -391,7 +444,17 @@ export default function AdminNotifications() {
           </label>
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <button className="button" disabled={editingBusy}>{editingBusy ? "Guardando..." : "Guardar cambios"}</button>
-            <button className="button secondary" type="button" onClick={() => setEditingId("")}>Cancelar</button>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => {
+                setEditingId("");
+                setEditingMessage("");
+                setEditingError("");
+              }}
+            >
+              Cancelar
+            </button>
           </div>
         </form>
       )}

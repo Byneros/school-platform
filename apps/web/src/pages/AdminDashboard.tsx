@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ActionFeedback from "../components/ActionFeedback";
 import KpiCard from "../components/KpiCard";
 import Section from "../components/Section";
 import Autocomplete from "../components/Autocomplete";
@@ -245,7 +246,13 @@ export default function AdminDashboard() {
         {editingId && (
           <form className="card" onSubmit={saveEdit} style={{ marginBottom: 10 }}>
             <div className="section-title">Editar estudiante</div>
-            {editError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{editError}</div>}
+            <ActionFeedback
+              tone="error"
+              title="Error al editar estudiante"
+              message={editError}
+              onDismiss={() => setEditError("")}
+              style={{ marginBottom: 8 }}
+            />
             <label>
               Nombre
               <input className="input" value={editForm.fullName} onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })} />

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ActionFeedback from "../components/ActionFeedback";
 import Section from "../components/Section";
 import { apiDownload, apiGet, apiPut } from "../services/api";
 
@@ -115,8 +116,20 @@ export default function AdminBranding() {
       )}
       {!loading && (
         <form className="card" onSubmit={save}>
-          {error && <div style={{ color: "#b91c1c", marginBottom: 10 }}>{error}</div>}
-          {message && <div style={{ color: "#15803d", marginBottom: 10 }}>{message}</div>}
+          <ActionFeedback
+            tone="error"
+            title="Error de personalizacion"
+            message={error}
+            onDismiss={() => setError("")}
+            style={{ marginBottom: 10 }}
+          />
+          <ActionFeedback
+            tone="success"
+            title="Personalizacion guardada"
+            message={message}
+            onDismiss={() => setMessage("")}
+            style={{ marginBottom: 10 }}
+          />
           <label>
             Nombre oficial del colegio
             <input

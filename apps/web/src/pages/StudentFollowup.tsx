@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import ActionFeedback from "../components/ActionFeedback";
 import Section from "../components/Section";
 import KpiCard from "../components/KpiCard";
 import DataTable from "../components/DataTable";
@@ -24,6 +25,31 @@ const observationTypeOptions = [
 function typeLabel(value: string) {
   if (value === "DISCIPLINARY") return "Disciplinario";
   return observationTypeOptions.find((item) => item.value === value)?.label || value;
+}
+
+function getFeedbackTone(message: string): "success" | "error" | "warning" | "info" {
+  const normalized = String(message || "").toLowerCase();
+  if (
+    normalized.includes("no se pudo") ||
+    normalized.includes("selecciona") ||
+    normalized.includes("ingresa") ||
+    normalized.includes("describe") ||
+    normalized.includes("escribe")
+  ) {
+    return "error";
+  }
+  if (normalized.includes("ya existe una solicitud pendiente")) {
+    return "warning";
+  }
+  if (
+    normalized.includes("registrada") ||
+    normalized.includes("solicitud enviada") ||
+    normalized.includes("actualizada") ||
+    normalized.includes("descarga disponible")
+  ) {
+    return "success";
+  }
+  return "info";
 }
 
 export default function StudentFollowup() {
@@ -676,11 +702,23 @@ export default function StudentFollowup() {
                   {associationBusy ? "Enviando solicitud..." : "Solicitar asociación"}
                 </button>
               </div>
-              {associationMessage && <div style={{ color: "#475569" }}>{associationMessage}</div>}
+              <ActionFeedback
+                tone={getFeedbackTone(associationMessage)}
+                title="Asociacion de acudiente"
+                message={associationMessage}
+                onDismiss={() => setAssociationMessage("")}
+                style={{ marginBottom: 0 }}
+              />
             </div>
           )}
         </div>
-        {certificateMessage && <div style={{ color: "#475569", marginTop: 8 }}>{certificateMessage}</div>}
+        <ActionFeedback
+          tone={getFeedbackTone(certificateMessage)}
+          title="Certificados y observador"
+          message={certificateMessage}
+          onDismiss={() => setCertificateMessage("")}
+          style={{ marginTop: 8 }}
+        />
         {studentId && (
           <div className="grid grid-4" style={{ marginTop: 10 }}>
             <KpiCard title="Observaciones" value={summaryLoading ? "..." : String(summary?.total || 0)} trend="Total" tone="primary" />
@@ -720,7 +758,13 @@ export default function StudentFollowup() {
                   Verificar
                 </button>
               </div>
-              {verifyError && <div style={{ color: "#b91c1c", marginTop: 8 }}>{verifyError}</div>}
+              <ActionFeedback
+                tone="error"
+                title="Error de verificacion"
+                message={verifyError}
+                onDismiss={() => setVerifyError("")}
+                style={{ marginTop: 8 }}
+              />
               {verifyResult && (
                 <div style={{ marginTop: 8, color: "#334155" }}>
                   Valido: {verifyResult.type} #{verifyResult.serial}/{verifyResult.year} - {verifyResult.code}
@@ -928,7 +972,13 @@ export default function StudentFollowup() {
                   <textarea className="input" rows={4} value={formDetail} onChange={(e) => setFormDetail(e.target.value)} />
                 </label>
               )}
-              {message && <div style={{ color: "#475569", marginTop: 8 }}>{message}</div>}
+              <ActionFeedback
+                tone={getFeedbackTone(message)}
+                title="Registro de observacion"
+                message={message}
+                onDismiss={() => setMessage("")}
+                style={{ marginTop: 8 }}
+              />
               <button className="button" style={{ marginTop: 10 }} disabled={busy}>
                 {busy ? "Guardando..." : "Registrar observacion"}
               </button>
@@ -948,7 +998,12 @@ export default function StudentFollowup() {
             </div>
           ) : (
             <>
-              {followUpMessage && <div style={{ color: "#475569", marginBottom: 8 }}>{followUpMessage}</div>}
+              <ActionFeedback
+                tone={getFeedbackTone(followUpMessage)}
+                title="Seguimientos"
+                message={followUpMessage}
+                onDismiss={() => setFollowUpMessage("")}
+              />
               <DataTable
                 columns={[
                   { key: "date", label: "Seguimiento" },

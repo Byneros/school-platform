@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ActionFeedback from "../components/ActionFeedback";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import Autocomplete from "../components/Autocomplete";
@@ -219,7 +220,13 @@ export default function AdminFinance() {
       {editingInvoiceId && (
         <form className="card" onSubmit={saveInvoice} style={{ marginTop: 10 }}>
           <div className="section-title">Editar factura</div>
-          {editInvoiceError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{editInvoiceError}</div>}
+          <ActionFeedback
+            tone="error"
+            title="Error al editar factura"
+            message={editInvoiceError}
+            onDismiss={() => setEditInvoiceError("")}
+            style={{ marginBottom: 8 }}
+          />
           <label>
             Monto
             <input className="input" value={editInvoiceForm.amount} onChange={(e) => setEditInvoiceForm({ ...editInvoiceForm, amount: e.target.value })} />

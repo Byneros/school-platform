@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ActionFeedback from "../components/ActionFeedback";
 import KpiCard from "../components/KpiCard";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
@@ -123,7 +124,13 @@ export default function TeacherDashboard() {
                 placeholder="Matematicas, Fisica, Quimica"
               />
             </label>
-            {profileMsg && <div style={{ color: "#64748b", marginTop: 8 }}>{profileMsg}</div>}
+            <ActionFeedback
+              tone={String(profileMsg || "").toLowerCase().includes("no se pudo") ? "error" : "success"}
+              title="Perfil docente"
+              message={profileMsg}
+              onDismiss={() => setProfileMsg("")}
+              style={{ marginTop: 8 }}
+            />
             <button className="button" style={{ marginTop: 10 }} disabled={profileBusy}>
               {profileBusy ? "Guardando..." : "Guardar perfil"}
             </button>
@@ -179,7 +186,13 @@ export default function TeacherDashboard() {
               Mensaje
               <textarea className="input" rows={4} value={body} onChange={(e) => setBody(e.target.value)} />
             </label>
-            {message && <div style={{ color: "#64748b", marginTop: 8 }}>{message}</div>}
+            <ActionFeedback
+              tone={String(message || "").toLowerCase().includes("no se pudo") ? "error" : "success"}
+              title="Comunicaciones"
+              message={message}
+              onDismiss={() => setMessage("")}
+              style={{ marginTop: 8 }}
+            />
             <button className="button" style={{ marginTop: 10 }} disabled={sending}>
               {sending ? "Enviando..." : "Enviar a aprobacion"}
             </button>

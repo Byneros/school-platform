@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Section from "../components/Section";
 import DataTable from "../components/DataTable";
+import ActionFeedback from "../components/ActionFeedback";
 import { apiDownload, apiGet, apiPost } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -648,8 +649,20 @@ export default function TeacherAttendance() {
 
       {!isAdminView && <form className="card" onSubmit={saveCourseAttendance}>
         <div className="section-title">Registro de asistencia por grado y grupo (checkbox)</div>
-        {saveMessage && <div style={{ marginBottom: 10, color: "#15803d", fontWeight: 600 }}>{saveMessage}</div>}
-        {saveError && <div style={{ marginBottom: 10, color: "#b91c1c", fontWeight: 600 }}>{saveError}</div>}
+        <ActionFeedback
+          tone="success"
+          title="Asistencia actualizada"
+          message={saveMessage}
+          onDismiss={() => setSaveMessage("")}
+          style={{ marginBottom: 10 }}
+        />
+        <ActionFeedback
+          tone="error"
+          title="Error en asistencia"
+          message={saveError}
+          onDismiss={() => setSaveError("")}
+          style={{ marginBottom: 10 }}
+        />
         {isSunday && (
           <div style={{ marginBottom: 10, color: "#64748b", fontWeight: 600 }}>
             Registro no disponible en domingo.
