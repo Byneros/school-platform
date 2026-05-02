@@ -454,6 +454,11 @@ export default function AdminUsers() {
       setImportError("Selecciona un archivo .xlsx.");
       return;
     }
+    const maxFileSizeBytes = 8 * 1024 * 1024;
+    if (importFile.size > maxFileSizeBytes) {
+      setImportError("El archivo .xlsx es demasiado grande. Usa un archivo menor a 8 MB o dividelo en varias importaciones.");
+      return;
+    }
     setImportBusy(true);
     setImportError("");
     setImportResult(null);

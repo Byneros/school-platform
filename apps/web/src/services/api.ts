@@ -1,5 +1,6 @@
 const API_URL = "https://school-platform-z8f4.onrender.com/api";
 const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
+const IMPORT_REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_IMPORT_TIMEOUT_MS || 120000);
 const DEVELOPER_ACCESS_TOKEN_KEY = "school.developer.access-token";
 
 export class ApiError extends Error {
@@ -90,8 +91,11 @@ function buildHeaders(withJson: boolean, normalizedPath: string) {
 async function request(path: string, method: RequestMethod, body?: unknown) {
   const withJson = body !== undefined;
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const timeoutMs = normalizedPath.startsWith("/reports/import-template/import")
+    ? IMPORT_REQUEST_TIMEOUT_MS
+    : REQUEST_TIMEOUT_MS;
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${normalizedPath}`, {
@@ -103,7 +107,9 @@ async function request(path: string, method: RequestMethod, body?: unknown) {
     });
   } catch {
     throw new ApiError(
-      "No se pudo conectar con el servidor. Verifica que la API este ejecutandose.",
+      normalizedPath.startsWith("/reports/import-template/import")
+        ? "La importacion no pudo completarse. Verifica el tamano del archivo, el tiempo de proceso o que la API siga activa."
+        : "No se pudo conectar con el servidor. Verifica que la API este ejecutandose.",
       0,
       null,
       normalizedPath

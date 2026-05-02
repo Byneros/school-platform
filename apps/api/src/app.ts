@@ -84,7 +84,7 @@ const twoFactorRateLimitMax = Math.max(
   Number(process.env.TWO_FACTOR_RATE_LIMIT_MAX || 10)
 );
 
-const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "1mb";
+const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "15mb";
 const cacheTtlSeconds = Math.max(5, Number(process.env.REDIS_CACHE_TTL_SECONDS || 300));
 const cacheTtlCritical = Math.max(60, Number(process.env.REDIS_CACHE_TTL_CRITICAL || 600));
 const cacheTtlSuggestions = Math.max(30, Number(process.env.REDIS_CACHE_TTL_SUGGESTIONS || 120));
@@ -541,8 +541,13 @@ const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
 
   const isJsonParseError =
     (error as any)?.type === "entity.parse.failed";
+  const isEntityTooLarge =
+    status === 413 ||
+    (error as any)?.type === "entity.too.large";
 
-  const message = isJsonParseError
+  const message = isEntityTooLarge
+    ? "El archivo o la solicitud es demasiado grande para procesarse. Usa una plantilla mas pequena o aumenta JSON_BODY_LIMIT."
+    : isJsonParseError
     ? "JSON invalido en la solicitud"
     : String(
         (error as any)?.message || "Error interno del servidor"
