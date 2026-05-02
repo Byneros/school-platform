@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import ActionFeedback from "../components/ActionFeedback";
 import Section from "../components/Section";
 import { apiDownload, apiGet, apiPut } from "../services/api";
+import { feedbackTitles } from "../utils/feedback";
 
 type BrandingSettings = {
   schoolName: string;
@@ -118,14 +119,14 @@ export default function AdminBranding() {
         <form className="card" onSubmit={save}>
           <ActionFeedback
             tone="error"
-            title="Error de personalizacion"
+            title={feedbackTitles.branding.error}
             message={error}
             onDismiss={() => setError("")}
             style={{ marginBottom: 10 }}
           />
           <ActionFeedback
             tone="success"
-            title="Personalizacion guardada"
+            title={feedbackTitles.branding.success}
             message={message}
             onDismiss={() => setMessage("")}
             style={{ marginBottom: 10 }}

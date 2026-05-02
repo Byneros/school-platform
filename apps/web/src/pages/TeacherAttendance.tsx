@@ -4,6 +4,7 @@ import DataTable from "../components/DataTable";
 import ActionFeedback from "../components/ActionFeedback";
 import { apiDownload, apiGet, apiPost } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { feedbackTitles } from "../utils/feedback";
 
 function toLocalDateInputValue(date: Date) {
   const year = date.getFullYear();
@@ -651,14 +652,14 @@ export default function TeacherAttendance() {
         <div className="section-title">Registro de asistencia por grado y grupo (checkbox)</div>
         <ActionFeedback
           tone="success"
-          title="Asistencia actualizada"
+          title={feedbackTitles.teacherAttendance.success}
           message={saveMessage}
           onDismiss={() => setSaveMessage("")}
           style={{ marginBottom: 10 }}
         />
         <ActionFeedback
           tone="error"
-          title="Error en asistencia"
+          title={feedbackTitles.teacherAttendance.error}
           message={saveError}
           onDismiss={() => setSaveError("")}
           style={{ marginBottom: 10 }}

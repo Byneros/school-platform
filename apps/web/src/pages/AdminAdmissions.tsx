@@ -8,6 +8,7 @@ import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/a
 import { gradeLabel, gradeOptions } from "../services/grades";
 import useDebounce from "../hooks/useDebounce";
 import useSuggestions from "../hooks/useSuggestions";
+import { feedbackTitles } from "../utils/feedback";
 
 function getClassGradeLevel(classData: any) {
   return String(classData?.gradeLevel || "").trim();
@@ -774,25 +775,25 @@ export default function AdminAdmissions() {
       </div>
       <ActionFeedback
         tone="success"
-        title="Estado de admision actualizado"
+        title={feedbackTitles.admissions.statusSuccess}
         message={admissionStatusMessage}
         onDismiss={() => setAdmissionStatusMessage("")}
       />
       <ActionFeedback
         tone="error"
-        title="Error al cambiar estado"
+        title={feedbackTitles.admissions.statusError}
         message={admissionStatusError}
         onDismiss={() => setAdmissionStatusError("")}
       />
       <ActionFeedback
         tone="success"
-        title="Matricula eliminada"
+        title={feedbackTitles.admissions.deleteEnrollmentSuccess}
         message={removeEnrollmentMessage}
         onDismiss={() => setRemoveEnrollmentMessage("")}
       />
       <ActionFeedback
         tone="error"
-        title="Error al eliminar matricula"
+        title={feedbackTitles.admissions.deleteEnrollmentError}
         message={removeEnrollmentError}
         onDismiss={() => setRemoveEnrollmentError("")}
       />
@@ -1199,7 +1200,13 @@ export default function AdminAdmissions() {
       </div>
       <div className="card" style={{ marginTop: 10 }}>
         <div className="section-title">Consultar matriculas</div>
-        {enrollmentsError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{enrollmentsError}</div>}
+        <ActionFeedback
+          tone="error"
+          title={feedbackTitles.admissions.loadEnrollmentsError}
+          message={enrollmentsError}
+          onDismiss={() => setEnrollmentsError("")}
+          style={{ marginBottom: 8 }}
+        />
         <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
           <Autocomplete
             className="input input-search"
@@ -1270,13 +1277,13 @@ export default function AdminAdmissions() {
           <div className="section-title">Editar matricula</div>
           <ActionFeedback
             tone="success"
-            title="Matricula actualizada"
+            title={feedbackTitles.admissions.updateEnrollmentSuccess}
             message={editingEnrollmentMessage}
             onDismiss={() => setEditingEnrollmentMessage("")}
           />
           <ActionFeedback
             tone="error"
-            title="Error al editar matricula"
+            title={feedbackTitles.admissions.updateEnrollmentError}
             message={editingEnrollmentError}
             onDismiss={() => setEditingEnrollmentError("")}
           />
@@ -1566,7 +1573,13 @@ export default function AdminAdmissions() {
           Eliminar filtro
         </button>
       </div>
-      {loadError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{loadError}</div>}
+      <ActionFeedback
+        tone="error"
+        title={feedbackTitles.admissions.loadAdmissionsError}
+        message={loadError}
+        onDismiss={() => setLoadError("")}
+        style={{ marginBottom: 8 }}
+      />
       <DataTable
         columns={[
           { key: "student", label: "Estudiante" },
@@ -1614,13 +1627,13 @@ export default function AdminAdmissions() {
           <div className="section-title">Editar admision</div>
           <ActionFeedback
             tone="success"
-            title="Admision actualizada"
+            title={feedbackTitles.admissions.updateAdmissionSuccess}
             message={editingMessage}
             onDismiss={() => setEditingMessage("")}
           />
           <ActionFeedback
             tone="error"
-            title="Error al editar admision"
+            title={feedbackTitles.admissions.updateAdmissionError}
             message={editingError}
             onDismiss={() => setEditingError("")}
           />

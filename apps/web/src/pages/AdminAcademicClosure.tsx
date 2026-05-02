@@ -6,6 +6,7 @@ import Autocomplete from "../components/Autocomplete";
 import { apiDownload, apiGet, apiPost, apiPut } from "../services/api";
 import { gradeLabel, gradeOptions } from "../services/grades";
 import useSuggestions from "../hooks/useSuggestions";
+import { feedbackTitles } from "../utils/feedback";
 
 export default function AdminAcademicClosure() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
@@ -227,14 +228,14 @@ export default function AdminAcademicClosure() {
         </div>
         <ActionFeedback
           tone="success"
-          title="Cierre academico"
+          title={feedbackTitles.academicClosure.success}
           message={message}
           onDismiss={() => setMessage("")}
           style={{ marginTop: 8 }}
         />
         <ActionFeedback
           tone="error"
-          title="Error en cierre academico"
+          title={feedbackTitles.academicClosure.error}
           message={error}
           onDismiss={() => setError("")}
           style={{ marginTop: 8 }}

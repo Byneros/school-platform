@@ -6,6 +6,7 @@ import Autocomplete from "../components/Autocomplete";
 import { apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
 import { gradeLabel } from "../services/grades";
 import useSuggestions from "../hooks/useSuggestions";
+import { feedbackTitles } from "../utils/feedback";
 
 export default function AdminFinance() {
   const [invoices, setInvoices] = useState<Array<{ id: string; amount: number; status: string; dueDate: string; student: { fullName: string } }>>([]);
@@ -222,7 +223,7 @@ export default function AdminFinance() {
           <div className="section-title">Editar factura</div>
           <ActionFeedback
             tone="error"
-            title="Error al editar factura"
+            title={feedbackTitles.finance.invoiceEditError}
             message={editInvoiceError}
             onDismiss={() => setEditInvoiceError("")}
             style={{ marginBottom: 8 }}

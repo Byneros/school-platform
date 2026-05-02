@@ -6,6 +6,7 @@ import Autocomplete from "../components/Autocomplete";
 import ActionFeedback from "../components/ActionFeedback";
 import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
 import useDebounce from "../hooks/useDebounce";
+import { feedbackTitles } from "../utils/feedback";
 import useSuggestions from "../hooks/useSuggestions";
 import { useAuth } from "../context/AuthContext";
 
@@ -490,37 +491,37 @@ export default function AdminUsers() {
       </div>
       <ActionFeedback
         tone="success"
-        title="Usuario creado"
+        title={feedbackTitles.users.createSuccess}
         message={createMessage}
         onDismiss={() => setCreateMessage("")}
       />
       <ActionFeedback
         tone="error"
-        title="Error al crear usuario"
+        title={feedbackTitles.users.createError}
         message={createError}
         onDismiss={() => setCreateError("")}
       />
       <ActionFeedback
         tone="success"
-        title="Usuario eliminado"
+        title={feedbackTitles.users.deleteSuccess}
         message={deleteMessage}
         onDismiss={() => setDeleteMessage("")}
       />
       <ActionFeedback
         tone="error"
-        title="Error al eliminar usuario"
+        title={feedbackTitles.users.deleteError}
         message={deleteError}
         onDismiss={() => setDeleteError("")}
       />
       <ActionFeedback
         tone="success"
-        title="Estado de usuario actualizado"
+        title={feedbackTitles.users.toggleSuccess}
         message={toggleMessage}
         onDismiss={() => setToggleMessage("")}
       />
       <ActionFeedback
         tone="error"
-        title="Error al cambiar estado de usuario"
+        title={feedbackTitles.users.toggleError}
         message={toggleError}
         onDismiss={() => setToggleError("")}
       />
@@ -709,7 +710,13 @@ export default function AdminUsers() {
             {importBusy ? "Procesando..." : importMode === "import" ? "Importar" : "Validar"}
           </button>
         </div>
-        {importError && <div style={{ color: "#b91c1c", marginTop: 8 }}>{importError}</div>}
+        <ActionFeedback
+          tone="error"
+          title={feedbackTitles.users.importError}
+          message={importError}
+          onDismiss={() => setImportError("")}
+          style={{ marginTop: 8 }}
+        />
         {importResult && (
           <div style={{ marginTop: 8, color: "#334155" }}>
             <div>Modo: {importResult.mode}</div>
@@ -803,19 +810,25 @@ export default function AdminUsers() {
           Eliminar filtro
         </button>
       </div>
-      {loadError && <div style={{ color: "#b91c1c", marginBottom: 8 }}>{loadError}</div>}
+      <ActionFeedback
+        tone="error"
+        title={feedbackTitles.users.loadError}
+        message={loadError}
+        onDismiss={() => setLoadError("")}
+        style={{ marginBottom: 8 }}
+      />
       {editingId && (
         <form ref={editPanelRef} className="card" onSubmit={saveEdit} style={{ marginBottom: 8 }}>
           <div className="section-title">Editar usuario</div>
           <ActionFeedback
             tone="success"
-            title="Usuario actualizado"
+            title={feedbackTitles.users.updateSuccess}
             message={editMessage}
             onDismiss={() => setEditMessage("")}
           />
           <ActionFeedback
             tone="error"
-            title="Error al editar usuario"
+            title={feedbackTitles.users.updateError}
             message={editError}
             onDismiss={() => setEditError("")}
           />

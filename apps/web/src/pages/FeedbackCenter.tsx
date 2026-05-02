@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPatch, apiPost } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import ActionFeedback from "../components/ActionFeedback";
+import { feedbackTitles } from "../utils/feedback";
 
 type FeedbackItem = {
   id: string;
@@ -146,14 +147,14 @@ export default function FeedbackCenter() {
         </label>
         <ActionFeedback
           tone="error"
-          title="Error en feedback"
+          title={feedbackTitles.feedback.error}
           message={error}
           onDismiss={() => setError("")}
           style={{ marginTop: 8, marginBottom: 0 }}
         />
         <ActionFeedback
           tone="success"
-          title="Feedback registrado"
+          title={feedbackTitles.feedback.success}
           message={message}
           onDismiss={() => setMessage("")}
           style={{ marginTop: 8, marginBottom: 0 }}

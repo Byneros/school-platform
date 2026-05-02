@@ -6,6 +6,7 @@ import ActionFeedback from "../components/ActionFeedback";
 import { apiGet, apiPatch, apiPost } from "../services/api";
 import useSuggestions, { SuggestionOption } from "../hooks/useSuggestions";
 import { isDueProcessNotification, prioritizeDueProcess } from "../utils/notificationPriority";
+import { feedbackTitles } from "../utils/feedback";
 
 const convivenciaTemplates = [
   {
@@ -227,25 +228,25 @@ export default function AdminNotifications() {
       </div>
       <ActionFeedback
         tone="success"
-        title="Notificacion creada"
+        title={feedbackTitles.notifications.createSuccess}
         message={createMessage}
         onDismiss={() => setCreateMessage("")}
       />
       <ActionFeedback
         tone="error"
-        title="Error al crear notificacion"
+        title={feedbackTitles.notifications.createError}
         message={createError}
         onDismiss={() => setCreateError("")}
       />
       <ActionFeedback
         tone="success"
-        title="Estado de notificacion actualizado"
+        title={feedbackTitles.notifications.statusSuccess}
         message={statusMessage}
         onDismiss={() => setStatusMessage("")}
       />
       <ActionFeedback
         tone="error"
-        title="Error al cambiar estado de notificacion"
+        title={feedbackTitles.notifications.statusError}
         message={statusError}
         onDismiss={() => setStatusError("")}
       />
@@ -424,13 +425,13 @@ export default function AdminNotifications() {
           <div className="section-title">Editar notificacion</div>
           <ActionFeedback
             tone="success"
-            title="Notificacion actualizada"
+            title={feedbackTitles.notifications.updateSuccess}
             message={editingMessage}
             onDismiss={() => setEditingMessage("")}
           />
           <ActionFeedback
             tone="error"
-            title="Error al editar notificacion"
+            title={feedbackTitles.notifications.updateError}
             message={editingError}
             onDismiss={() => setEditingError("")}
           />

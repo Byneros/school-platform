@@ -4,6 +4,7 @@ import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import { apiDownload, apiGet, apiPut } from "../services/api";
 import { gradeOptions } from "../services/grades";
+import { feedbackTitles, inferFeedbackTone } from "../utils/feedback";
 
 type SubjectHour = {
   subject: string;
@@ -420,15 +421,15 @@ export default function AdminTeacherHours() {
         </label>
       </div>
       <ActionFeedback
-        tone={String(message || "").toLowerCase().includes("no se pudo") ? "error" : "success"}
-        title="Horas docentes"
+        tone={inferFeedbackTone(message)}
+        title={feedbackTitles.teacherHours.success}
         message={message}
         onDismiss={() => setMessage("")}
         style={{ marginBottom: 8 }}
       />
       <ActionFeedback
         tone="error"
-        title="Error al cargar horas"
+        title={feedbackTitles.teacherHours.error}
         message={loadError}
         onDismiss={() => setLoadError("")}
         style={{ marginBottom: 8 }}

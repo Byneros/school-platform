@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import ActionFeedback from "../components/ActionFeedback";
 import { apiGet } from "../services/api";
+import { feedbackTitles } from "../utils/feedback";
 
 type MetricBucket = {
   total: number;
@@ -65,7 +67,13 @@ export default function AdminCacheMetrics() {
         <button className="button secondary" onClick={load}>Recargar</button>
       </div>
 
-      {error && <div className="error" style={{ marginTop: 12 }}>{error}</div>}
+      <ActionFeedback
+        tone="error"
+        title={feedbackTitles.cache.error}
+        message={error || ""}
+        onDismiss={() => setError(null)}
+        style={{ marginTop: 12 }}
+      />
       {loading && <div style={{ color: "#6b7280", marginTop: 12 }}>Cargando...</div>}
 
       {metrics && !loading && (

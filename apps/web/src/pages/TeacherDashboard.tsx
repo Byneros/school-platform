@@ -6,6 +6,7 @@ import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import { apiGet, apiPost, apiPut } from "../services/api";
 import { gradeLabel } from "../services/grades";
+import { feedbackTitles, inferFeedbackTone } from "../utils/feedback";
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
@@ -125,8 +126,8 @@ export default function TeacherDashboard() {
               />
             </label>
             <ActionFeedback
-              tone={String(profileMsg || "").toLowerCase().includes("no se pudo") ? "error" : "success"}
-              title="Perfil docente"
+              tone={inferFeedbackTone(profileMsg)}
+              title={feedbackTitles.teacherDashboard.profile}
               message={profileMsg}
               onDismiss={() => setProfileMsg("")}
               style={{ marginTop: 8 }}
@@ -187,8 +188,8 @@ export default function TeacherDashboard() {
               <textarea className="input" rows={4} value={body} onChange={(e) => setBody(e.target.value)} />
             </label>
             <ActionFeedback
-              tone={String(message || "").toLowerCase().includes("no se pudo") ? "error" : "success"}
-              title="Comunicaciones"
+              tone={inferFeedbackTone(message)}
+              title={feedbackTitles.teacherDashboard.communications}
               message={message}
               onDismiss={() => setMessage("")}
               style={{ marginTop: 8 }}

@@ -7,6 +7,7 @@ import DataTable from "../components/DataTable";
 import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
 import { gradeLabel } from "../services/grades";
 import { useAuth } from "../context/AuthContext";
+import { feedbackTitles, inferFeedbackTone } from "../utils/feedback";
 
 type StudentOption = {
   id: string;
@@ -25,31 +26,6 @@ const observationTypeOptions = [
 function typeLabel(value: string) {
   if (value === "DISCIPLINARY") return "Disciplinario";
   return observationTypeOptions.find((item) => item.value === value)?.label || value;
-}
-
-function getFeedbackTone(message: string): "success" | "error" | "warning" | "info" {
-  const normalized = String(message || "").toLowerCase();
-  if (
-    normalized.includes("no se pudo") ||
-    normalized.includes("selecciona") ||
-    normalized.includes("ingresa") ||
-    normalized.includes("describe") ||
-    normalized.includes("escribe")
-  ) {
-    return "error";
-  }
-  if (normalized.includes("ya existe una solicitud pendiente")) {
-    return "warning";
-  }
-  if (
-    normalized.includes("registrada") ||
-    normalized.includes("solicitud enviada") ||
-    normalized.includes("actualizada") ||
-    normalized.includes("descarga disponible")
-  ) {
-    return "success";
-  }
-  return "info";
 }
 
 export default function StudentFollowup() {
@@ -703,8 +679,8 @@ export default function StudentFollowup() {
                 </button>
               </div>
               <ActionFeedback
-                tone={getFeedbackTone(associationMessage)}
-                title="Asociacion de acudiente"
+                tone={inferFeedbackTone(associationMessage)}
+                title={feedbackTitles.studentFollowup.association}
                 message={associationMessage}
                 onDismiss={() => setAssociationMessage("")}
                 style={{ marginBottom: 0 }}
@@ -713,8 +689,8 @@ export default function StudentFollowup() {
           )}
         </div>
         <ActionFeedback
-          tone={getFeedbackTone(certificateMessage)}
-          title="Certificados y observador"
+          tone={inferFeedbackTone(certificateMessage)}
+          title={feedbackTitles.studentFollowup.certificates}
           message={certificateMessage}
           onDismiss={() => setCertificateMessage("")}
           style={{ marginTop: 8 }}
@@ -760,7 +736,7 @@ export default function StudentFollowup() {
               </div>
               <ActionFeedback
                 tone="error"
-                title="Error de verificacion"
+                title={feedbackTitles.studentFollowup.verifyError}
                 message={verifyError}
                 onDismiss={() => setVerifyError("")}
                 style={{ marginTop: 8 }}
@@ -973,8 +949,8 @@ export default function StudentFollowup() {
                 </label>
               )}
               <ActionFeedback
-                tone={getFeedbackTone(message)}
-                title="Registro de observacion"
+                tone={inferFeedbackTone(message)}
+                title={feedbackTitles.studentFollowup.observation}
                 message={message}
                 onDismiss={() => setMessage("")}
                 style={{ marginTop: 8 }}
@@ -999,8 +975,8 @@ export default function StudentFollowup() {
           ) : (
             <>
               <ActionFeedback
-                tone={getFeedbackTone(followUpMessage)}
-                title="Seguimientos"
+                tone={inferFeedbackTone(followUpMessage)}
+                title={feedbackTitles.studentFollowup.followUps}
                 message={followUpMessage}
                 onDismiss={() => setFollowUpMessage("")}
               />

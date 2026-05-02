@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ActionFeedback from "../components/ActionFeedback";
 import {
   ApiError,
   apiGet,
@@ -6,6 +7,7 @@ import {
   getDeveloperAccessToken,
   setDeveloperAccessToken
 } from "../services/api";
+import { feedbackTitles } from "../utils/feedback";
 
 type DeveloperInfo = {
   service: string;
@@ -99,7 +101,12 @@ export default function DeveloperZone() {
       </div>
 
       {loading && <div className="card">Cargando zona developer...</div>}
-      {error && <div className="card" style={{ color: "#b91c1c" }}>{error}</div>}
+      <ActionFeedback
+        tone="error"
+        title={feedbackTitles.developer.accessError}
+        message={error || ""}
+        onDismiss={() => setError(null)}
+      />
 
       {data && !loading && (
         <>

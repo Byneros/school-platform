@@ -52,6 +52,8 @@ export default function ActionFeedback({
   const onDismissRef = useRef<Props["onDismiss"]>(onDismiss);
   const [highlight, setHighlight] = useState(false);
   const palette = toneStyles[tone];
+  const liveMode = tone === "error" ? "assertive" : "polite";
+  const role = tone === "error" ? "alert" : "status";
 
   useEffect(() => {
     onDismissRef.current = onDismiss;
@@ -81,6 +83,10 @@ export default function ActionFeedback({
   return (
     <div
       ref={ref}
+      role={role}
+      aria-live={liveMode}
+      aria-atomic="true"
+      tabIndex={-1}
       className="card"
       style={{
         marginBottom: 12,

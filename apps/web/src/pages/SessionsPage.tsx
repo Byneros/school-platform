@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import ActionFeedback from "../components/ActionFeedback";
 import { apiGet, apiPost } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { feedbackTitles } from "../utils/feedback";
 
 type SessionItem = {
   id: string;
@@ -159,14 +160,14 @@ export default function SessionsPage() {
 
       <ActionFeedback
         tone="success"
-        title="Sesiones"
+        title={feedbackTitles.sessions.success}
         message={msg || ""}
         onDismiss={() => setMsg(null)}
         style={{ marginBottom: 12 }}
       />
       <ActionFeedback
         tone="error"
-        title="Error de sesiones"
+        title={feedbackTitles.sessions.error}
         message={error || ""}
         onDismiss={() => setError(null)}
         style={{ marginBottom: 12 }}

@@ -7,6 +7,7 @@ import DataTable from "../components/DataTable";
 import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
 import { gradeLabel } from "../services/grades";
 import { isDueProcessNotification, prioritizeDueProcess } from "../utils/notificationPriority";
+import { feedbackTitles, inferFeedbackTone } from "../utils/feedback";
 
 type Admission = {
   id: string;
@@ -366,8 +367,8 @@ export default function AdminAlerts() {
           <button className="button secondary" type="button" onClick={() => navigate("/admin/finanzas")}>Ir a Finanzas</button>
         </div>
         <ActionFeedback
-          tone={String(message || "").toLowerCase().includes("no se pudo") ? "error" : "info"}
-          title="Centro de alertas"
+          tone={inferFeedbackTone(message)}
+          title={feedbackTitles.alerts.center}
           message={message}
           onDismiss={() => setMessage("")}
           style={{ marginTop: 10 }}

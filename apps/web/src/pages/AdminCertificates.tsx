@@ -4,6 +4,7 @@ import Section from "../components/Section";
 import DataTable from "../components/DataTable";
 import { apiDownload, apiGet, apiPost } from "../services/api";
 import { gradeLabel } from "../services/grades";
+import { feedbackTitles } from "../utils/feedback";
 
 export default function AdminCertificates() {
   const [requestRows, setRequestRows] = useState<any[]>([]);
@@ -145,7 +146,7 @@ export default function AdminCertificates() {
         </div>
         <ActionFeedback
           tone="error"
-          title="Error en solicitudes"
+          title={feedbackTitles.certificates.requestsError}
           message={requestError}
           onDismiss={() => setRequestError("")}
           style={{ marginTop: 8 }}
@@ -256,7 +257,7 @@ export default function AdminCertificates() {
 
         <ActionFeedback
           tone="error"
-          title="Error en certificados"
+          title={feedbackTitles.certificates.issuedError}
           message={error}
           onDismiss={() => setError("")}
           style={{ marginTop: 8 }}

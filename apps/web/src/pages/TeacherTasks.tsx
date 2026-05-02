@@ -4,6 +4,7 @@ import DataTable from "../components/DataTable";
 import ActionFeedback from "../components/ActionFeedback";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "../services/api";
 import { gradeLabel } from "../services/grades";
+import { feedbackTitles } from "../utils/feedback";
 
 const PERIODS = ["P1", "P2", "P3", "P4"];
 const ASPECTS = [
@@ -509,17 +510,17 @@ export default function TeacherTasks() {
           <div style={{ color: "#64748b", marginTop: 8 }}>
             Ponderacion aplicada: <strong>{getAspectWeight(taskForm.aspect)}%</strong> · Nota maxima 0–5
           </div>
-          <ActionFeedback
-            tone="error"
-            title="Error en tareas"
-            message={error}
+            <ActionFeedback
+              tone="error"
+              title={feedbackTitles.teacherTasks.taskError}
+              message={error}
             onDismiss={() => setError("")}
             style={{ marginTop: 8, marginBottom: 0 }}
           />
-          <ActionFeedback
-            tone="success"
-            title="Accion completada"
-            message={message}
+            <ActionFeedback
+              tone="success"
+              title={feedbackTitles.teacherTasks.taskSuccess}
+              message={message}
             onDismiss={() => setMessage("")}
             style={{ marginTop: 8, marginBottom: 0 }}
           />
@@ -637,17 +638,17 @@ export default function TeacherTasks() {
               <div />
               <div />
             </div>
-            <ActionFeedback
-              tone="error"
-              title="Error al editar tarea"
-              message={editingError}
+              <ActionFeedback
+                tone="error"
+                title={feedbackTitles.teacherTasks.updateError}
+                message={editingError}
               onDismiss={() => setEditingError("")}
               style={{ marginTop: 8, marginBottom: 0 }}
             />
-            <ActionFeedback
-              tone="success"
-              title="Tarea actualizada"
-              message={editingMessage}
+              <ActionFeedback
+                tone="success"
+                title={feedbackTitles.teacherTasks.updateSuccess}
+                message={editingMessage}
               onDismiss={() => setEditingMessage("")}
               style={{ marginTop: 8, marginBottom: 0 }}
             />
@@ -775,14 +776,14 @@ export default function TeacherTasks() {
             </div>
             <ActionFeedback
               tone="error"
-              title="Error en calificaciones"
+              title={feedbackTitles.teacherTasks.gradesError}
               message={error}
               onDismiss={() => setError("")}
               style={{ marginTop: 8, marginBottom: 0 }}
             />
             <ActionFeedback
               tone="success"
-              title="Calificaciones actualizadas"
+              title={feedbackTitles.teacherTasks.gradesSuccess}
               message={message}
               onDismiss={() => setMessage("")}
               style={{ marginTop: 8, marginBottom: 0 }}

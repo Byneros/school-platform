@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import ActionFeedback from "../components/ActionFeedback";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../services/api";
+import { feedbackTitles } from "../utils/feedback";
 
 export default function LoginPage() {
   const { login, verifyTwoFactor, resendTwoFactor } = useAuth();
@@ -176,7 +177,7 @@ export default function LoginPage() {
             </label>
             <ActionFeedback
               tone="error"
-              title="Error de acceso"
+              title={feedbackTitles.login.accessError}
               message={error}
               onDismiss={() => setError("")}
               style={{ marginTop: 8 }}
@@ -217,7 +218,7 @@ export default function LoginPage() {
               </label>
               <ActionFeedback
                 tone="error"
-                title="Error de verificacion"
+                title={feedbackTitles.login.verificationError}
                 message={error}
                 onDismiss={() => setError("")}
                 style={{ marginTop: 8 }}

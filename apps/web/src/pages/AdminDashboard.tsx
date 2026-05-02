@@ -7,6 +7,7 @@ import Autocomplete from "../components/Autocomplete";
 import { apiDelete, apiDownload, apiGet, apiPatch } from "../services/api";
 import { gradeLabel, gradeOptions } from "../services/grades";
 import useSuggestions from "../hooks/useSuggestions";
+import { feedbackTitles } from "../utils/feedback";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -248,7 +249,7 @@ export default function AdminDashboard() {
             <div className="section-title">Editar estudiante</div>
             <ActionFeedback
               tone="error"
-              title="Error al editar estudiante"
+              title={feedbackTitles.dashboard.studentEditError}
               message={editError}
               onDismiss={() => setEditError("")}
               style={{ marginBottom: 8 }}
