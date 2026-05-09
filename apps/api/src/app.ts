@@ -536,21 +536,40 @@ app.use("/api", (req, res) => {
 
 const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   const requestId = (req as any).requestId || null;
+  const errorAny = error as any;
+  const errorName = String(errorAny?.name || "");
+  const errorCode = String(errorAny?.code || "");
+  const errorMessage = String(errorAny?.message || "");
+  const isPrismaError =
+    errorName.startsWith("Prisma") ||
+    errorCode.startsWith("P") ||
+    errorMessage.includes("Prisma") ||
+    errorMessage.includes("DATABASE_URL") ||
+    errorMessage.includes("Can't reach database server");
+  const isPrismaUnavailable =
+    errorName === "PrismaClientInitializationError" ||
+    errorCode === "P1001" ||
+    errorMessage.includes("DATABASE_URL") ||
+    errorMessage.includes("Can't reach database server");
 
-  const status = Number((error as any)?.status || 500);
+  const status = Number(errorAny?.status || (isPrismaUnavailable ? 503 : 500));
 
   const isJsonParseError =
-    (error as any)?.type === "entity.parse.failed";
+    errorAny?.type === "entity.parse.failed";
   const isEntityTooLarge =
     status === 413 ||
-    (error as any)?.type === "entity.too.large";
+    errorAny?.type === "entity.too.large";
 
   const message = isEntityTooLarge
     ? "El archivo o la solicitud es demasiado grande para procesarse. Usa una plantilla mas pequena o aumenta JSON_BODY_LIMIT."
     : isJsonParseError
     ? "JSON invalido en la solicitud"
+    : isPrismaUnavailable
+    ? "Base de datos no disponible o DATABASE_URL no configurado."
+    : isPrismaError
+    ? "Error de base de datos. Verifica migraciones y conexion."
     : String(
-        (error as any)?.message || "Error interno del servidor"
+        errorAny?.message || "Error interno del servidor"
       );
 
   if (status >= 500) {
@@ -559,8 +578,8 @@ const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
       method: req.method,
       path: req.originalUrl,
       statusCode: status,
-      errorName: (error as any)?.name || "Error",
-      errorMessage: (error as any)?.message || "Unknown error",
+      errorName: errorAny?.name || "Error",
+      errorMessage: errorAny?.message || "Unknown error",
     });
   }
 

@@ -1,10 +1,6 @@
 import dotenv from "dotenv";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import app from "./app.js";
-import { startNotificationWorker } from "./workers/notificationWorker.js";
-import { startEmailWorker } from "./workers/emailWorker.js";
-import { startCacheWarmWorker } from "./workers/cacheWarmWorker.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
@@ -17,9 +13,31 @@ if (!isProd) {
   }
 }
 
-const PORT = Number(process.env.PORT) || 3000;
-app.listen(PORT, "0.0.0.0", () => {
+const { default: app } = await import("./app.js");
+const { startNotificationWorker } = await import("./workers/notificationWorker.js");
+const { startEmailWorker } = await import("./workers/emailWorker.js");
+const { startCacheWarmWorker } = await import("./workers/cacheWarmWorker.js");
+
+const PORT = Number(process.env.PORT) || (isProd ? 3000 : 4003);
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(`API running on port ${PORT}`);
+});
+
+server.on("error", (error: NodeJS.ErrnoException) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(
+      [
+        `No se pudo iniciar la API: el puerto ${PORT} ya esta en uso.`,
+        "Cierra el proceso que ocupa ese puerto o define otro puerto antes de iniciar:",
+        "  PowerShell: $env:PORT=4004; npm.cmd run dev:api",
+        "  CMD: set PORT=4004 && npm.cmd run dev:api"
+      ].join("\n")
+    );
+    process.exit(1);
+  }
+
+  console.error("No se pudo iniciar la API:", error.message || error);
+  process.exit(1);
 });
 
 function shouldStartWorker(envKey: string) {

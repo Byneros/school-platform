@@ -27,60 +27,10 @@ import {
 } from "../utils/refreshTokens.js";
 
 const router = Router();
-
 const jwtExpiresIn = getAccessTokenTtl();
 
-/* ✅ CENTRALIZACIÓN DE ROLES */
 type Role = "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER";
-
-const twoFactorEnabledEnv = String(process.env.ADMIN_2FA_ENABLED || "").toLowerCase();
-const twoFactorRolesEnv = String(process.env.TWO_FACTOR_ROLES || "ADMIN,TEACHER,PARENT,DEVELOPER");
-const isProd = process.env.NODE_ENV === "production";
-
-const twoFactorEnabled =
-  twoFactorEnabledEnv
-    ? ["true", "1", "yes"].includes(twoFactorEnabledEnv)
-    : isProd;
-
-const twoFactorRoles = new Set(
-  twoFactorRolesEnv
-    .split(",")
-    .map((r) => r.trim().toUpperCase())
-    .filter(Boolean)
-);
-
-const twoFactorCodeTtlMs = Math.max(
-  60_000,
-  Number(process.env.ADMIN_2FA_CODE_TTL_MS || 10 * 60 * 1000)
-);
-
-const twoFactorMaxAttempts = Math.max(3, Number(process.env.ADMIN_2FA_MAX_ATTEMPTS || 5));
-
-const twoFactorResendCooldownMs = Math.max(
-  30_000,
-  Number(process.env.ADMIN_2FA_RESEND_COOLDOWN_MS || 60 * 1000)
-);
-
-const twoFactorPepper = process.env.ADMIN_2FA_CODE_SECRET || "";
-const queueTwoFactorEmail = String(process.env.EMAIL_QUEUE_2FA || "").toLowerCase() === "true";
-
-const loginLockoutWindowMs = Math.max(
-  60_000,
-  Number(process.env.LOGIN_LOCKOUT_WINDOW_MS || 15 * 60 * 1000)
-);
-
-const loginLockoutMax = Math.max(3, Number(process.env.LOGIN_LOCKOUT_MAX || 5));
-
-const loginLockoutBlockMs = Math.max(
-  60_000,
-  Number(process.env.LOGIN_LOCKOUT_BLOCK_MS || 15 * 60 * 1000)
-);
-
 type LoginAttempt = { count: number; resetAt: number; blockedUntil?: number };
-
-const loginAttempts = new Map<string, LoginAttempt>();
-
-/* ✅ FIX AQUÍ */
 type TwoFactorSession = {
   userId: string;
   role: Role;
@@ -91,7 +41,53 @@ type TwoFactorSession = {
   attempts: number;
 };
 
+const twoFactorEnabledEnv = String(process.env.ADMIN_2FA_ENABLED || "").toLowerCase();
+const twoFactorRolesEnv = String(process.env.TWO_FACTOR_ROLES || "ADMIN,TEACHER,PARENT,DEVELOPER");
+const isProd = process.env.NODE_ENV === "production";
+const twoFactorEnabled = twoFactorEnabledEnv
+  ? ["true", "1", "yes"].includes(twoFactorEnabledEnv)
+  : isProd;
+const twoFactorRoles = new Set(
+  twoFactorRolesEnv
+    .split(",")
+    .map((r) => r.trim().toUpperCase())
+    .filter(Boolean)
+);
+const twoFactorCodeTtlMs = Math.max(60_000, Number(process.env.ADMIN_2FA_CODE_TTL_MS || 10 * 60 * 1000));
+const twoFactorMaxAttempts = Math.max(3, Number(process.env.ADMIN_2FA_MAX_ATTEMPTS || 5));
+const twoFactorResendCooldownMs = Math.max(
+  30_000,
+  Number(process.env.ADMIN_2FA_RESEND_COOLDOWN_MS || 60 * 1000)
+);
+const twoFactorPepper = process.env.ADMIN_2FA_CODE_SECRET || "";
+const queueTwoFactorEmail = String(process.env.EMAIL_QUEUE_2FA || "").toLowerCase() === "true";
+const loginLockoutWindowMs = Math.max(60_000, Number(process.env.LOGIN_LOCKOUT_WINDOW_MS || 15 * 60 * 1000));
+const loginLockoutMax = Math.max(3, Number(process.env.LOGIN_LOCKOUT_MAX || 5));
+const loginLockoutBlockMs = Math.max(60_000, Number(process.env.LOGIN_LOCKOUT_BLOCK_MS || 15 * 60 * 1000));
+
+const loginAttempts = new Map<string, LoginAttempt>();
 const twoFactorSessions = new Map<string, TwoFactorSession>();
+
+function asyncHandler(handler: any) {
+  return (req: any, res: any, next: any) => {
+    Promise.resolve(handler(req, res, next)).catch(next);
+  };
+}
+
+function httpError(status: number, message: string) {
+  const error: any = new Error(message);
+  error.status = status;
+  return error;
+}
+
+function ensureAuthConfig() {
+  if (!process.env.DATABASE_URL) {
+    throw httpError(503, "Servicio de autenticacion no configurado: falta DATABASE_URL.");
+  }
+  if (!process.env.JWT_SECRET) {
+    throw httpError(503, "Servicio de autenticacion no configurado: falta JWT_SECRET.");
+  }
+}
 
 function cleanupLoginAttempts(now: number) {
   for (const [key, attempt] of loginAttempts.entries()) {
@@ -104,6 +100,18 @@ function cleanupLoginAttempts(now: number) {
 function getLoginAttemptKey(req: any, email: string) {
   const ip = req.ip || req.headers["x-forwarded-for"] || "unknown";
   return `${ip}:${email}`;
+}
+
+function registerFailedLogin(key: string, now: number, current?: LoginAttempt) {
+  const nextAttempt =
+    current && current.resetAt > now
+      ? current
+      : { count: 0, resetAt: now + loginLockoutWindowMs };
+  nextAttempt.count += 1;
+  if (nextAttempt.count >= loginLockoutMax) {
+    nextAttempt.blockedUntil = now + loginLockoutBlockMs;
+  }
+  loginAttempts.set(key, nextAttempt);
 }
 
 function cleanupTwoFactorSessions(now: number) {
@@ -119,9 +127,8 @@ function hashTwoFactorCode(code: string) {
 }
 
 async function sendTwoFactorCodeEmail(email: string, code: string) {
-  const subject = "Codigo de verificacion (Administrador)";
+  const subject = "Codigo de verificacion";
   const text = `Tu codigo de verificacion es: ${code}\n\nEste codigo expira en 10 minutos.`;
-
   const html = `
     <div style="font-family: Arial, sans-serif; color: #0f172a;">
       <h2>Codigo de verificacion</h2>
@@ -138,10 +145,9 @@ async function sendTwoFactorCodeEmail(email: string, code: string) {
   return sendEmail({ to: email, subject, text, html });
 }
 
-/* ✅ FIX AQUÍ TAMBIÉN */
 function signToken(payload: { userId: string; role: Role }) {
   const jwtSecret = process.env.JWT_SECRET || "";
-  if (!jwtSecret) throw new Error("JWT_SECRET no configurado");
+  if (!jwtSecret) throw httpError(503, "Servicio de autenticacion no configurado: falta JWT_SECRET.");
 
   const token = jwt.sign(payload, jwtSecret, { expiresIn: jwtExpiresIn as any });
   const decoded = jwt.decode(token) as jwt.JwtPayload | null;
@@ -158,45 +164,77 @@ async function issueSessionTokens(res: any, req: any, user: { id: string; role: 
   return signed;
 }
 
-/* ================= LOGIN ================= */
+function bearerToken(req: any) {
+  const header = String(req.headers.authorization || "");
+  return header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
+}
 
-router.post("/login", validate(loginSchema), async (req, res) => {
-  const { email, password } = (req as any).validated.body;
+function sessionResponse(user: { role: Role | string; fullName: string; email?: string }) {
+  return {
+    role: user.role,
+    fullName: user.fullName,
+    ...(user.email ? { email: user.email } : {})
+  };
+}
+
+router.post("/login", validate(loginSchema), asyncHandler(async (req: any, res: any) => {
+  ensureAuthConfig();
+
+  const { email, password } = req.validated.body;
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const now = Date.now();
+  cleanupLoginAttempts(now);
+
+  const attemptKey = getLoginAttemptKey(req, normalizedEmail);
+  const attempt = loginAttempts.get(attemptKey);
+  if (attempt?.blockedUntil && attempt.blockedUntil > now) {
+    return res.status(429).json({ error: "Too many login attempts" });
+  }
 
   const user = await prisma.user.findFirst({
-    where: { email: { equals: email.trim().toLowerCase(), mode: "insensitive" } }
+    where: { email: { equals: normalizedEmail, mode: "insensitive" } }
   });
 
-  if (!user || !user.passwordHash) {
+  if (!user || !user.passwordHash || !user.isActive) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const valid = await bcrypt.compare(password.trim(), user.passwordHash);
-
+  const valid = await bcrypt.compare(String(password).trim(), user.passwordHash);
   if (!valid) {
+    registerFailedLogin(attemptKey, now, attempt);
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  /* 🔐 2FA */
+  loginAttempts.delete(attemptKey);
+
   if (twoFactorEnabled && twoFactorRoles.has(user.role)) {
     const token = randomUUID();
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const expiresAt = Date.now() + twoFactorCodeTtlMs;
 
     twoFactorSessions.set(token, {
       userId: user.id,
       role: user.role as Role,
       email: user.email,
       codeHash: hashTwoFactorCode(code),
-      expiresAt: Date.now() + twoFactorCodeTtlMs,
+      expiresAt,
       resendAvailableAt: Date.now() + twoFactorResendCooldownMs,
       attempts: 0
     });
 
-    await sendTwoFactorCodeEmail(user.email, code);
+    const emailSent = await sendTwoFactorCodeEmail(user.email, code);
+    if (!emailSent && isProd) {
+      twoFactorSessions.delete(token);
+      throw httpError(503, "No se pudo enviar el codigo de verificacion.");
+    }
 
     return res.json({
       requiresTwoFactor: true,
-      twoFactorToken: token
+      twoFactorToken: token,
+      email: user.email,
+      role: user.role,
+      expiresAt: new Date(expiresAt).toISOString(),
+      ...(!emailSent ? { devCode: code } : {})
     });
   }
 
@@ -211,6 +249,205 @@ router.post("/login", validate(loginSchema), async (req, res) => {
     fullName: user.fullName,
     expiresAt: signed.expiresAt
   });
-});
+}));
+
+router.post("/2fa/verify", validate(twoFactorVerifySchema), asyncHandler(async (req: any, res: any) => {
+  ensureAuthConfig();
+  cleanupTwoFactorSessions(Date.now());
+
+  const { token, code } = req.validated.body;
+  const session = twoFactorSessions.get(token);
+  if (!session) return res.status(401).json({ error: "Invalid or expired verification token" });
+
+  if (session.attempts >= twoFactorMaxAttempts) {
+    twoFactorSessions.delete(token);
+    return res.status(401).json({ error: "Verification attempts exceeded" });
+  }
+
+  if (session.codeHash !== hashTwoFactorCode(String(code).trim())) {
+    session.attempts += 1;
+    return res.status(401).json({ error: "Invalid verification code" });
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+  if (!user || !user.isActive) {
+    twoFactorSessions.delete(token);
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const signed = await issueSessionTokens(res, req, { id: user.id, role: user.role as Role });
+  twoFactorSessions.delete(token);
+
+  return res.json({
+    token: signed.token,
+    role: user.role,
+    fullName: user.fullName,
+    expiresAt: signed.expiresAt
+  });
+}));
+
+router.post("/2fa/resend", validate(twoFactorResendSchema), asyncHandler(async (req: any, res: any) => {
+  cleanupTwoFactorSessions(Date.now());
+
+  const { token } = req.validated.body;
+  const session = twoFactorSessions.get(token);
+  const now = Date.now();
+  if (!session) return res.status(401).json({ error: "Invalid or expired verification token" });
+  if (session.resendAvailableAt > now) {
+    return res.status(429).json({ error: "Wait before requesting another code" });
+  }
+
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  session.codeHash = hashTwoFactorCode(code);
+  session.expiresAt = now + twoFactorCodeTtlMs;
+  session.resendAvailableAt = now + twoFactorResendCooldownMs;
+  session.attempts = 0;
+
+  const emailSent = await sendTwoFactorCodeEmail(session.email, code);
+  if (!emailSent && isProd) {
+    throw httpError(503, "No se pudo enviar el codigo de verificacion.");
+  }
+
+  return res.json({
+    ok: true,
+    expiresAt: new Date(session.expiresAt).toISOString(),
+    ...(!emailSent ? { devCode: code } : {})
+  });
+}));
+
+router.get("/session", requireAuth, asyncHandler(async (req: any, res: any) => {
+  const auth = req.auth;
+  const user = await prisma.user.findUnique({
+    where: { id: auth.userId },
+    select: { email: true, fullName: true, role: true, isActive: true }
+  });
+
+  if (!user || !user.isActive) return res.status(401).json({ error: "Invalid token" });
+  return res.json(sessionResponse(user));
+}));
+
+router.post("/refresh", asyncHandler(async (req: any, res: any) => {
+  ensureAuthConfig();
+
+  const refreshToken = getRefreshTokenFromRequest(req);
+  if (refreshToken) {
+    const tokenHash = hashRefreshToken(refreshToken);
+    const session = await prisma.refreshSession.findUnique({
+      where: { tokenHash },
+      include: { user: true }
+    });
+
+    if (!session || session.revokedAt || session.expiresAt <= new Date() || !session.user.isActive) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: "Invalid refresh token" });
+    }
+
+    await rotateRefreshSession(session, req, res);
+    const signed = signToken({ userId: session.userId, role: session.user.role as Role });
+    return res.json({
+      token: signed.token,
+      role: session.user.role,
+      fullName: session.user.fullName,
+      expiresAt: signed.expiresAt
+    });
+  }
+
+  const token = bearerToken(req);
+  if (!token) return res.status(401).json({ error: "Missing token" });
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET || "") as { userId: string; role: Role };
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!user || !user.isActive) return res.status(401).json({ error: "Invalid token" });
+    const signed = signToken({ userId: user.id, role: user.role as Role });
+    return res.json({
+      token: signed.token,
+      role: user.role,
+      fullName: user.fullName,
+      expiresAt: signed.expiresAt
+    });
+  } catch {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+}));
+
+router.post("/logout", asyncHandler(async (req: any, res: any) => {
+  const refreshToken = getRefreshTokenFromRequest(req);
+  if (refreshToken) {
+    await revokeRefreshSession(hashRefreshToken(refreshToken));
+  }
+  clearRefreshCookie(res);
+  return res.json({ ok: true });
+}));
+
+router.get("/sessions", requireAuth, asyncHandler(async (req: any, res: any) => {
+  const auth = req.auth;
+  const refreshToken = getRefreshTokenFromRequest(req);
+  const currentHash = refreshToken ? hashRefreshToken(refreshToken) : "";
+  const sessions = await prisma.refreshSession.findMany({
+    where: {
+      userId: auth.userId,
+      revokedAt: null,
+      expiresAt: { gt: new Date() }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  return res.json({
+    data: sessions.map((session) => ({
+      id: session.id,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt,
+      ip: session.ip,
+      userAgent: session.userAgent,
+      deviceLabel: session.deviceLabel,
+      geoCity: session.geoCity,
+      geoRegion: session.geoRegion,
+      geoCountry: session.geoCountry,
+      geoCountryCode: session.geoCountryCode,
+      geoTimezone: session.geoTimezone,
+      current: Boolean(currentHash && session.tokenHash === currentHash)
+    }))
+  });
+}));
+
+router.post("/logout-session", requireAuth, validate(revokeSessionSchema), asyncHandler(async (req: any, res: any) => {
+  await prisma.refreshSession.updateMany({
+    where: { id: req.validated.body.sessionId, userId: req.auth.userId, revokedAt: null },
+    data: { revokedAt: new Date() }
+  });
+  return res.json({ ok: true });
+}));
+
+router.post("/sessions/label", requireAuth, validate(updateSessionLabelSchema), asyncHandler(async (req: any, res: any) => {
+  await prisma.refreshSession.updateMany({
+    where: { id: req.validated.body.sessionId, userId: req.auth.userId },
+    data: { deviceLabel: String(req.validated.body.label).trim() }
+  });
+  return res.json({ ok: true });
+}));
+
+router.post("/logout-all", requireAuth, asyncHandler(async (req: any, res: any) => {
+  await revokeAllSessionsForUser(req.auth.userId);
+  clearRefreshCookie(res);
+  return res.json({ ok: true });
+}));
+
+router.post(
+  "/logout-role",
+  requireAuth,
+  requireRole(["ADMIN", "DEVELOPER"]),
+  validate(revokeRoleSessionsSchema),
+  asyncHandler(async (req: any, res: any) => {
+    const result = await prisma.refreshSession.updateMany({
+      where: {
+        revokedAt: null,
+        user: { role: req.validated.body.role }
+      },
+      data: { revokedAt: new Date() }
+    });
+    return res.json({ ok: true, revoked: result.count });
+  })
+);
 
 export default router;

@@ -49,6 +49,32 @@ test("POST /api/auth/login con JSON invalido responde 400 consistente", async ()
   });
 });
 
+test("POST /api/auth/login sin DATABASE_URL responde 503 claro", async () => {
+  const previousDatabaseUrl = process.env.DATABASE_URL;
+  delete process.env.DATABASE_URL;
+  try {
+    await withServer(async (baseUrl) => {
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "ing.nelsonjulio@gmail.com",
+          password: "Password123"
+        })
+      });
+      const body = (await res.json()) as { message?: string };
+      assert.equal(res.status, 503);
+      assert.match(body.message || "", /DATABASE_URL/);
+    });
+  } finally {
+    if (previousDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = previousDatabaseUrl;
+    }
+  }
+});
+
 test("POST /api/attendance sin token responde 401", async () => {
   await withServer(async (baseUrl) => {
     const res = await fetch(`${baseUrl}/api/attendance`, {

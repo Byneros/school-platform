@@ -62,8 +62,11 @@ function parseArgs(argv: string[]): Args {
   }
 
   if (!email) throw new Error("Debes indicar --email.");
+  if (!password) {
+    password = String(process.env.RESET_USER_PASSWORD || "");
+  }
   if (!password || password.length < 6) {
-    throw new Error("Debes indicar --password con minimo 6 caracteres.");
+    throw new Error("Debes indicar --password o RESET_USER_PASSWORD con minimo 6 caracteres.");
   }
 
   return { email, password, activate };
@@ -74,7 +77,7 @@ function printUsage() {
     [
       "Uso:",
       "  npm --workspace apps/api run prisma:reset:user -- --email usuario@colegio.edu --password NuevaClave123!",
-      "  npm --workspace apps/api run prisma:reset:user -- --email usuario@colegio.edu --password NuevaClave123! --activate",
+      "  RESET_USER_PASSWORD=NuevaClave123! npm --workspace apps/api run prisma:reset:user -- --email usuario@colegio.edu --activate",
     ].join("\n"),
   );
 }
