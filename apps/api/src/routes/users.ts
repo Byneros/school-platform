@@ -379,7 +379,7 @@ router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createUserSchema)
       if (body.role === "TEACHER") {
         await tx.teacher.create({
           data: {
-            userId: created.id,
+            user: { connect: { id: created.id } },
             subjects: teacherSubjects,
             subjectHours: subjectHoursMap as Prisma.InputJsonValue,
             subjectSchedules: subjectSchedulesMap as Prisma.InputJsonValue,
@@ -565,7 +565,7 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
       }
       let unassignedTeacherId = unassignedUser.teacher?.id;
       if (!unassignedTeacherId) {
-        const t = await tx.teacher.create({ data: { userId: unassignedUser.id } });
+        const t = await tx.teacher.create({ data: { user: { connect: { id: unassignedUser.id } } } });
         unassignedTeacherId = t.id;
       }
       await tx.class.updateMany({

@@ -2173,6 +2173,121 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
 
   const modeIsImport = result.mode === "import";
 
+  const digitsOnly = (value: any) => String(value || "").replace(/\D+/g, "");
+  const slugify = (value: any) =>
+    normalizeText(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ".")
+      .replace(/^\.+|\.+$/g, "")
+      .slice(0, 40);
+  const isEmailLike = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+
+  const uniqueParentEmail = async (baseEmail: string) => {
+    const normalizedBase = String(baseEmail || "").trim().toLowerCase();
+    const [localPartRaw, domainRaw] = normalizedBase.includes("@")
+      ? normalizedBase.split("@")
+      : [normalizedBase || "acudiente", "colegio.edu"];
+    const localPart = localPartRaw || "acudiente";
+    const domain = domainRaw || "colegio.edu";
+
+    let candidate = `${localPart}@${domain}`;
+    let suffix = 1;
+    while (true) {
+      const existing = await prisma.user.findUnique({
+        where: { email: candidate },
+        select: { id: true, role: true }
+      });
+      if (!existing || existing.role === "PARENT") return candidate;
+      candidate = `${localPart}.pf${suffix}@${domain}`;
+      suffix += 1;
+    }
+  };
+
+  const ensureRoleProfile = async (user: { id: string; role: string }) => {
+    if (user.role === "TEACHER") {
+      const teacher = await prisma.teacher.findUnique({ where: { userId: user.id }, select: { id: true } });
+      if (!teacher) {
+        await prisma.teacher.create({ data: { user: { connect: { id: user.id } } } });
+        result.created.teachers += 1;
+      }
+    }
+    if (user.role === "PARENT") {
+      const parent = await prisma.parent.findUnique({ where: { userId: user.id }, select: { id: true } });
+      if (!parent) {
+        await prisma.parent.create({ data: { userId: user.id } });
+        result.created.parents += 1;
+      }
+    }
+  };
+
+  const ensureParentGuardianFromEnrollment = async (enrollmentData: any, studentId: string, rowNumber: number) => {
+    const guardianName = normalizeText(enrollmentData.guardianFullName) || "Acudiente";
+    const guardianDoc = normalizeText(enrollmentData.guardianDocNumber);
+    const contactEmail = normalizeEmail(enrollmentData.contactEmail);
+    const contactPhone = normalizeText(enrollmentData.contactPhone);
+    if (!studentId || (!guardianName && !guardianDoc && !contactEmail && !contactPhone)) return;
+
+    const preferredEmail = isEmailLike(contactEmail)
+      ? contactEmail
+      : guardianDoc && guardianDoc !== "SIN_DOCUMENTO"
+      ? `padre.${digitsOnly(guardianDoc) || slugify(guardianDoc)}@colegio.edu`
+      : `${slugify(guardianName) || "acudiente"}.${digitsOnly(contactPhone) || "0000"}@colegio.edu`;
+
+    const parentEmail = await uniqueParentEmail(preferredEmail);
+    let user = await prisma.user.findUnique({
+      where: { email: parentEmail },
+      select: { id: true, role: true, fullName: true }
+    });
+
+    if (!user) {
+      const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+      result.defaultPasswordUsed = true;
+      user = await prisma.user.create({
+        data: {
+          email: parentEmail,
+          fullName: guardianName,
+          role: "PARENT",
+          isActive: true,
+          passwordHash
+        },
+        select: { id: true, role: true, fullName: true }
+      });
+      result.created.users += 1;
+      result.created.parents += 1;
+    } else if (user.role !== "PARENT") {
+      result.errors.push({
+        sheet: "MATRICULAS",
+        row: rowNumber,
+        message: `No se vinculo acudiente ${guardianName}: el correo ${parentEmail} existe con rol ${user.role}.`
+      });
+      return;
+    }
+
+    const parent = await prisma.parent.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id },
+      select: { id: true }
+    });
+    await prisma.guardian.upsert({
+      where: {
+        parentId_studentId: {
+          parentId: parent.id,
+          studentId
+        }
+      },
+      update: { relation: normalizeText(enrollmentData.guardianRelation) || "Acudiente" },
+      create: {
+        parentId: parent.id,
+        studentId,
+        relation: normalizeText(enrollmentData.guardianRelation) || "Acudiente"
+      }
+    });
+    result.created.guardians += 1;
+  };
+
   const usersSheet = sheetRows("USUARIOS");
   if (usersSheet.rows.length && ensureHeaders("USUARIOS", usersSheet.headers, ["email", "fullName", "role"])) {
     for (let i = 0; i < usersSheet.rows.length; i += 1) {
@@ -2194,7 +2309,12 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           if (password) {
             update.passwordHash = await bcrypt.hash(password, 10);
           }
-          await prisma.user.update({ where: { id: existing.id }, data: update });
+          const updated = await prisma.user.update({
+            where: { id: existing.id },
+            data: update,
+            select: { id: true, role: true }
+          });
+          await ensureRoleProfile(updated);
           result.updated.users += 1;
         } else {
           const passwordValue = password || DEFAULT_PASSWORD;
@@ -2204,7 +2324,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
             data: { email, fullName, role: role as any, isActive, passwordHash }
           });
           if (role === "TEACHER") {
-            await prisma.teacher.create({ data: { userId: created.id } });
+            await prisma.teacher.create({ data: { user: { connect: { id: created.id } } } });
             result.created.teachers += 1;
           }
           if (role === "PARENT") {
@@ -2245,21 +2365,26 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
                 .map((s) => s.trim())
                 .filter(Boolean)
           : [];
+        const optionalNumber = (value: unknown) => {
+          if (value === null || value === undefined || value === "") return undefined;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        };
         const updateData: any = {
           subjects,
           subjectHours: parseJson(row.subjectHours) || undefined,
           subjectSchedules: parseJson(row.subjectSchedules) || undefined,
           subjectHoursMode: parseJson(row.subjectHoursMode) || undefined,
-          cognitiveWeight: row.cognitiveWeight ? Number(row.cognitiveWeight) : undefined,
-          personalWeight: row.personalWeight ? Number(row.personalWeight) : undefined,
-          socialWeight: row.socialWeight ? Number(row.socialWeight) : undefined
+          cognitiveWeight: optionalNumber(row.cognitiveWeight),
+          personalWeight: optionalNumber(row.personalWeight),
+          socialWeight: optionalNumber(row.socialWeight)
         };
         const teacher = await prisma.teacher.findUnique({ where: { userId: user.id } });
         if (teacher) {
           await prisma.teacher.update({ where: { id: teacher.id }, data: updateData });
           result.updated.teachers += 1;
         } else {
-          await prisma.teacher.create({ data: { userId: user.id, ...updateData } });
+          await prisma.teacher.create({ data: { user: { connect: { id: user.id } }, ...updateData } });
           result.created.teachers += 1;
         }
       }
@@ -2390,6 +2515,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           await prisma.enrollment.create({ data });
           result.created.enrollments += 1;
         }
+        await ensureParentGuardianFromEnrollment(data, studentId, i + 2);
       }
     }
   }
@@ -2423,16 +2549,26 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           result.created.users += 1;
           result.created.parents += 1;
         }
-        const parent = await prisma.parent.findUnique({ where: { userId: user.id } });
-        if (!parent) {
-          result.errors.push({ sheet: "ACUDIENTES", row: i + 2, message: "No se pudo crear el padre." });
+        if (user.role !== "PARENT") {
+          result.errors.push({ sheet: "ACUDIENTES", row: i + 2, message: "El usuario existe pero no tiene rol PARENT." });
           result.skipped += 1;
           continue;
         }
+        const parent = await prisma.parent.upsert({
+          where: { userId: user.id },
+          update: {},
+          create: { userId: user.id }
+        });
         const relation = normalizeText(row.relation) || "Acudiente";
-        await prisma.guardian.createMany({
-          data: [{ parentId: parent.id, studentId, relation }],
-          skipDuplicates: true
+        await prisma.guardian.upsert({
+          where: {
+            parentId_studentId: {
+              parentId: parent.id,
+              studentId
+            }
+          },
+          update: { relation },
+          create: { parentId: parent.id, studentId, relation }
         });
         result.created.guardians += 1;
       }

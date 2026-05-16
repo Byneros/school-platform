@@ -1,0 +1,603 @@
+[
+  {
+    "id": "05fb0a48-a119-43c8-84a7-641ef910ec0f",
+    "createdAt": "2026-05-16T20:56:09.449Z",
+    "createdById": "cmp8tn6760008c5tchsp0d2dt",
+    "createdByName": "Admin",
+    "createdByEmail": "admin@colegio.edu",
+    "mode": "validate",
+    "summary": {
+      "created": {
+        "users": 0,
+        "teachers": 0,
+        "parents": 0,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0,
+        "guardians": 0,
+        "admissions": 0,
+        "invoices": 0,
+        "payments": 0
+      },
+      "updated": {
+        "users": 0,
+        "teachers": 0,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0
+      },
+      "skipped": 1019,
+      "errorsCount": 1019,
+      "defaultPasswordUsed": false
+    },
+    "errors": [
+      {
+        "sheet": "FACTURAS",
+        "row": 2,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 3,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 4,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 5,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 6,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 7,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 8,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 9,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 10,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 11,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 12,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 13,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 14,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 15,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 16,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 17,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 18,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 19,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 20,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 21,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 22,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 23,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 24,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 25,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 26,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 27,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 28,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 29,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 30,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 31,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 32,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 33,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 34,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 35,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 36,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 37,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 38,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 39,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 40,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 41,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 42,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 43,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 44,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 45,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 46,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 47,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 48,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 49,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 50,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 51,
+        "message": "studentId, amount o dueDate invalido."
+      }
+    ]
+  },
+  {
+    "id": "ac34d54c-fe2b-4f10-bef1-6e10aa1ae2af",
+    "createdAt": "2026-05-16T20:51:42.926Z",
+    "createdById": "cmp8tn6760008c5tchsp0d2dt",
+    "createdByName": "Admin",
+    "createdByEmail": "admin@colegio.edu",
+    "mode": "validate",
+    "summary": {
+      "created": {
+        "users": 0,
+        "teachers": 0,
+        "parents": 0,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0,
+        "guardians": 0,
+        "admissions": 0,
+        "invoices": 0,
+        "payments": 0
+      },
+      "updated": {
+        "users": 0,
+        "teachers": 0,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0
+      },
+      "skipped": 1019,
+      "errorsCount": 1019,
+      "defaultPasswordUsed": false
+    },
+    "errors": [
+      {
+        "sheet": "FACTURAS",
+        "row": 2,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 3,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 4,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 5,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 6,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 7,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 8,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 9,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 10,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 11,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 12,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 13,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 14,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 15,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 16,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 17,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 18,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 19,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 20,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 21,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 22,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 23,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 24,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 25,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 26,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 27,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 28,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 29,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 30,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 31,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 32,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 33,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 34,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 35,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 36,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 37,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 38,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 39,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 40,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 41,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 42,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 43,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 44,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 45,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 46,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 47,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 48,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 49,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 50,
+        "message": "studentId, amount o dueDate invalido."
+      },
+      {
+        "sheet": "FACTURAS",
+        "row": 51,
+        "message": "studentId, amount o dueDate invalido."
+      }
+    ]
+  },
+  {
+    "id": "0bd63afd-3ef3-444e-8867-d39513c7ecac",
+    "createdAt": "2026-05-16T20:16:21.953Z",
+    "createdById": "cmp8s8nxk000641yyejfn505k",
+    "createdByName": "Admin",
+    "createdByEmail": "admin@colegio.edu",
+    "mode": "validate",
+    "summary": {
+      "created": {
+        "users": 0,
+        "teachers": 0,
+        "parents": 0,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0,
+        "guardians": 0,
+        "admissions": 0,
+        "invoices": 0,
+        "payments": 0
+      },
+      "updated": {
+        "users": 0,
+        "teachers": 0,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0
+      },
+      "skipped": 0,
+      "errorsCount": 0,
+      "defaultPasswordUsed": false
+    },
+    "errors": []
+  }
+]

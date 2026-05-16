@@ -255,7 +255,7 @@ export default function AdminUsers() {
       });
 
   const loadAllForSections = () =>
-    apiGet(`/users?page=1&pageSize=500${roleFilter ? `&role=${roleFilter}` : ""}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`)
+    apiGet(`/users?page=1&pageSize=5000${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`)
       .then((res) => {
         setAllUsersForSections(res.data || []);
       })

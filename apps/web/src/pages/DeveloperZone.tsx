@@ -3,6 +3,7 @@ import ActionFeedback from "../components/ActionFeedback";
 import {
   ApiError,
   apiGet,
+  apiPost,
   clearDeveloperAccessToken,
   getDeveloperAccessToken,
   setDeveloperAccessToken
@@ -31,6 +32,10 @@ export default function DeveloperZone() {
   const [users, setUsers] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [purgeConfirmation, setPurgeConfirmation] = useState("");
+  const [purgeBusy, setPurgeBusy] = useState(false);
+  const [purgeError, setPurgeError] = useState<string | null>(null);
+  const [purgeResult, setPurgeResult] = useState<any>(null);
 
   const load = () => {
     setLoading(true);
@@ -63,6 +68,30 @@ export default function DeveloperZone() {
     clearDeveloperAccessToken();
     setAccessTokenInput("");
     load();
+  };
+
+  const purgeDatabase = async () => {
+    setPurgeError(null);
+    setPurgeResult(null);
+    if (purgeConfirmation.trim() !== "BORRAR BASE DE DATOS") {
+      setPurgeError("Escribe exactamente BORRAR BASE DE DATOS para confirmar.");
+      return;
+    }
+    const confirmed = window.confirm(
+      "Esta accion borrara estudiantes, matriculas, acudientes, docentes, administradores, pagos, reportes, notificaciones y todo dato operativo. Solo conservara usuarios desarrolladores. Continuar?"
+    );
+    if (!confirmed) return;
+    setPurgeBusy(true);
+    try {
+      const result = await apiPost("/dev/database/purge", { confirmation: purgeConfirmation.trim() });
+      setPurgeResult(result);
+      setPurgeConfirmation("");
+      load();
+    } catch (err: any) {
+      setPurgeError(err?.message || "No se pudo borrar la base de datos.");
+    } finally {
+      setPurgeBusy(false);
+    }
   };
 
   return (
@@ -172,6 +201,47 @@ export default function DeveloperZone() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+
+          <div className="card" style={{ borderColor: "#fecaca", background: "#fff7f7" }}>
+            <div className="section-title">Borrar base de datos</div>
+            <div style={{ color: "#991b1b", marginBottom: 10 }}>
+              Elimina todos los datos operativos y todos los usuarios excepto los usuarios con rol DEVELOPER.
+            </div>
+            <label>
+              Confirmacion requerida
+              <input
+                className="input"
+                value={purgeConfirmation}
+                onChange={(e) => setPurgeConfirmation(e.target.value)}
+                placeholder="BORRAR BASE DE DATOS"
+              />
+            </label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+              <button
+                className="button danger"
+                type="button"
+                onClick={purgeDatabase}
+                disabled={purgeBusy || purgeConfirmation.trim() !== "BORRAR BASE DE DATOS"}
+              >
+                {purgeBusy ? "Borrando..." : "Borrar todo excepto desarrolladores"}
+              </button>
+            </div>
+            <ActionFeedback
+              tone="error"
+              title={feedbackTitles.developer.accessError}
+              message={purgeError || ""}
+              onDismiss={() => setPurgeError(null)}
+              style={{ marginTop: 10 }}
+            />
+            {purgeResult && (
+              <div style={{ marginTop: 10, color: "#166534" }}>
+                {purgeResult.message || "Base borrada."}
+                <pre style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
+                  {JSON.stringify(purgeResult.deleted || {}, null, 2)}
+                </pre>
               </div>
             )}
           </div>
