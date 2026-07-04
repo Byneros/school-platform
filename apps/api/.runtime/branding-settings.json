@@ -1,6 +1,81 @@
 {
   "promotionRulesHistory": [
     {
+      "id": "044159e0-96da-407e-b9b1-edb001d641d7",
+      "changedAt": "2026-07-01T17:20:44.234Z",
+      "changedById": "cmpddgcd000sk11q4g86mxock",
+      "changedByName": "Admin",
+      "restoredFromId": "2b66f239-255c-46d2-8dc5-62c000c87410",
+      "previous": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      },
+      "next": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      }
+    },
+    {
+      "id": "ef4b661f-55b6-446b-8a1f-103b529daf62",
+      "changedAt": "2026-07-01T17:20:40.067Z",
+      "changedById": "cmpddgcd000sk11q4g86mxock",
+      "changedByName": "Admin",
+      "restoredFromId": "2b66f239-255c-46d2-8dc5-62c000c87410",
+      "previous": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      },
+      "next": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      }
+    },
+    {
+      "id": "04996d69-bf9f-4c35-a8ef-dd43bd775b4d",
+      "changedAt": "2026-07-01T17:20:36.193Z",
+      "changedById": "cmpddgcd000sk11q4g86mxock",
+      "changedByName": "Admin",
+      "restoredFromId": "2b66f239-255c-46d2-8dc5-62c000c87410",
+      "previous": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      },
+      "next": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      }
+    },
+    {
+      "id": "6913cfad-51bf-4cb8-b564-992429d989ca",
+      "changedAt": "2026-07-01T17:20:31.487Z",
+      "changedById": "cmpddgcd000sk11q4g86mxock",
+      "changedByName": "Admin",
+      "restoredFromId": "2b66f239-255c-46d2-8dc5-62c000c87410",
+      "previous": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      },
+      "next": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      }
+    },
+    {
+      "id": "1dd93393-2533-4f8c-a5b0-ecb69104ec39",
+      "changedAt": "2026-07-01T17:20:25.880Z",
+      "changedById": "cmpddgcd000sk11q4g86mxock",
+      "changedByName": "Admin",
+      "restoredFromId": "2b66f239-255c-46d2-8dc5-62c000c87410",
+      "previous": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      },
+      "next": {
+        "minAverage": 60,
+        "maxFailedSubjects": 2
+      }
+    },
+    {
       "id": "2b66f239-255c-46d2-8dc5-62c000c87410",
       "changedAt": "2026-03-04T22:51:36.723Z",
       "changedById": "cmlfwvhoa00007zp7jz2a9vx6",

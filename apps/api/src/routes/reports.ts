@@ -2014,15 +2014,18 @@ router.get("/import-template/excel", requireAuth, requireRole(["ADMIN"]), async 
     "status",
     "studentFullName",
     "studentBirthDate",
+    "studentDocType",
+    "studentDocNumber",
     "studentGradeLevel",
     "studentAddress",
     "guardianFullName",
+    "guardianDocType",
     "guardianDocNumber",
     "guardianRelation",
     "contactPhone",
     "contactEmail"
   ]);
-  addSheet("ACUDIENTES", ["parentEmail", "studentId", "relation"]);
+  addSheet("ACUDIENTES", ["parentEmail", "studentId", "studentFullName", "relation"]);
   addSheet("ADMISIONES", [
     "studentName",
     "gradeLevel",
@@ -2229,19 +2232,30 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     const contactPhone = normalizeText(enrollmentData.contactPhone);
     if (!studentId || (!guardianName && !guardianDoc && !contactEmail && !contactPhone)) return;
 
-    const preferredEmail = isEmailLike(contactEmail)
-      ? contactEmail
-      : guardianDoc && guardianDoc !== "SIN_DOCUMENTO"
-      ? `padre.${digitsOnly(guardianDoc) || slugify(guardianDoc)}@colegio.edu`
-      : `${slugify(guardianName) || "acudiente"}.${digitsOnly(contactPhone) || "0000"}@colegio.edu`;
+    let user = isEmailLike(contactEmail)
+      ? await prisma.user.findUnique({
+          where: { email: contactEmail },
+          select: { id: true, role: true, fullName: true }
+        })
+      : null;
 
-    const parentEmail = await uniqueParentEmail(preferredEmail);
-    let user = await prisma.user.findUnique({
-      where: { email: parentEmail },
-      select: { id: true, role: true, fullName: true }
-    });
+    if (!user && guardianName !== "Acudiente") {
+      user = await prisma.user.findFirst({
+        where: {
+          role: "PARENT",
+          fullName: { equals: guardianName, mode: "insensitive" }
+        },
+        select: { id: true, role: true, fullName: true }
+      });
+    }
 
     if (!user) {
+      const preferredEmail = isEmailLike(contactEmail)
+        ? contactEmail
+        : guardianDoc && guardianDoc !== "SIN_DOCUMENTO"
+        ? `padre.${digitsOnly(guardianDoc) || slugify(guardianDoc)}@colegio.edu`
+        : `${slugify(guardianName) || "acudiente"}.${digitsOnly(contactPhone) || "0000"}@colegio.edu`;
+      const parentEmail = await uniqueParentEmail(preferredEmail);
       const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
       result.defaultPasswordUsed = true;
       user = await prisma.user.create({
@@ -2260,7 +2274,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       result.errors.push({
         sheet: "MATRICULAS",
         row: rowNumber,
-        message: `No se vinculo acudiente ${guardianName}: el correo ${parentEmail} existe con rol ${user.role}.`
+        message: `No se vinculo acudiente ${guardianName}: el usuario encontrado existe con rol ${user.role}.`
       });
       return;
     }
@@ -2286,6 +2300,99 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       }
     });
     result.created.guardians += 1;
+  };
+
+  const resolveStudentForEnrollment = async (row: Record<string, any>, classEntity: any, rowNumber: number) => {
+    const rawStudentId = normalizeText(row.studentId);
+    if (rawStudentId) {
+      const byId = await prisma.student.findUnique({ where: { id: rawStudentId } });
+      if (byId) return byId;
+
+      const byEnrollmentDoc = await prisma.enrollment.findFirst({
+        where: { studentDocNumber: rawStudentId },
+        include: { student: true }
+      });
+      if (byEnrollmentDoc?.student) return byEnrollmentDoc.student;
+    }
+
+    const fullName = normalizeText(row.studentFullName || row.fullName || row.studentName);
+    const birthDate = parseDate(row.studentBirthDate || row.birthDate);
+    const gradeLevel = normalizeText(row.studentGradeLevel || row.gradeLevel || classEntity?.gradeLevel).toUpperCase();
+
+    if (!fullName) {
+      result.errors.push({
+        sheet: "MATRICULAS",
+        row: rowNumber,
+        message: "No se pudo identificar el estudiante. Usa studentId valido o studentFullName."
+      });
+      result.skipped += 1;
+      return null;
+    }
+
+    if (!gradeValues.includes(gradeLevel)) {
+      result.errors.push({
+        sheet: "MATRICULAS",
+        row: rowNumber,
+        message: "studentGradeLevel invalido o no se pudo inferir desde la clase."
+      });
+      result.skipped += 1;
+      return null;
+    }
+
+    const existing = await prisma.student.findFirst({
+      where: {
+        fullName: { equals: fullName, mode: "insensitive" },
+        ...(birthDate ? { birthDate } : { gradeLevel: gradeLevel as any })
+      }
+    });
+    if (existing) {
+      const updateData: any = { gradeLevel: gradeLevel as any };
+      if (birthDate) updateData.birthDate = birthDate;
+      await prisma.student.update({ where: { id: existing.id }, data: updateData });
+      return { ...existing, ...updateData };
+    }
+
+    const created = await prisma.student.create({
+      data: {
+        fullName,
+        birthDate,
+        gradeLevel: gradeLevel as any,
+        isActive: true
+      }
+    });
+    result.created.students += 1;
+    return created;
+  };
+
+  const resolveStudentForGuardian = async (row: Record<string, any>, rowNumber: number) => {
+    const rawStudentId = normalizeText(row.studentId);
+    if (rawStudentId) {
+      const byId = await prisma.student.findUnique({ where: { id: rawStudentId } });
+      if (byId) return byId;
+
+      const byEnrollmentDoc = await prisma.enrollment.findFirst({
+        where: { studentDocNumber: rawStudentId },
+        include: { student: true }
+      });
+      if (byEnrollmentDoc?.student) return byEnrollmentDoc.student;
+    }
+
+    const fullName = normalizeText(row.studentFullName || row.fullName || row.studentName);
+    if (fullName) {
+      const byName = await prisma.student.findFirst({
+        where: { fullName: { equals: fullName, mode: "insensitive" } },
+        orderBy: { createdAt: "desc" }
+      });
+      if (byName) return byName;
+    }
+
+    result.errors.push({
+      sheet: "ACUDIENTES",
+      row: rowNumber,
+      message: "No se encontro el estudiante. Usa studentId interno, documento en studentId, o studentFullName."
+    });
+    result.skipped += 1;
+    return null;
   };
 
   const usersSheet = sheetRows("USUARIOS");
@@ -2471,22 +2578,31 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   }
 
   const enrollSheet = sheetRows("MATRICULAS");
-  if (enrollSheet.rows.length && ensureHeaders("MATRICULAS", enrollSheet.headers, ["studentId", "classId", "year"])) {
+  if (enrollSheet.rows.length && ensureHeaders("MATRICULAS", enrollSheet.headers, ["classId", "year"])) {
     for (let i = 0; i < enrollSheet.rows.length; i += 1) {
       const row = enrollSheet.rows[i];
-      const studentId = normalizeText(row.studentId);
       const classId = normalizeText(row.classId);
       const year = Number(row.year);
-      if (!studentId || !classId || !year) {
-        result.errors.push({ sheet: "MATRICULAS", row: i + 2, message: "studentId, classId y year requeridos." });
+      if (!classId || !year) {
+        result.errors.push({ sheet: "MATRICULAS", row: i + 2, message: "classId y year requeridos." });
         result.skipped += 1;
         continue;
       }
       if (modeIsImport) {
-        const student = await prisma.student.findUnique({ where: { id: studentId } });
         const classEntity = await prisma.class.findUnique({ where: { id: classId } });
-        if (!student || !classEntity) {
-          result.errors.push({ sheet: "MATRICULAS", row: i + 2, message: "studentId o classId no encontrado." });
+        if (!classEntity) {
+          result.errors.push({ sheet: "MATRICULAS", row: i + 2, message: "classId no encontrado." });
+          result.skipped += 1;
+          continue;
+        }
+        const student = await resolveStudentForEnrollment(row, classEntity, i + 2);
+        if (!student) {
+          continue;
+        }
+        const studentId = student.id;
+        const studentGradeLevel = normalizeText(row.studentGradeLevel || row.gradeLevel || classEntity.gradeLevel || student.gradeLevel).toUpperCase();
+        if (!gradeValues.includes(studentGradeLevel)) {
+          result.errors.push({ sheet: "MATRICULAS", row: i + 2, message: "studentGradeLevel invalido." });
           result.skipped += 1;
           continue;
         }
@@ -2497,13 +2613,16 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           status: normalizeText(row.status) || "ACTIVE",
           studentFullName: normalizeText(row.studentFullName) || student.fullName,
           studentBirthDate: parseDate(row.studentBirthDate) || student.birthDate,
-          studentGradeLevel: (normalizeText(row.studentGradeLevel) || student.gradeLevel) as any,
+          studentDocType: normalizeText(row.studentDocType) || null,
+          studentDocNumber: normalizeText(row.studentDocNumber || row.studentId) || "N/A",
+          studentGradeLevel: studentGradeLevel as any,
           studentAddress: normalizeText(row.studentAddress) || "",
           guardianFullName: normalizeText(row.guardianFullName) || "Acudiente",
+          guardianDocType: normalizeText(row.guardianDocType) || null,
           guardianDocNumber: normalizeText(row.guardianDocNumber) || "SIN_DOCUMENTO",
           guardianRelation: normalizeText(row.guardianRelation) || "Acudiente",
           contactPhone: normalizeText(row.contactPhone) || "SIN_TELEFONO",
-          contactEmail: normalizeText(row.contactEmail) || ""
+          contactEmail: normalizeEmail(row.contactEmail) || ""
         };
         const existing = await prisma.enrollment.findUnique({
           where: { studentId_classId_year: { studentId, classId, year } }
@@ -2525,13 +2644,18 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     for (let i = 0; i < guardiansSheet.rows.length; i += 1) {
       const row = guardiansSheet.rows[i];
       const parentEmail = normalizeEmail(row.parentEmail);
-      const studentId = normalizeText(row.studentId);
-      if (!parentEmail || !studentId) {
-        result.errors.push({ sheet: "ACUDIENTES", row: i + 2, message: "parentEmail y studentId requeridos." });
+      const studentKey = normalizeText(row.studentId || row.studentFullName || row.fullName || row.studentName);
+      if (!parentEmail || !studentKey) {
+        result.errors.push({ sheet: "ACUDIENTES", row: i + 2, message: "parentEmail y studentId/studentFullName requeridos." });
         result.skipped += 1;
         continue;
       }
       if (modeIsImport) {
+        const student = await resolveStudentForGuardian(row, i + 2);
+        if (!student) {
+          continue;
+        }
+        const studentId = student.id;
         let user = await prisma.user.findUnique({ where: { email: parentEmail } });
         if (!user) {
           const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);

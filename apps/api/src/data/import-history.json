@@ -1,5 +1,213 @@
 [
   {
+    "id": "744b9ccf-f092-4fbd-a11b-606948ffc20c",
+    "createdAt": "2026-05-20T01:47:47.018Z",
+    "createdById": "cmpddgcd000sk11q4g86mxock",
+    "createdByName": "Admin",
+    "createdByEmail": "admin@colegio.edu",
+    "mode": "import",
+    "summary": {
+      "created": {
+        "users": 0,
+        "teachers": 0,
+        "parents": 0,
+        "students": 1000,
+        "classes": 0,
+        "enrollments": 0,
+        "guardians": 0,
+        "admissions": 0,
+        "invoices": 0,
+        "payments": 0
+      },
+      "updated": {
+        "users": 0,
+        "teachers": 0,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0
+      },
+      "skipped": 14,
+      "errorsCount": 14,
+      "defaultPasswordUsed": false
+    },
+    "errors": [
+      {
+        "sheet": "DOCENTES",
+        "row": 2,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 3,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 4,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 5,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 6,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 7,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 8,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 9,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 10,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 11,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 12,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 13,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 14,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 15,
+        "message": "Usuario no encontrado para el docente."
+      }
+    ]
+  },
+  {
+    "id": "14be518e-c0b8-4556-b42a-61be116c79bb",
+    "createdAt": "2026-05-20T01:12:10.103Z",
+    "createdById": "cmlrbi8pb0001qo9xdtrnat4m",
+    "createdByName": "Nelson Rafael Julio Martinez",
+    "createdByEmail": "ing.nelsonjulio@gmail.com",
+    "mode": "import",
+    "summary": {
+      "created": {
+        "users": 0,
+        "teachers": 0,
+        "parents": 0,
+        "students": 1000,
+        "classes": 0,
+        "enrollments": 0,
+        "guardians": 0,
+        "admissions": 0,
+        "invoices": 0,
+        "payments": 0
+      },
+      "updated": {
+        "users": 0,
+        "teachers": 0,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0
+      },
+      "skipped": 14,
+      "errorsCount": 14,
+      "defaultPasswordUsed": false
+    },
+    "errors": [
+      {
+        "sheet": "DOCENTES",
+        "row": 2,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 3,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 4,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 5,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 6,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 7,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 8,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 9,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 10,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 11,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 12,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 13,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 14,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 15,
+        "message": "Usuario no encontrado para el docente."
+      }
+    ]
+  },
+  {
     "id": "05fb0a48-a119-43c8-84a7-641ef910ec0f",
     "createdAt": "2026-05-16T20:56:09.449Z",
     "createdById": "cmp8tn6760008c5tchsp0d2dt",

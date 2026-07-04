@@ -165,6 +165,7 @@ export default function AdminAdmissions() {
   const [editingEnrollmentMessage, setEditingEnrollmentMessage] = useState("");
   const [removeEnrollmentMessage, setRemoveEnrollmentMessage] = useState("");
   const [removeEnrollmentError, setRemoveEnrollmentError] = useState("");
+  const [selectedEnrollment, setSelectedEnrollment] = useState<any | null>(null);
   const [admissionStatusMessage, setAdmissionStatusMessage] = useState("");
   const [admissionStatusError, setAdmissionStatusError] = useState("");
   const [editingEnrollmentForm, setEditingEnrollmentForm] = useState({
@@ -345,6 +346,7 @@ export default function AdminAdmissions() {
         const list = Array.isArray(res) ? res : res?.data || [];
         setEnrollmentsError("");
         setEnrollments(list);
+        setSelectedEnrollment((current) => (current ? list.find((item: any) => item.id === current.id) || current : null));
         setEnrollmentsTotal(Array.isArray(res) ? list.length : Number(res?.total || 0));
       })
       .catch((error: any) => {
@@ -665,6 +667,7 @@ export default function AdminAdmissions() {
   const startEditEnrollment = (enrollment: any) => {
     setEditingEnrollmentError("");
     setEditingEnrollmentMessage("");
+    setSelectedEnrollment(enrollment);
     setEditingEnrollmentId(enrollment.id);
     setEditingEnrollmentForm({
       studentFullName: enrollment.studentFullName || "",
@@ -727,6 +730,7 @@ export default function AdminAdmissions() {
         documentsNotes: editingEnrollmentForm.documentsNotes
       });
       setEnrollments((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setSelectedEnrollment(updated);
       loadEnrollments();
       setEditingEnrollmentMessage("Matricula actualizada satisfactoriamente.");
     } catch (error: any) {
@@ -746,6 +750,9 @@ export default function AdminAdmissions() {
         setEditingEnrollmentId("");
         setEditingEnrollmentMessage("");
         setEditingEnrollmentError("");
+      }
+      if (selectedEnrollment?.id === id) {
+        setSelectedEnrollment(null);
       }
       setRemoveEnrollmentMessage("Matricula eliminada satisfactoriamente.");
       loadEnrollments();
@@ -1246,6 +1253,7 @@ export default function AdminAdmissions() {
                   <td><span className={`status-badge status-${String(item.status || "").toLowerCase()}`}>{item.status}</span></td>
                   <td>
                     <div style={{ display: "flex", gap: 8 }}>
+                      <button type="button" className="button secondary" onClick={() => setSelectedEnrollment(item)}>Ver</button>
                       <button type="button" className="button secondary" onClick={() => startEditEnrollment(item)}>Editar</button>
                       <button type="button" className="button danger" onClick={() => removeEnrollment(item.id)}>Eliminar</button>
                     </div>
@@ -1272,6 +1280,61 @@ export default function AdminAdmissions() {
           </button>
         </div>
       </div>
+      {selectedEnrollment && (
+        <div className="card" style={{ marginTop: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <div className="section-title">Detalle de matricula</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" className="button secondary" onClick={() => startEditEnrollment(selectedEnrollment)}>
+                Editar
+              </button>
+              <button type="button" className="button secondary" onClick={() => setSelectedEnrollment(null)}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            <div>
+              <strong>Estudiante</strong>
+              <div>{selectedEnrollment.studentFullName || "-"}</div>
+              <div style={{ color: "#64748b" }}>
+                {selectedEnrollment.studentDocType || "Documento"}: {selectedEnrollment.studentDocNumber || "-"}
+              </div>
+            </div>
+            <div>
+              <strong>Grado y clase</strong>
+              <div>{gradeLabel(selectedEnrollment.studentGradeLevel)}</div>
+              <div style={{ color: "#64748b" }}>
+                {selectedEnrollment.class?.teacher?.user?.fullName ? `Docente: ${selectedEnrollment.class.teacher.user.fullName}` : "Docente sin asignar"}
+              </div>
+            </div>
+            <div>
+              <strong>Matricula</strong>
+              <div>Ano {selectedEnrollment.year || "-"}</div>
+              <div><span className={`status-badge status-${String(selectedEnrollment.status || "").toLowerCase()}`}>{selectedEnrollment.status || "-"}</span></div>
+            </div>
+            <div>
+              <strong>Acudiente</strong>
+              <div>{selectedEnrollment.guardianFullName || "-"}</div>
+              <div style={{ color: "#64748b" }}>
+                {selectedEnrollment.guardianRelation || "Acudiente"} · {selectedEnrollment.contactPhone || "Sin telefono"}
+              </div>
+            </div>
+            <div>
+              <strong>Contacto</strong>
+              <div>{selectedEnrollment.contactEmail || "Sin correo"}</div>
+              <div style={{ color: "#64748b" }}>{selectedEnrollment.studentAddress || "Sin direccion"}</div>
+            </div>
+            <div>
+              <strong>Documentos</strong>
+              <div style={{ color: "#64748b" }}>
+                {Object.values(selectedEnrollment.documents || {}).filter(Boolean).length} documento(s) marcado(s)
+              </div>
+              <div>{selectedEnrollment.documentsNotes || "Sin observaciones"}</div>
+            </div>
+          </div>
+        </div>
+      )}
       {editingEnrollmentId && (
         <form ref={editEnrollmentPanelRef} className="card" onSubmit={saveEnrollmentEdit} style={{ marginTop: 10 }}>
           <div className="section-title">Editar matricula</div>
@@ -1352,6 +1415,23 @@ export default function AdminAdmissions() {
               {gradeOptions.map((g) => (
                 <option key={g.value} value={g.value}>{g.label}</option>
               ))}
+            </select>
+          </label>
+          <label>
+            Clase
+            <select
+              className="input"
+              value={editingEnrollmentForm.classId}
+              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, classId: e.target.value })}
+            >
+              <option value="">Selecciona una clase</option>
+              {classes
+                .filter((cls) => !editingEnrollmentForm.studentGradeLevel || getClassGradeLevel(cls) === editingEnrollmentForm.studentGradeLevel)
+                .map((cls) => (
+                  <option key={cls.id} value={cls.id}>
+                    {gradeLabel(cls.gradeLevel)}{cls.teacher?.user?.fullName ? ` - ${cls.teacher.user.fullName}` : ""}
+                  </option>
+                ))}
             </select>
           </label>
           <label>
