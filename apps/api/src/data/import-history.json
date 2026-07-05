@@ -1,5 +1,38 @@
 [
   {
+    "id": "57dd9dd2-5d58-42e1-8990-ee483bf91321",
+    "createdAt": "2026-07-05T03:03:45.601Z",
+    "createdById": "cmr75qgmv0000i86elikzkao8",
+    "createdByName": "Administrador Principal",
+    "createdByEmail": "admin@colegio.edu",
+    "mode": "import",
+    "summary": {
+      "created": {
+        "users": 1,
+        "teachers": 0,
+        "parents": 1,
+        "students": 1,
+        "classes": 0,
+        "enrollments": 1,
+        "guardians": 1,
+        "admissions": 0,
+        "invoices": 0,
+        "payments": 0
+      },
+      "updated": {
+        "users": 0,
+        "teachers": 0,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0
+      },
+      "skipped": 0,
+      "errorsCount": 0,
+      "defaultPasswordUsed": true
+    },
+    "errors": []
+  },
+  {
     "id": "744b9ccf-f092-4fbd-a11b-606948ffc20c",
     "createdAt": "2026-05-20T01:47:47.018Z",
     "createdById": "cmpddgcd000sk11q4g86mxock",

@@ -2225,6 +2225,59 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     }
   };
 
+  const findExistingParentUserForEnrollment = async (enrollmentData: any) => {
+    const guardianName = normalizeText(enrollmentData.guardianFullName);
+    const guardianDoc = normalizeText(enrollmentData.guardianDocNumber);
+    const contactEmail = normalizeEmail(enrollmentData.contactEmail);
+
+    if (isEmailLike(contactEmail)) {
+      const user = await prisma.user.findUnique({
+        where: { email: contactEmail },
+        select: { id: true, role: true, fullName: true }
+      });
+      if (user) return user;
+    }
+
+    if (guardianDoc && guardianDoc !== "SIN_DOCUMENTO" && guardianDoc !== "N/A") {
+      const matchingEnrollment = await prisma.enrollment.findFirst({
+        where: {
+          guardianDocNumber: { equals: guardianDoc, mode: "insensitive" }
+        },
+        select: { studentId: true }
+      });
+      if (matchingEnrollment) {
+        const guardian = await prisma.guardian.findFirst({
+          where: { studentId: matchingEnrollment.studentId },
+          include: {
+            parent: {
+              include: {
+                user: {
+                  select: { id: true, role: true, fullName: true }
+                }
+              }
+            }
+          }
+        });
+        if (guardian?.parent?.user?.role === "PARENT") {
+          return guardian.parent.user;
+        }
+      }
+    }
+
+    if (guardianName && guardianName !== "Acudiente") {
+      const user = await prisma.user.findFirst({
+        where: {
+          role: "PARENT",
+          fullName: { equals: guardianName, mode: "insensitive" }
+        },
+        select: { id: true, role: true, fullName: true }
+      });
+      if (user) return user;
+    }
+
+    return null;
+  };
+
   const ensureParentGuardianFromEnrollment = async (enrollmentData: any, studentId: string, rowNumber: number) => {
     const guardianName = normalizeText(enrollmentData.guardianFullName) || "Acudiente";
     const guardianDoc = normalizeText(enrollmentData.guardianDocNumber);
@@ -2232,22 +2285,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     const contactPhone = normalizeText(enrollmentData.contactPhone);
     if (!studentId || (!guardianName && !guardianDoc && !contactEmail && !contactPhone)) return;
 
-    let user = isEmailLike(contactEmail)
-      ? await prisma.user.findUnique({
-          where: { email: contactEmail },
-          select: { id: true, role: true, fullName: true }
-        })
-      : null;
-
-    if (!user && guardianName !== "Acudiente") {
-      user = await prisma.user.findFirst({
-        where: {
-          role: "PARENT",
-          fullName: { equals: guardianName, mode: "insensitive" }
-        },
-        select: { id: true, role: true, fullName: true }
-      });
-    }
+    let user = await findExistingParentUserForEnrollment(enrollmentData);
 
     if (!user) {
       const preferredEmail = isEmailLike(contactEmail)
