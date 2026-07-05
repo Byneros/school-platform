@@ -2,12 +2,13 @@
 -- This migration is intentionally idempotent to support environments with drift.
 
 ALTER TABLE "Teacher"
+ADD COLUMN IF NOT EXISTS "subjectHours" JSONB,
+ADD COLUMN IF NOT EXISTS "subjectSchedules" JSONB,
 ADD COLUMN IF NOT EXISTS "subjectHoursMode" JSONB;
 
 ALTER TABLE "Student"
 ADD COLUMN IF NOT EXISTS "studentGroup" TEXT;
 
--- Normalize nullable JSON fields used by scheduling logic.
 UPDATE "Teacher"
 SET
   "subjectHours" = COALESCE("subjectHours", '{}'::jsonb),
