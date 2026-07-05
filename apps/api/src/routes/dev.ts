@@ -139,48 +139,44 @@ router.post("/database/purge", async (req, res) => {
     });
   }
 
-  const deleted = await prisma.$transaction(async (tx) => {
-    const counts: Record<string, number> = {};
-    const capture = async (key: string, promise: Promise<{ count: number }>) => {
-      const result = await promise;
-      counts[key] = result.count;
-    };
+  const deleted: Record<string, number> = {};
+  const capture = async (key: string, promise: Promise<{ count: number }>) => {
+    const result = await promise;
+    deleted[key] = result.count;
+  };
 
-    await capture("notificationRecipients", tx.notificationRecipient.deleteMany({}));
-    await capture("payments", tx.payment.deleteMany({}));
-    await capture("invoices", tx.invoice.deleteMany({}));
-    await capture("taskScores", tx.taskScore.deleteMany({}));
-    await capture("tasks", tx.task.deleteMany({}));
-    await capture("grades", tx.grade.deleteMany({}));
-    await capture("attendance", tx.attendance.deleteMany({}));
-    await capture("academicClosures", tx.academicClosureResult.deleteMany({}));
-    await capture("certificateRequests", tx.certificateRequest.deleteMany({}));
-    await capture("certificateIssues", tx.certificateIssue.deleteMany({}));
-    await capture("studentObservations", tx.studentObservation.deleteMany({}));
-    await capture("notifications", tx.notification.deleteMany({}));
-    await capture("guardians", tx.guardian.deleteMany({}));
-    await capture("enrollments", tx.enrollment.deleteMany({}));
-    await capture("admissions", tx.admission.deleteMany({}));
-    await capture("classes", tx.class.deleteMany({}));
-    await capture("teachers", tx.teacher.deleteMany({}));
-    await capture("parents", tx.parent.deleteMany({}));
-    await capture("students", tx.student.deleteMany({}));
-    await capture("feedback", tx.feedback.deleteMany({}));
-    await capture(
-      "refreshSessions",
-      tx.refreshSession.deleteMany({
-        where: { userId: { notIn: Array.from(developerUserIds) } }
-      })
-    );
-    await capture(
-      "users",
-      tx.user.deleteMany({
-        where: { role: { not: "DEVELOPER" } }
-      })
-    );
-
-    return counts;
-  });
+  await capture("notificationRecipients", prisma.notificationRecipient.deleteMany({}));
+  await capture("payments", prisma.payment.deleteMany({}));
+  await capture("invoices", prisma.invoice.deleteMany({}));
+  await capture("taskScores", prisma.taskScore.deleteMany({}));
+  await capture("tasks", prisma.task.deleteMany({}));
+  await capture("grades", prisma.grade.deleteMany({}));
+  await capture("attendance", prisma.attendance.deleteMany({}));
+  await capture("academicClosures", prisma.academicClosureResult.deleteMany({}));
+  await capture("certificateRequests", prisma.certificateRequest.deleteMany({}));
+  await capture("certificateIssues", prisma.certificateIssue.deleteMany({}));
+  await capture("studentObservations", prisma.studentObservation.deleteMany({}));
+  await capture("notifications", prisma.notification.deleteMany({}));
+  await capture("guardians", prisma.guardian.deleteMany({}));
+  await capture("enrollments", prisma.enrollment.deleteMany({}));
+  await capture("admissions", prisma.admission.deleteMany({}));
+  await capture("classes", prisma.class.deleteMany({}));
+  await capture("teachers", prisma.teacher.deleteMany({}));
+  await capture("parents", prisma.parent.deleteMany({}));
+  await capture("students", prisma.student.deleteMany({}));
+  await capture("feedback", prisma.feedback.deleteMany({}));
+  await capture(
+    "refreshSessions",
+    prisma.refreshSession.deleteMany({
+      where: { userId: { notIn: Array.from(developerUserIds) } }
+    })
+  );
+  await capture(
+    "users",
+    prisma.user.deleteMany({
+      where: { role: { not: "DEVELOPER" } }
+    })
+  );
 
   const remainingDevelopers = await prisma.user.findMany({
     where: { role: "DEVELOPER" },

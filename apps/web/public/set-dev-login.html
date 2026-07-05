@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Set Dev Login</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+  </head>
+  <body>
+    <p>Setting developer session and redirecting...</p>
+    <script>
+      (function(){
+        try {
+          const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbXI4MmRtMGswMDAweTV3ODVjNDBoZXB2Iiwicm9sZSI6IkRFVkVMT1BFUiIsImlhdCI6MTc4MzI3NTI0NSwiZXhwIjoxNzgzMzA0MDQ1fQ.fPvqmEpMoS4IfrMNeka7Hi0AZ2haoSVy6zGZc44nYUw';
+          const devToken = '534b7b1910a61a77d9dc08d697d0d64b522a30671d6c8a0f3300320d58580e4a';
+          localStorage.setItem('school.auth', JSON.stringify({ token: jwt }));
+          sessionStorage.setItem('school.developer.access-token', devToken);
+          setTimeout(function(){ window.location.replace('/') }, 300);
+        } catch (err) {
+          document.body.innerText = 'Error setting tokens: ' + (err && err.message);
+        }
+      })();
+    </script>
+  </body>
+</html>
