@@ -8,7 +8,15 @@ import useSuggestions, { SuggestionOption } from "../hooks/useSuggestions";
 import { isDueProcessNotification, prioritizeDueProcess } from "../utils/notificationPriority";
 import { feedbackTitles } from "../utils/feedback";
 
-const convivenciaTemplates = [
+type NotificationTemplate = {
+  key: string;
+  label: string;
+  title: string;
+  legalReferences: string[];
+  body: string;
+};
+
+const convivenciaTemplates: NotificationTemplate[] = [
   {
     key: "debido_proceso",
     label: "Debido proceso disciplinario",

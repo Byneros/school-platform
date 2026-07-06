@@ -1,0 +1,143 @@
+const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
+const IMPORT_REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_IMPORT_TIMEOUT_MS || 120000);
+const DEVELOPER_ACCESS_TOKEN_KEY = "school.developer.access-token";
+export class ApiError extends Error {
+    constructor(message, status, requestId = null, path = null) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+        this.requestId = requestId;
+        this.path = path;
+    }
+}
+async function toApiError(res, fallback = "Request failed", path = null) {
+    const requestIdHeader = res.headers.get("x-request-id");
+    try {
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+            const body = await res.json();
+            const message = body?.message || body?.error;
+            const requestId = body?.requestId || requestIdHeader || null;
+            if (message)
+                return new ApiError(String(message), res.status, requestId, path);
+        }
+        else {
+            const text = await res.text();
+            if (text)
+                return new ApiError(text, res.status, requestIdHeader || null, path);
+        }
+    }
+    catch {
+        // ignore parse issues and use fallback
+    }
+    return new ApiError(fallback, res.status, requestIdHeader || null, path);
+}
+function getToken() {
+    try {
+        const raw = localStorage.getItem("school.auth");
+        if (!raw)
+            return "";
+        const data = JSON.parse(raw);
+        return data.token || "";
+    }
+    catch {
+        return "";
+    }
+}
+export function getDeveloperAccessToken() {
+    try {
+        return sessionStorage.getItem(DEVELOPER_ACCESS_TOKEN_KEY) || "";
+    }
+    catch {
+        return "";
+    }
+}
+export function setDeveloperAccessToken(token) {
+    try {
+        const normalized = token.trim();
+        if (!normalized) {
+            sessionStorage.removeItem(DEVELOPER_ACCESS_TOKEN_KEY);
+            return;
+        }
+        sessionStorage.setItem(DEVELOPER_ACCESS_TOKEN_KEY, normalized);
+    }
+    catch {
+        // ignore storage failures
+    }
+}
+export function clearDeveloperAccessToken() {
+    try {
+        sessionStorage.removeItem(DEVELOPER_ACCESS_TOKEN_KEY);
+    }
+    catch {
+        // ignore storage failures
+    }
+}
+function buildHeaders(withJson, normalizedPath) {
+    const token = getToken();
+    const developerAccessToken = normalizedPath.startsWith("/dev") ? getDeveloperAccessToken() : "";
+    return {
+        ...(withJson ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(developerAccessToken ? { "X-Developer-Access-Token": developerAccessToken } : {})
+    };
+}
+async function request(path, method, body) {
+    const withJson = body !== undefined;
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    const timeoutMs = normalizedPath.startsWith("/reports/import-template/import")
+        ? IMPORT_REQUEST_TIMEOUT_MS
+        : REQUEST_TIMEOUT_MS;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+        res = await fetch(`${API_URL}${normalizedPath}`, {
+            method,
+            headers: buildHeaders(withJson, normalizedPath),
+            signal: controller.signal,
+            credentials: "include",
+            ...(withJson ? { body: JSON.stringify(body) } : {})
+        });
+    }
+    catch {
+        throw new ApiError(normalizedPath.startsWith("/reports/import-template/import")
+            ? "La importacion no pudo completarse. Verifica el tamano del archivo, el tiempo de proceso o que la API siga activa."
+            : "No se pudo conectar con el servidor. Verifica que la API este ejecutandose.", 0, null, normalizedPath);
+    }
+    finally {
+        window.clearTimeout(timeout);
+    }
+    if (!res.ok)
+        throw await toApiError(res, "Request failed", normalizedPath);
+    return res;
+}
+export async function apiGet(path) {
+    const res = await request(path, "GET");
+    if (res.status === 204)
+        return null;
+    return res.json();
+}
+export async function apiPost(path, body) {
+    const res = await request(path, "POST", body);
+    return res.json();
+}
+export async function apiPatch(path, body) {
+    const res = await request(path, "PATCH", body);
+    return res.json();
+}
+export async function apiPut(path, body) {
+    const res = await request(path, "PUT", body);
+    return res.json();
+}
+export async function apiDownload(path) {
+    const res = await request(path, "GET");
+    return res.blob();
+}
+export async function apiDelete(path) {
+    const res = await request(path, "DELETE");
+    if (res.status === 204)
+        return null;
+    return res.json();
+}

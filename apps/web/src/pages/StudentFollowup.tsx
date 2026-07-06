@@ -71,9 +71,11 @@ export default function StudentFollowup() {
   const isTeacher = user?.role === "TEACHER";
   const noTeacherStudents = isTeacher && students.length === 0;
   const shouldShowTimeline = !isParent || data.length > 0;
-  const certificateTypes = [
-    { type: "STUDY", kind: "study" as const, label: "Constancia de estudio" },
-    { type: "ENROLLMENT", kind: "enrollment" as const, label: "Certificado de matricula" }
+  type CertificateType = "STUDY" | "ENROLLMENT";
+
+  const certificateTypes: Array<{ type: CertificateType; kind: "study" | "enrollment"; label: string }> = [
+    { type: "STUDY", kind: "study", label: "Constancia de estudio" },
+    { type: "ENROLLMENT", kind: "enrollment", label: "Certificado de matricula" }
   ];
 
   const loadStudents = () => {
@@ -341,7 +343,7 @@ export default function StudentFollowup() {
     }
   };
 
-  const requestCertificate = async (type: "STUDY" | "ENROLLMENT") => {
+  const requestCertificate = async (type: CertificateType) => {
     if (!studentId) {
       setCertificateMessage("Selecciona un estudiante para solicitar el certificado.");
       return;

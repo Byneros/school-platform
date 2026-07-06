@@ -248,7 +248,7 @@ export default function AdminTeacherHours() {
       const totalsByDay: Record<string, number> = Object.fromEntries(days.map((d) => [d, 0]));
       const gradeGroupByDay: Record<string, Set<string>> = Object.fromEntries(days.map((d) => [d, new Set<string>()]));
       r.subjects.forEach((s) => {
-        let slots: Array<{ dayOfWeek: string; startTime: string; endTime: string }> = [];
+        let slots: Array<{ dayOfWeek: string; startTime: string; endTime: string; gradeLevel?: string; group?: string }> = [];
         try {
           const raw = hoursDraft[`${r.teacherId}::${s.subject}::slots`];
           slots = raw ? JSON.parse(raw) : s.slots || [];

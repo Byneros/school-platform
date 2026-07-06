@@ -152,12 +152,12 @@ export default function TeacherAttendance() {
         .catch(() => setGradeCatalog([]));
       apiGet("/enrollments?page=0&pageSize=1")
         .then((res) => {
-          const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+          const list = Array.isArray(res?.data) ? (res.data as any[]) : Array.isArray(res) ? (res as any[]) : [];
           const groups = Array.from(
-            new Set(
+            new Set<string>(
               list
                 .map((item: any) => normalizeGroupKey(String(item?.student?.studentGroup || "")))
-                .filter(Boolean)
+                .filter((value): value is string => Boolean(value))
             )
           ).sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
           setAdminGroupOptions(groups);

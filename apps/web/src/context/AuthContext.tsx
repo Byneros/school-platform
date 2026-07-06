@@ -2,15 +2,31 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { ApiError, apiGet, apiPost, clearDeveloperAccessToken } from "../services/api";
 import { getAuth, setAuth, clearAuth, AuthUser } from "../services/auth";
 
+type LoginResult =
+  | { status: "ok"; user: AuthUser }
+  | { status: "2fa"; token: string; email: string; role?: AuthUser["role"]; expiresAt?: string; devCode?: string };
+
+type LoginApiResponse =
+  | {
+      requiresTwoFactor: true;
+      twoFactorToken: string;
+      email: string;
+      role?: AuthUser["role"];
+      expiresAt?: string;
+      devCode?: string;
+    }
+  | {
+      token: string;
+      role: AuthUser["role"];
+      fullName: string;
+    };
+
 type AuthContextValue = {
   user: AuthUser | null;
   initializing: boolean;
   inactivityWarning: boolean;
   extendSession: () => void;
-  login: (email: string, password: string) => Promise<
-    | { status: "ok"; user: AuthUser }
-    | { status: "2fa"; token: string; email: string; role?: AuthUser["role"]; expiresAt?: string; devCode?: string }
-  >;
+  login: (email: string, password: string) => Promise<LoginResult>;
   verifyTwoFactor: (token: string, code: string) => Promise<AuthUser>;
   resendTwoFactor: (token: string) => Promise<{ ok: boolean; devCode?: string }>;
   logout: () => void;
@@ -131,13 +147,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    const data = await apiPost("/auth/login", {
+    const data = await apiPost<any>("/auth/login", {
       email: email.trim().toLowerCase(),
       password: password.trim()
     });
     if (data?.requiresTwoFactor) {
       return {
-        status: "2fa",
+        status: "2fa" as const,
         token: data.twoFactorToken,
         email: data.email,
         role: data.role,
@@ -149,11 +165,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuth(authUser);
     setUser(authUser);
     setInitializing(false);
-    return { status: "ok", user: authUser };
+    return { status: "ok" as const, user: authUser };
   };
 
   const verifyTwoFactor = async (token: string, code: string) => {
-    const data = await apiPost("/auth/2fa/verify", {
+    const data = await apiPost<any>("/auth/2fa/verify", {
       token,
       code: code.trim()
     });
@@ -165,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resendTwoFactor = async (token: string) =>
-    apiPost("/auth/2fa/resend", { token });
+    apiPost<{ ok: boolean; devCode?: string }>("/auth/2fa/resend", { token });
 
   const logout = () => {
     apiPost("/auth/logout", {}).catch(() => undefined);

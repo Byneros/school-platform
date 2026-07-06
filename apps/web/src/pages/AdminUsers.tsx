@@ -783,8 +783,8 @@ export default function AdminUsers() {
                       <td>{String(row.createdAt || "").slice(0, 19).replace("T", " ")}</td>
                       <td>{row.mode}</td>
                       <td>{row.createdByName || "-"}</td>
-                      <td>{row.summary?.created ? Object.values(row.summary.created).reduce((s: any, v: any) => s + Number(v || 0), 0) : 0}</td>
-                      <td>{row.summary?.updated ? Object.values(row.summary.updated).reduce((s: any, v: any) => s + Number(v || 0), 0) : 0}</td>
+                      <td>{row.summary?.created ? (Object.values(row.summary.created) as number[]).reduce((s, v) => s + Number(v || 0), 0) : 0}</td>
+                      <td>{row.summary?.updated ? (Object.values(row.summary.updated) as number[]).reduce((s, v) => s + Number(v || 0), 0) : 0}</td>
                       <td>{row.summary?.skipped || 0}</td>
                       <td>{row.summary?.errorsCount || 0}</td>
                     </tr>

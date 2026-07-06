@@ -2,6 +2,7 @@ type AuthUser = {
   token: string;
   role: "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER";
   fullName: string;
+  email?: string;
 };
 
 const STORAGE_KEY = "school.auth";

@@ -121,23 +121,23 @@ async function request(path: string, method: RequestMethod, body?: unknown) {
   return res;
 }
 
-export async function apiGet(path: string) {
+export async function apiGet<T = any>(path: string): Promise<T | null> {
   const res = await request(path, "GET");
   if (res.status === 204) return null;
   return res.json();
 }
 
-export async function apiPost(path: string, body: any) {
+export async function apiPost<T = any>(path: string, body: any): Promise<T> {
   const res = await request(path, "POST", body);
   return res.json();
 }
 
-export async function apiPatch(path: string, body: any) {
+export async function apiPatch<T = any>(path: string, body: any): Promise<T> {
   const res = await request(path, "PATCH", body);
   return res.json();
 }
 
-export async function apiPut(path: string, body: any) {
+export async function apiPut<T = any>(path: string, body: any): Promise<T> {
   const res = await request(path, "PUT", body);
   return res.json();
 }
