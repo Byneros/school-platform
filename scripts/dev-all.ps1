@@ -7,6 +7,9 @@ function Test-Command {
 
 Write-Host "== School Platform: inicio rapido ==" -ForegroundColor Cyan
 
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$dockerComposePath = Join-Path $repoRoot "infra/docker-compose.yml"
+
 if (-not (Test-Command "docker")) {
   Write-Host "Docker no esta instalado o no esta en PATH." -ForegroundColor Red
   exit 1
@@ -18,7 +21,7 @@ if (-not (Test-Command "npm")) {
 }
 
 Write-Host "Levantando infraestructura (Postgres, Redis, Mailpit)..." -ForegroundColor Yellow
-docker compose -f "infra/docker-compose.yml" up -d
+docker compose -f $dockerComposePath up -d
 
 $healthUrl = "http://127.0.0.1:4003/health"
 $apiReady = $false

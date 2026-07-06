@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:all": "powershell -ExecutionPolicy Bypass -File ../../scripts/dev-all.ps1",
     "build": "prisma generate --schema=./prisma/schema.prisma && tsc -p tsconfig.json",
     "postinstall": "prisma generate --schema=./prisma/schema.prisma",
     "start": "node dist/index.js",
