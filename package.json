@@ -47,6 +47,7 @@
     "tsx": "^4.21.0"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "ioredis": "^5.10.1"
   }
 }
