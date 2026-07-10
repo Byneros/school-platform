@@ -12,16 +12,19 @@ async function check(url) {
     const res = await fetch(url, { signal: timeout.controller.signal });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json?.ok !== true) {
-      throw new Error(`Health no valido (${res.status})`);
+      const checks = json?.checks ? ` checks=${JSON.stringify(json.checks)}` : "";
+      throw new Error(`Health no valido (${res.status})${checks}`);
     }
-    console.log(`[health] OK ${url}`);
+    const checks = json?.checks ? ` ${JSON.stringify(json.checks)}` : "";
+    console.log(`[health] OK ${url}${checks}`);
   } finally {
     timeout.clear();
   }
 }
 
 async function main() {
-  const apiHealth = process.env.API_HEALTH_URL || "http://localhost:4001/health";
+  const port = process.env.PORT || "4003";
+  const apiHealth = process.env.API_HEALTH_URL || process.env.API_READY_URL || `http://localhost:${port}/ready`;
   await check(apiHealth);
 }
 

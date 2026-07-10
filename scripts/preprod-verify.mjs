@@ -106,11 +106,11 @@ async function requestJson(url, timeoutMs = 5000) {
   }
 }
 
-async function waitForHealth(baseUrl, timeoutMs = 30000) {
+async function waitForReady(baseUrl, timeoutMs = 30000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await requestJson(`${baseUrl}/health`, 2500);
+      const res = await requestJson(`${baseUrl}/ready`, 2500);
       if (res.ok && res.json?.ok === true) return true;
     } catch {
       // retry
@@ -159,7 +159,7 @@ async function main() {
 
   logStep(`Verificando API en ${baseUrl}`);
   let apiStartedByScript = null;
-  let isUp = await waitForHealth(baseUrl, 5000);
+  let isUp = await waitForReady(baseUrl, 5000);
 
   if (!isUp) {
     logStep("API no detectada. Iniciando API temporalmente...");
@@ -176,12 +176,12 @@ async function main() {
       process.stderr.write(`[api] ${String(chunk)}`);
     });
 
-    isUp = await waitForHealth(baseUrl, 30000);
+    isUp = await waitForReady(baseUrl, 30000);
   }
 
   if (!isUp) {
     if (apiStartedByScript) apiStartedByScript.kill();
-    throw new Error(`No se pudo validar /health en ${baseUrl}`);
+    throw new Error(`No se pudo validar /ready en ${baseUrl}`);
   }
 
   try {
