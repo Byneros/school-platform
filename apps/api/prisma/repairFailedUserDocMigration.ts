@@ -7,12 +7,21 @@ const migrationName = "20260727175234_add_user_doc_fields";
 const prisma = new PrismaClient();
 
 try {
+  const migrationTable = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(
+    `
+      SELECT to_regclass('public."_prisma_migrations"') IS NOT NULL AS exists
+    `
+  );
+
+  if (!migrationTable[0]?.exists) {
+    process.exit(0);
+  }
+
   const rows = await prisma.$queryRawUnsafe<Array<{ migration_name: string }>>(
     `
       SELECT migration_name
       FROM "_prisma_migrations"
       WHERE migration_name = $1
-        AND failed_at IS NOT NULL
         AND finished_at IS NULL
         AND rolled_back_at IS NULL
       LIMIT 1
