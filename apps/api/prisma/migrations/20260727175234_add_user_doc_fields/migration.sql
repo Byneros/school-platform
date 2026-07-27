@@ -3,7 +3,7 @@
 
   - A unique constraint covering the columns `[userId]` on the table `Student` will be added. If there are existing duplicate values, this will fail.
   - A unique constraint covering the columns `[docType,docNumber]` on the table `User` will be added. If there are existing duplicate values, this will fail.
-  - Added the required column `updatedAt` to the `User` table without a default value. This is not possible if the table is not empty.
+  - Adds `updatedAt` to the `User` table in a backwards-compatible way for databases with existing rows.
 
 */
 -- CreateEnum
@@ -36,7 +36,14 @@ ADD COLUMN     "docType" "DocumentType",
 ADD COLUMN     "gender" "Gender",
 ADD COLUMN     "phone" TEXT,
 ADD COLUMN     "photoUrl" TEXT,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL;
+ADD COLUMN     "updatedAt" TIMESTAMP(3);
+
+-- Backfill existing users before enforcing the NOT NULL constraint.
+UPDATE "User"
+SET "updatedAt" = COALESCE("createdAt", NOW())
+WHERE "updatedAt" IS NULL;
+
+ALTER TABLE "User" ALTER COLUMN "updatedAt" SET NOT NULL;
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Student_userId_key" ON "Student"("userId");
