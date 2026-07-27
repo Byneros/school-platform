@@ -529,7 +529,10 @@ export default function AdminUsers() {
   const fileToBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onload = () => {
+        const value = String(reader.result || "");
+        resolve(value.includes("base64,") ? value.split("base64,")[1] : value);
+      };
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
@@ -537,6 +540,10 @@ export default function AdminUsers() {
   const runImport = async () => {
     if (!importFile) {
       setImportError("Selecciona un archivo .xlsx.");
+      return;
+    }
+    if (!importFile.name.toLowerCase().endsWith(".xlsx")) {
+      setImportError("El archivo debe estar en formato .xlsx.");
       return;
     }
     const maxFileSizeBytes = 8 * 1024 * 1024;

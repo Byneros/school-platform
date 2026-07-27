@@ -43,6 +43,11 @@ function normalizeImportedRow(row: unknown[]) {
   return normalized;
 }
 
+function isLikelyXlsxBuffer(buffer: Buffer) {
+  if (buffer.length < 4) return false;
+  return buffer[0] === 0x50 && buffer[1] === 0x4b;
+}
+
 async function readImportHistory() {
   try {
     const raw = await fs.readFile(importHistoryPath, "utf-8");
@@ -2339,10 +2344,18 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   const mode = String(payload.mode || "import").toLowerCase();
   if (!rawBase64) return res.status(400).json({ message: "Archivo requerido" });
 
-  const base64 = rawBase64.includes("base64,") ? rawBase64.split("base64,")[1] : rawBase64;
+  const base64 = (rawBase64.includes("base64,") ? rawBase64.split("base64,")[1] : rawBase64)
+    .replace(/\s/g, "")
+    .trim();
   let workbook: ImportedWorkbook;
   try {
     const buffer = Buffer.from(base64, "base64");
+    if (!isLikelyXlsxBuffer(buffer)) {
+      return res.status(400).json({
+        message:
+          "El archivo recibido no es un .xlsx valido. Descarga la plantilla oficial y guardala en formato .xlsx.",
+      });
+    }
     const sheets = await readXlsxFile(buffer);
     workbook = new Map(
       sheets.map((sheet) => [
@@ -2350,8 +2363,15 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         sheet.data.map((row) => normalizeImportedRow(row as unknown[])),
       ])
     );
-  } catch {
-    return res.status(400).json({ message: "Archivo invalido o corrupto" });
+  } catch (error) {
+    console.warn(
+      "Import Excel parse failed:",
+      error instanceof Error ? error.message : String(error)
+    );
+    return res.status(400).json({
+      message:
+        "No se pudo leer el archivo .xlsx. Verifica que sea la plantilla oficial y que no este protegido o corrupto.",
+    });
   }
 
   const result = {
