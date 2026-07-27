@@ -13,7 +13,7 @@
     "test:regression": "tsx scripts/api-regression-tests.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:deploy": "tsx prisma/repairFailedUserDocMigration.ts && prisma migrate deploy",
     "prisma:backfill": "tsx prisma/backfillSubjectHoursMode.ts && tsx prisma/backfillTeacherSchedules.ts && tsx prisma/backfillClassGradeLevel.ts",
     "prisma:backfill:class-grade": "tsx prisma/backfillClassGradeLevel.ts",
     "prisma:backfill:attendance-teacher": "tsx prisma/backfillAttendanceTeacherMarker.ts",
