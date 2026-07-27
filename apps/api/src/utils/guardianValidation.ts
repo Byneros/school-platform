@@ -7,7 +7,7 @@ const ALLOWED_GUARDIAN_RELATIONS = new Set([
   "TIA",
   "HERMANO",
   "HERMANA",
-  "ACUDIENTE_LEGAL"
+  "ACUDIENTE_LEGAL",
 ]);
 
 const ADULT_GUARDIAN_DOC_TYPES = new Set(["CEDULA", "CEDULA_EXTRANJERIA", "PASAPORTE"]);
@@ -22,7 +22,7 @@ function normalize(value: unknown) {
 export function getGuardianRules() {
   return {
     relations: Array.from(ALLOWED_GUARDIAN_RELATIONS),
-    adultDocTypes: Array.from(ADULT_GUARDIAN_DOC_TYPES)
+    adultDocTypes: Array.from(ADULT_GUARDIAN_DOC_TYPES),
   };
 }
 

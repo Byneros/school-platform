@@ -7,12 +7,12 @@ const router = Router();
 router.get("/simple", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_req, res) => {
   const classes = await prisma.class.findMany({
     include: { teacher: { include: { user: true } } },
-    orderBy: { id: "asc" }
+    orderBy: { id: "asc" },
   });
   const data = classes.map((c) => ({
     ...c,
     gradeLevel: (c as any).gradeLevel || "",
-    gradeName: (c as any).gradeLevel || ""
+    gradeName: (c as any).gradeLevel || "",
   }));
   res.json(data);
 });
@@ -20,7 +20,7 @@ router.get("/simple", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_re
 router.get("/admin-hours", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const classes = await prisma.class.findMany({
     include: { teacher: { include: { user: true } } },
-    orderBy: [{ teacherId: "asc" }, { id: "asc" }]
+    orderBy: [{ teacherId: "asc" }, { id: "asc" }],
   });
   const data = classes.map((c) => {
     const schedule = (c.schedule || {}) as Record<string, any>;
@@ -33,7 +33,7 @@ router.get("/admin-hours", requireAuth, requireRole(["ADMIN"]), async (_req, res
       gradeLevel: (c as any).gradeLevel || "",
       gradeId: (c as any).gradeLevel || "",
       gradeName: (c as any).gradeLevel || "",
-      hoursPerWeek
+      hoursPerWeek,
     };
   });
   res.json(data);
@@ -47,7 +47,10 @@ router.put("/:id/hours", requireAuth, requireRole(["ADMIN"]), async (req, res) =
     return res.status(400).json({ message: "Las horas por semana deben estar entre 0 y 60" });
   }
 
-  const current = await prisma.class.findUnique({ where: { id: classId }, select: { schedule: true } });
+  const current = await prisma.class.findUnique({
+    where: { id: classId },
+    select: { schedule: true },
+  });
   if (!current) return res.status(404).json({ message: "Clase no encontrada" });
   const currentSchedule = (current.schedule || {}) as Record<string, any>;
   const updatedSchedule = { ...currentSchedule, hoursPerWeek };
@@ -55,7 +58,7 @@ router.put("/:id/hours", requireAuth, requireRole(["ADMIN"]), async (req, res) =
   const updated = await prisma.class.update({
     where: { id: classId },
     data: { schedule: updatedSchedule },
-    include: { teacher: { include: { user: true } } }
+    include: { teacher: { include: { user: true } } },
   });
 
   res.json({
@@ -66,7 +69,7 @@ router.put("/:id/hours", requireAuth, requireRole(["ADMIN"]), async (req, res) =
     gradeLevel: (updated as any).gradeLevel || "",
     gradeId: (updated as any).gradeLevel || "",
     gradeName: (updated as any).gradeLevel || "",
-    hoursPerWeek: Number(((updated.schedule || {}) as Record<string, any>).hoursPerWeek || 0)
+    hoursPerWeek: Number(((updated.schedule || {}) as Record<string, any>).hoursPerWeek || 0),
   });
 });
 

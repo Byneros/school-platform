@@ -35,7 +35,7 @@ function usage() {
       "  --execute             Ejecuta comandos. Sin esto, solo imprime plan",
       "  --no-stop-on-error    Continua aunque un colegio falle",
       "  --no-sudo             Ejecuta sin prefijo sudo",
-    ].join("\n"),
+    ].join("\n")
   );
 }
 
@@ -155,7 +155,7 @@ function main() {
 
   for (const item of normalized) {
     console.log(
-      `[bootstrap:multi] >>> ${item.collegeCode} | ${item.domain} | puerto=${item.webPort}`,
+      `[bootstrap:multi] >>> ${item.collegeCode} | ${item.domain} | puerto=${item.webPort}`
     );
     const cmd = buildCommand(item, args.useSudo);
     const code = run(cmd, args.execute);

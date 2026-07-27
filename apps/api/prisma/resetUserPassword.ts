@@ -28,7 +28,9 @@ function parseArgs(argv: string[]): Args {
       continue;
     }
     if (arg.startsWith("--email=")) {
-      email = String(arg.slice("--email=".length) || "").trim().toLowerCase();
+      email = String(arg.slice("--email=".length) || "")
+        .trim()
+        .toLowerCase();
       continue;
     }
     if (arg.startsWith("--password=")) {
@@ -36,7 +38,9 @@ function parseArgs(argv: string[]): Args {
       continue;
     }
     if (arg === "--email") {
-      email = String(argv[++i] || "").trim().toLowerCase();
+      email = String(argv[++i] || "")
+        .trim()
+        .toLowerCase();
       continue;
     }
     if (arg === "--password") {
@@ -55,7 +59,9 @@ function parseArgs(argv: string[]): Args {
   }
 
   if (!email && positional.length >= 1) {
-    email = String(positional[0] || "").trim().toLowerCase();
+    email = String(positional[0] || "")
+      .trim()
+      .toLowerCase();
   }
   if (!password && positional.length >= 2) {
     password = String(positional[1] || "");
@@ -78,7 +84,7 @@ function printUsage() {
       "Uso:",
       "  npm --workspace apps/api run prisma:reset:user -- --email usuario@colegio.edu --password NuevaClave123!",
       "  RESET_USER_PASSWORD=NuevaClave123! npm --workspace apps/api run prisma:reset:user -- --email usuario@colegio.edu --activate",
-    ].join("\n"),
+    ].join("\n")
   );
 }
 

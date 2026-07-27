@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+
 import ActionFeedback from "../components/ActionFeedback";
 import Section from "../components/Section";
 import { apiDownload, apiGet, apiPut } from "../services/api";
@@ -19,7 +20,7 @@ const defaultForm: BrandingSettings = {
   primaryColor: "#1e3a8a",
   secondaryColor: "#0ea5e9",
   accentColor: "#f59e0b",
-  footerText: ""
+  footerText: "",
 };
 
 export default function AdminBranding() {
@@ -34,14 +35,17 @@ export default function AdminBranding() {
     setLoading(true);
     setError("");
     try {
-      const [branding, access] = await Promise.all([apiGet("/branding"), apiGet("/branding/access")]);
+      const [branding, access] = await Promise.all([
+        apiGet("/branding"),
+        apiGet("/branding/access"),
+      ]);
       setForm({
         schoolName: branding.schoolName || "",
         logoDataUrl: branding.logoDataUrl || null,
         primaryColor: branding.primaryColor || "#1e3a8a",
         secondaryColor: branding.secondaryColor || "#0ea5e9",
         accentColor: branding.accentColor || "#f59e0b",
-        footerText: branding.footerText || ""
+        footerText: branding.footerText || "",
       });
       setCanEdit(Boolean(access?.canEdit));
     } catch (err: any) {
@@ -193,7 +197,11 @@ export default function AdminBranding() {
           </label>
           {form.logoDataUrl && (
             <div style={{ marginTop: 10 }}>
-              <img src={form.logoDataUrl} alt="Logo institucional" style={{ maxHeight: 80, maxWidth: 220, objectFit: "contain" }} />
+              <img
+                src={form.logoDataUrl}
+                alt="Logo institucional"
+                style={{ maxHeight: 80, maxWidth: 220, objectFit: "contain" }}
+              />
               {canEdit && (
                 <div style={{ marginTop: 8 }}>
                   <button
@@ -226,7 +234,11 @@ export default function AdminBranding() {
               <button type="button" className="button secondary" onClick={downloadPreviewPdf}>
                 PDF demo
               </button>
-              <button type="button" className="button secondary" onClick={downloadStudentsPreviewPdf}>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={downloadStudentsPreviewPdf}
+              >
                 PDF demo con estudiantes
               </button>
             </div>
@@ -237,28 +249,44 @@ export default function AdminBranding() {
               borderRadius: 10,
               background: "#ffffff",
               minHeight: 260,
-              padding: 16
+              padding: 16,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
               {form.logoDataUrl ? (
-                <img src={form.logoDataUrl} alt="Logo vista previa" style={{ width: 44, height: 44, objectFit: "contain" }} />
+                <img
+                  src={form.logoDataUrl}
+                  alt="Logo vista previa"
+                  style={{ width: 44, height: 44, objectFit: "contain" }}
+                />
               ) : (
                 <div
                   style={{
                     width: 44,
                     height: 44,
                     borderRadius: 8,
-                    border: "1px dashed #94a3b8"
+                    border: "1px dashed #94a3b8",
                   }}
                 />
               )}
               <div>
-                <div style={{ color: form.primaryColor, fontSize: 14, fontWeight: 700 }}>{form.schoolName || "Nombre del colegio"}</div>
-                <div style={{ color: "#64748b", fontSize: 12 }}>Generado: {new Date().toLocaleString("es-CO")}</div>
+                <div style={{ color: form.primaryColor, fontSize: 14, fontWeight: 700 }}>
+                  {form.schoolName || "Nombre del colegio"}
+                </div>
+                <div style={{ color: "#64748b", fontSize: 12 }}>
+                  Generado: {new Date().toLocaleString("es-CO")}
+                </div>
               </div>
             </div>
-            <div style={{ color: form.primaryColor, fontSize: 20, fontWeight: 800, textAlign: "center", marginTop: 8 }}>
+            <div
+              style={{
+                color: form.primaryColor,
+                fontSize: 20,
+                fontWeight: 800,
+                textAlign: "center",
+                marginTop: 8,
+              }}
+            >
               Reporte institucional
             </div>
             <div
@@ -268,7 +296,7 @@ export default function AdminBranding() {
                 borderRadius: 8,
                 padding: "8px 10px",
                 marginTop: 16,
-                fontWeight: 700
+                fontWeight: 700,
               }}
             >
               Encabezado de tabla

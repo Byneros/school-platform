@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import ActionFeedback from "../components/ActionFeedback";
 import {
   ApiError,
@@ -6,7 +7,7 @@ import {
   apiPost,
   clearDeveloperAccessToken,
   getDeveloperAccessToken,
-  setDeveloperAccessToken
+  setDeveloperAccessToken,
 } from "../services/api";
 import { feedbackTitles } from "../utils/feedback";
 
@@ -26,21 +27,38 @@ type DeveloperInfo = {
   rateLimit?: { total?: number; blocked?: number };
 };
 
+type DeveloperUser = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+};
+
 export default function DeveloperZone() {
   const [accessToken, setAccessTokenInput] = useState(getDeveloperAccessToken());
   const [data, setData] = useState<DeveloperInfo | null>(null);
-  const [users, setUsers] = useState<Array<any>>([]);
+  const [users, setUsers] = useState<DeveloperUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [purgeConfirmation, setPurgeConfirmation] = useState("");
   const [purgeBusy, setPurgeBusy] = useState(false);
   const [purgeError, setPurgeError] = useState<string | null>(null);
-  const [purgeResult, setPurgeResult] = useState<any>(null);
+
+  type PurgeResult = {
+    message?: string;
+    deleted?: Record<string, number>;
+  };
+
+  const [purgeResult, setPurgeResult] = useState<PurgeResult | null>(null);
 
   const load = () => {
     setLoading(true);
     setError(null);
-    Promise.all([apiGet("/dev/info"), apiGet("/dev/users")])
+    Promise.all([
+      apiGet<DeveloperInfo>("/dev/info"),
+      apiGet<{ data: DeveloperUser[] }>("/dev/users"),
+    ])
       .then(([infoRes, usersRes]) => {
         setData(infoRes);
         setUsers(usersRes?.data || []);
@@ -83,12 +101,14 @@ export default function DeveloperZone() {
     if (!confirmed) return;
     setPurgeBusy(true);
     try {
-      const result = await apiPost("/dev/database/purge", { confirmation: purgeConfirmation.trim() });
+      const result = await apiPost<PurgeResult>("/dev/database/purge", {
+        confirmation: purgeConfirmation.trim(),
+      });
       setPurgeResult(result);
       setPurgeConfirmation("");
       load();
-    } catch (err: any) {
-      setPurgeError(err?.message || "No se pudo borrar la base de datos.");
+    } catch (err) {
+      setPurgeError(err instanceof Error ? err.message : "No se pudo borrar la base de datos.");
     } finally {
       setPurgeBusy(false);
     }
@@ -97,14 +117,24 @@ export default function DeveloperZone() {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div className="card" style={{ padding: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
           <div>
             <h2 style={{ marginTop: 0, marginBottom: 6 }}>Zona de desarrollador</h2>
             <div style={{ color: "#64748b" }}>
               Consola privada con diagnostico, usuarios, metricas y control avanzado.
             </div>
           </div>
-          <button className="button secondary" onClick={load}>Recargar</button>
+          <button className="button secondary" onClick={load}>
+            Recargar
+          </button>
         </div>
 
         <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
@@ -139,7 +169,13 @@ export default function DeveloperZone() {
 
       {data && !loading && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
             <div className="card">
               <div style={{ color: "#64748b" }}>Servicio</div>
               <div style={{ fontWeight: 700 }}>{data.service}</div>
@@ -170,7 +206,9 @@ export default function DeveloperZone() {
             <div className="section-title">Usuarios por rol</div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", color: "#334155" }}>
               {Object.entries(data.metrics?.usersByRole || {}).map(([role, count]) => (
-                <div key={role} className="badge">{role}: {count}</div>
+                <div key={role} className="badge">
+                  {role}: {count}
+                </div>
               ))}
             </div>
           </div>
@@ -208,7 +246,8 @@ export default function DeveloperZone() {
           <div className="card" style={{ borderColor: "#fecaca", background: "#fff7f7" }}>
             <div className="section-title">Borrar base de datos</div>
             <div style={{ color: "#991b1b", marginBottom: 10 }}>
-              Elimina todos los datos operativos y todos los usuarios excepto los usuarios con rol DEVELOPER.
+              Elimina todos los datos operativos y todos los usuarios excepto los usuarios con rol
+              DEVELOPER.
             </div>
             <label>
               Confirmacion requerida

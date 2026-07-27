@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+
 import ActionFeedback from "../components/ActionFeedback";
-import { apiGet, apiPost } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { apiGet, apiPost } from "../services/api";
 import { feedbackTitles } from "../utils/feedback";
 
 type SessionItem = {
@@ -22,7 +23,7 @@ type SessionItem = {
 const roleLabels: Record<string, string> = {
   ADMIN: "Administradores",
   TEACHER: "Docentes",
-  PARENT: "Padres"
+  PARENT: "Padres",
 };
 
 export default function SessionsPage() {
@@ -37,27 +38,36 @@ export default function SessionsPage() {
   const getDeviceLabel = (session: SessionItem) => {
     if (session.deviceLabel) return session.deviceLabel;
     const ua = (session.userAgent || "").toLowerCase();
-    const os =
-      ua.includes("windows") ? "Windows" :
-      ua.includes("android") ? "Android" :
-      ua.includes("iphone") ? "iPhone" :
-      ua.includes("ipad") ? "iPad" :
-      ua.includes("mac os x") ? "macOS" :
-      ua.includes("linux") ? "Linux" :
-      "Dispositivo";
-    const browser =
-      ua.includes("edg") ? "Edge" :
-      ua.includes("chrome") && !ua.includes("edg") ? "Chrome" :
-      ua.includes("safari") && !ua.includes("chrome") ? "Safari" :
-      ua.includes("firefox") ? "Firefox" :
-      ua.includes("opera") || ua.includes("opr/") ? "Opera" :
-      "";
+    const os = ua.includes("windows")
+      ? "Windows"
+      : ua.includes("android")
+        ? "Android"
+        : ua.includes("iphone")
+          ? "iPhone"
+          : ua.includes("ipad")
+            ? "iPad"
+            : ua.includes("mac os x")
+              ? "macOS"
+              : ua.includes("linux")
+                ? "Linux"
+                : "Dispositivo";
+    const browser = ua.includes("edg")
+      ? "Edge"
+      : ua.includes("chrome") && !ua.includes("edg")
+        ? "Chrome"
+        : ua.includes("safari") && !ua.includes("chrome")
+          ? "Safari"
+          : ua.includes("firefox")
+            ? "Firefox"
+            : ua.includes("opera") || ua.includes("opr/")
+              ? "Opera"
+              : "";
     return browser ? `${browser} en ${os}` : os;
   };
 
   const getDeviceIcon = (session: SessionItem) => {
     const ua = (session.userAgent || "").toLowerCase();
-    if (ua.includes("iphone") || ua.includes("android") && ua.includes("mobile")) return "📱";
+    if (ua.includes("iphone") || (ua.includes("android") && ua.includes("mobile"))) return "📱";
     if (ua.includes("ipad") || ua.includes("tablet")) return "📲";
     if (ua.includes("android")) return "📱";
     if (ua.includes("mac os x") || ua.includes("windows") || ua.includes("linux")) return "🖥️";

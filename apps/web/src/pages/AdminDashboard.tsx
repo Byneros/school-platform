@@ -1,17 +1,26 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import ActionFeedback from "../components/ActionFeedback";
+import Autocomplete from "../components/Autocomplete";
 import KpiCard from "../components/KpiCard";
 import Section from "../components/Section";
-import Autocomplete from "../components/Autocomplete";
+import useSuggestions from "../hooks/useSuggestions";
 import { apiDelete, apiDownload, apiGet, apiPatch } from "../services/api";
 import { gradeLabel, gradeOptions } from "../services/grades";
-import useSuggestions from "../hooks/useSuggestions";
 import { feedbackTitles } from "../utils/feedback";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [students, setStudents] = useState<Array<{ id: string; fullName: string; gradeLevel: string; studentGroup?: string | null; isActive: boolean }>>([]);
+  const [students, setStudents] = useState<
+    Array<{
+      id: string;
+      fullName: string;
+      gradeLevel: string;
+      studentGroup?: string | null;
+      isActive: boolean;
+    }>
+  >([]);
   const [totalStudents, setTotalStudents] = useState(0);
   const [globalStudents, setGlobalStudents] = useState(0);
   const [usersTotal, setUsersTotal] = useState(0);
@@ -32,7 +41,7 @@ export default function AdminDashboard() {
     fullName: "",
     gradeLevel: "PRE_JARDIN",
     studentGroup: "A",
-    isActive: true
+    isActive: true,
   });
   const preschoolGrades = new Set(["PRE_JARDIN", "JARDIN", "TRANSICION"]);
   const groupOptionsForGrade = (gradeLevel: string) =>
@@ -40,15 +49,19 @@ export default function AdminDashboard() {
 
   const studentSearchOptions = useSuggestions({
     endpoint: "/suggestions?type=students",
-    query: search
+    query: search,
   });
 
-  const query = useMemo(() => new URLSearchParams({
-    page: String(page),
-    pageSize: String(pageSize),
-    search,
-    ...(gradeFilter ? { gradeLevel: gradeFilter } : {})
-  }).toString(), [page, pageSize, search, gradeFilter]);
+  const query = useMemo(
+    () =>
+      new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        search,
+        ...(gradeFilter ? { gradeLevel: gradeFilter } : {}),
+      }).toString(),
+    [page, pageSize, search, gradeFilter]
+  );
 
   useEffect(() => {
     let active = true;
@@ -82,17 +95,19 @@ export default function AdminDashboard() {
       apiGet("/admissions?page=1&pageSize=1&status=PENDING"),
       apiGet("/invoices?page=1&pageSize=1&status=PENDING"),
       apiGet("/notifications?page=1&pageSize=1&status=PENDING"),
-      apiGet("/reports/certificate/requests?page=1&pageSize=1&status=PENDING")
+      apiGet("/reports/certificate/requests?page=1&pageSize=1&status=PENDING"),
     ])
-      .then(([studentsRes, usersRes, admissionsRes, invoicesRes, notificationsRes, certificateRes]) => {
-        if (!active) return;
-        setGlobalStudents(Number(studentsRes?.total || 0));
-        setUsersTotal(Number(usersRes?.total || 0));
-        setPendingAdmissions(Number(admissionsRes?.total || 0));
-        setPendingInvoices(Number(invoicesRes?.total || 0));
-        setPendingNotifications(Number(notificationsRes?.total || 0));
-        setPendingCertificateRequests(Number(certificateRes?.total || 0));
-      })
+      .then(
+        ([studentsRes, usersRes, admissionsRes, invoicesRes, notificationsRes, certificateRes]) => {
+          if (!active) return;
+          setGlobalStudents(Number(studentsRes?.total || 0));
+          setUsersTotal(Number(usersRes?.total || 0));
+          setPendingAdmissions(Number(admissionsRes?.total || 0));
+          setPendingInvoices(Number(invoicesRes?.total || 0));
+          setPendingNotifications(Number(notificationsRes?.total || 0));
+          setPendingCertificateRequests(Number(certificateRes?.total || 0));
+        }
+      )
       .catch(() => undefined);
 
     return () => {
@@ -105,11 +120,12 @@ export default function AdminDashboard() {
   const downloadStudents = async (type: "csv" | "pdf") => {
     const query = new URLSearchParams({
       ...(search ? { search } : {}),
-      ...(gradeFilter ? { gradeLevel: gradeFilter } : {})
+      ...(gradeFilter ? { gradeLevel: gradeFilter } : {}),
     }).toString();
-    const path = type === "csv"
-      ? `/reports/students-excel${query ? `?${query}` : ""}`
-      : `/reports/students-pdf${query ? `?${query}` : ""}`;
+    const path =
+      type === "csv"
+        ? `/reports/students-excel${query ? `?${query}` : ""}`
+        : `/reports/students-pdf${query ? `?${query}` : ""}`;
     const blob = await apiDownload(path);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -121,7 +137,13 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url);
   };
 
-  const startEdit = (student: { id: string; fullName: string; gradeLevel: string; studentGroup?: string | null; isActive: boolean }) => {
+  const startEdit = (student: {
+    id: string;
+    fullName: string;
+    gradeLevel: string;
+    studentGroup?: string | null;
+    isActive: boolean;
+  }) => {
     setEditError("");
     setEditingId(student.id);
     const groups = groupOptionsForGrade(student.gradeLevel);
@@ -129,7 +151,7 @@ export default function AdminDashboard() {
       fullName: student.fullName,
       gradeLevel: student.gradeLevel,
       studentGroup: student.studentGroup || groups[0],
-      isActive: student.isActive
+      isActive: student.isActive,
     });
   };
 
@@ -143,7 +165,7 @@ export default function AdminDashboard() {
         fullName: editForm.fullName,
         gradeLevel: editForm.gradeLevel,
         studentGroup: editForm.studentGroup,
-        isActive: editForm.isActive
+        isActive: editForm.isActive,
       });
       setStudents((prev) => prev.map((s) => (s.id === editingId ? updated : s)));
       setEditingId("");
@@ -155,7 +177,9 @@ export default function AdminDashboard() {
   };
 
   const deleteStudent = async (id: string, fullName: string) => {
-    const confirmed = window.confirm(`Eliminar estudiante ${fullName}? Esta accion no se puede deshacer.`);
+    const confirmed = window.confirm(
+      `Eliminar estudiante ${fullName}? Esta accion no se puede deshacer.`
+    );
     if (!confirmed) return;
     setError("");
     try {
@@ -174,23 +198,52 @@ export default function AdminDashboard() {
         <div className="section-head">
           <div>
             <div className="section-title">Panel Administrador</div>
-            <div style={{ color: "#6b7280" }}>Accesos rapidos a gestion academica, personal y finanzas.</div>
+            <div style={{ color: "#6b7280" }}>
+              Accesos rapidos a gestion academica, personal y finanzas.
+            </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="button secondary" onClick={() => navigate("/admin/alertas")}>Alertas</button>
-            <button className="button secondary" onClick={() => navigate("/admin/admisiones")}>Nueva admision</button>
-            <button className="button" onClick={() => navigate("/admin/usuarios")}>Crear usuario</button>
-            <button className="button secondary" onClick={() => navigate("/admin/notificaciones")}>Notificaciones</button>
-            <button className="button secondary" onClick={() => navigate("/admin/certificados")}>Certificados</button>
-            <button className="button secondary" onClick={() => navigate("/admin/finanzas")}>Finanzas</button>
+            <button className="button secondary" onClick={() => navigate("/admin/alertas")}>
+              Alertas
+            </button>
+            <button className="button secondary" onClick={() => navigate("/admin/admisiones")}>
+              Nueva admision
+            </button>
+            <button className="button" onClick={() => navigate("/admin/usuarios")}>
+              Crear usuario
+            </button>
+            <button className="button secondary" onClick={() => navigate("/admin/notificaciones")}>
+              Notificaciones
+            </button>
+            <button className="button secondary" onClick={() => navigate("/admin/certificados")}>
+              Certificados
+            </button>
+            <button className="button secondary" onClick={() => navigate("/admin/finanzas")}>
+              Finanzas
+            </button>
           </div>
         </div>
       </div>
 
       <div className="grid grid-4">
-        <KpiCard title="Estudiantes registrados" value={String(globalStudents)} trend="Total del sistema" tone="primary" />
-        <KpiCard title="Usuarios" value={String(usersTotal)} trend="Activos e inactivos" tone="success" />
-        <KpiCard title="Admisiones pendientes" value={String(pendingAdmissions)} trend="Por aprobar" tone="warning" />
+        <KpiCard
+          title="Estudiantes registrados"
+          value={String(globalStudents)}
+          trend="Total del sistema"
+          tone="primary"
+        />
+        <KpiCard
+          title="Usuarios"
+          value={String(usersTotal)}
+          trend="Activos e inactivos"
+          tone="success"
+        />
+        <KpiCard
+          title="Admisiones pendientes"
+          value={String(pendingAdmissions)}
+          trend="Por aprobar"
+          tone="warning"
+        />
         <KpiCard
           title="Pendientes (finanzas y avisos)"
           value={String(pendingInvoices + pendingNotifications)}
@@ -231,16 +284,26 @@ export default function AdminDashboard() {
           >
             <option value="">Todos los niveles</option>
             {gradeOptions.map((g) => (
-              <option key={g.value} value={g.value}>{g.label}</option>
+              <option key={g.value} value={g.value}>
+                {g.label}
+              </option>
             ))}
           </select>
           <div style={{ minWidth: 140, alignSelf: "center", color: "#64748b" }}>
             {totalStudents} resultados
           </div>
-          <button className="button secondary" type="button" onClick={() => downloadStudents("pdf")}>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => downloadStudents("pdf")}
+          >
             Exportar PDF
           </button>
-          <button className="button secondary" type="button" onClick={() => downloadStudents("csv")}>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => downloadStudents("csv")}
+          >
             Exportar Excel
           </button>
         </div>
@@ -256,7 +319,11 @@ export default function AdminDashboard() {
             />
             <label>
               Nombre
-              <input className="input" value={editForm.fullName} onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })} />
+              <input
+                className="input"
+                value={editForm.fullName}
+                onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+              />
             </label>
             <label>
               Grado
@@ -270,28 +337,46 @@ export default function AdminDashboard() {
                 }}
               >
                 {gradeOptions.map((g) => (
-                  <option key={g.value} value={g.value}>{g.label}</option>
+                  <option key={g.value} value={g.value}>
+                    {g.label}
+                  </option>
                 ))}
               </select>
             </label>
             <label>
               Grupo
-              <select className="input" value={editForm.studentGroup} onChange={(e) => setEditForm({ ...editForm, studentGroup: e.target.value })}>
+              <select
+                className="input"
+                value={editForm.studentGroup}
+                onChange={(e) => setEditForm({ ...editForm, studentGroup: e.target.value })}
+              >
                 {groupOptionsForGrade(editForm.gradeLevel).map((group) => (
-                  <option key={group} value={group}>{group}</option>
+                  <option key={group} value={group}>
+                    {group}
+                  </option>
                 ))}
               </select>
             </label>
             <label>
               Estado
-              <select className="input" value={editForm.isActive ? "ACTIVE" : "INACTIVE"} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.value === "ACTIVE" })}>
+              <select
+                className="input"
+                value={editForm.isActive ? "ACTIVE" : "INACTIVE"}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, isActive: e.target.value === "ACTIVE" })
+                }
+              >
                 <option value="ACTIVE">Activo</option>
                 <option value="INACTIVE">Inactivo</option>
               </select>
             </label>
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <button className="button" disabled={editBusy}>{editBusy ? "Guardando..." : "Guardar cambios"}</button>
-              <button className="button secondary" type="button" onClick={() => setEditingId("")}>Cancelar</button>
+              <button className="button" disabled={editBusy}>
+                {editBusy ? "Guardando..." : "Guardar cambios"}
+              </button>
+              <button className="button secondary" type="button" onClick={() => setEditingId("")}>
+                Cancelar
+              </button>
             </div>
           </form>
         )}
@@ -309,52 +394,90 @@ export default function AdminDashboard() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={5} className="table-empty">Cargando...</td></tr>
-              )}
-              {!loading && error && (
-                <tr><td colSpan={5} className="table-empty">{error}</td></tr>
-              )}
-              {!loading && !error && students.length === 0 && (
-                <tr><td colSpan={5} className="table-empty">Sin datos</td></tr>
-              )}
-              {!loading && !error && students.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.fullName}</td>
-                  <td>{gradeLabel(s.gradeLevel)}</td>
-                  <td>{s.studentGroup || "-"}</td>
-                  <td>
-                    <span className={`status-badge ${s.isActive ? "status-active" : "status-inactive"}`}>
-                      {s.isActive ? "ACTIVE" : "INACTIVE"}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "stretch" }}>
-                      <button className="button secondary" type="button" onClick={() => startEdit(s)}>
-                        Editar
-                      </button>
-                      <button className="button danger" type="button" onClick={() => deleteStudent(s.id, s.fullName)}>
-                        Eliminar
-                      </button>
-                    </div>
+                <tr>
+                  <td colSpan={5} className="table-empty">
+                    Cargando...
                   </td>
                 </tr>
-              ))}
+              )}
+              {!loading && error && (
+                <tr>
+                  <td colSpan={5} className="table-empty">
+                    {error}
+                  </td>
+                </tr>
+              )}
+              {!loading && !error && students.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="table-empty">
+                    Sin datos
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                !error &&
+                students.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.fullName}</td>
+                    <td>{gradeLabel(s.gradeLevel)}</td>
+                    <td>{s.studentGroup || "-"}</td>
+                    <td>
+                      <span
+                        className={`status-badge ${s.isActive ? "status-active" : "status-inactive"}`}
+                      >
+                        {s.isActive ? "ACTIVE" : "INACTIVE"}
+                      </span>
+                    </td>
+                    <td>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                          alignItems: "stretch",
+                        }}
+                      >
+                        <button
+                          className="button secondary"
+                          type="button"
+                          onClick={() => startEdit(s)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="button danger"
+                          type="button"
+                          onClick={() => deleteStudent(s.id, s.fullName)}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-          <button className="button secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+          <button
+            className="button secondary"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
             Anterior
           </button>
           <div style={{ alignSelf: "center", color: "#64748b" }}>
             Pagina {page} de {totalPages}
           </div>
-          <button className="button secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+          <button
+            className="button secondary"
+            disabled={page >= totalPages}
+            onClick={() => setPage(page + 1)}
+          >
             Siguiente
           </button>
         </div>
       </Section>
-
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import Section from "../components/Section";
-import DataTable from "../components/DataTable";
+
 import ActionFeedback from "../components/ActionFeedback";
-import { apiDownload, apiGet, apiPost } from "../services/api";
+import DataTable from "../components/DataTable";
+import Section from "../components/Section";
 import { useAuth } from "../context/AuthContext";
+import { apiDownload, apiGet, apiPost } from "../services/api";
 import { feedbackTitles } from "../utils/feedback";
 
 function toLocalDateInputValue(date: Date) {
@@ -22,23 +23,90 @@ function normalizeGradeKey(value: string) {
 }
 
 function normalizeGroupKey(value: string) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
 function parseGradeGroupEntry(entry: string) {
-  const raw = String(entry || "").trim().toUpperCase();
-  const [grade, ...rest] = raw.split("-").map((p) => p.trim()).filter(Boolean);
+  const raw = String(entry || "")
+    .trim()
+    .toUpperCase();
+  const [grade, ...rest] = raw
+    .split("-")
+    .map((p) => p.trim())
+    .filter(Boolean);
   return {
     grade: grade || "",
-    group: rest.join("-") || ""
+    group: rest.join("-") || "",
   };
 }
 
-function getClassGradeLevel(classData: any) {
+function getClassGradeLevel(classData?: Partial<ClassSummary> | null) {
   return String(classData?.gradeLevel || "").trim();
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Ha ocurrido un error.";
+}
+
 type RegisterAttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "EXCUSED";
+
+interface TeacherSummary {
+  teacherId: string;
+  teacherName: string;
+}
+
+interface StudentSummary {
+  id: string;
+  fullName: string;
+  studentGroup?: string;
+}
+
+interface ClassSummary {
+  id: string;
+  name?: string;
+  gradeLevel: string;
+}
+
+interface EnrollmentSummary {
+  id: string;
+  student: StudentSummary;
+  class: ClassSummary;
+}
+
+interface AttendanceRecord {
+  enrollmentId: string;
+  status: RegisterAttendanceStatus;
+}
+
+interface AttendanceHistoryRecord {
+  date?: string;
+  status: RegisterAttendanceStatus;
+  teacherName?: string;
+
+  enrollment?: {
+    student?: {
+      fullName?: string;
+      studentGroup?: string;
+    };
+
+    class?: {
+      gradeLevel?: string;
+
+      teacher?: {
+        user?: {
+          fullName?: string;
+        };
+      };
+    };
+  };
+}
+
 const GRADE_ORDER: Record<string, number> = {
   PRE_JARDIN: 1,
   JARDIN: 2,
@@ -53,7 +121,7 @@ const GRADE_ORDER: Record<string, number> = {
   OCTAVO: 11,
   NOVENO: 12,
   DECIMO: 13,
-  ONCE: 14
+  ONCE: 14,
 };
 
 function sortGradesAcademic(values: string[]) {
@@ -68,8 +136,8 @@ function sortGradesAcademic(values: string[]) {
 export default function TeacherAttendance() {
   const { user } = useAuth();
   const isAdminView = user?.role === "ADMIN";
-  const [enrollments, setEnrollments] = useState<Array<any>>([]);
-  const [attendance, setAttendance] = useState<Array<any>>([]);
+  const [enrollments, setEnrollments] = useState<EnrollmentSummary[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceHistoryRecord[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState("");
@@ -80,13 +148,17 @@ export default function TeacherAttendance() {
   const [historyTeacherFilter, setHistoryTeacherFilter] = useState("");
   const [adminGroupOptions, setAdminGroupOptions] = useState<string[]>([]);
   const [teachers, setTeachers] = useState<Array<{ id: string; fullName: string }>>([]);
-  const [gradeCatalog, setGradeCatalog] = useState<Array<{ id: string; name: string; gradeLevel: string }>>([]);
+  const [gradeCatalog, setGradeCatalog] = useState<
+    Array<{ id: string; name: string; gradeLevel: string }>
+  >([]);
   const [consultGradeFilter, setConsultGradeFilter] = useState("");
   const [consultGroupFilter, setConsultGroupFilter] = useState("");
   const [registerGradeFilter, setRegisterGradeFilter] = useState("");
   const [registerGroupFilter, setRegisterGroupFilter] = useState("");
-  const [registerDate, setRegisterDate] = useState(() => toLocalDateInputValue(new Date()));
-  const [registerStatuses, setRegisterStatuses] = useState<Record<string, RegisterAttendanceStatus>>({});
+  const [registerDate] = useState(() => toLocalDateInputValue(new Date()));
+  const [registerStatuses, setRegisterStatuses] = useState<
+    Record<string, RegisterAttendanceStatus>
+  >({});
   const [saveBusy, setSaveBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportPdfBusy, setExportPdfBusy] = useState(false);
@@ -95,9 +167,13 @@ export default function TeacherAttendance() {
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [todayWindows, setTodayWindows] = useState<{ dayOfWeek: string; grades: string[]; gradeGroups?: string[] }>({
+  const [todayWindows, setTodayWindows] = useState<{
+    dayOfWeek: string;
+    grades: string[];
+    gradeGroups?: string[];
+  }>({
     dayOfWeek: "",
-    grades: []
+    grades: [],
   });
 
   useEffect(() => {
@@ -110,14 +186,14 @@ export default function TeacherAttendance() {
   const registerCutoff = new Date(todayDate);
   registerCutoff.setHours(23, 59, 59, 999);
   const isRegisterWindowOpen = nowMs <= registerCutoff.getTime() && registerDate === todayString;
-
-  useEffect(() => {
-    if (registerDate !== todayString) {
-      setRegisterDate(todayString);
-      setRegisterStatuses({});
-    }
-  }, [todayString, registerDate]);
-
+  /*
+    useEffect(() => {
+      if (registerDate !== todayString) {
+        setRegisterDate(todayString);
+        setRegisterStatuses({});
+      }
+    }, [todayString, registerDate]);
+  */
   const loadBase = () => {
     if (isAdminView) {
       apiGet("/teacher/admin-subject-hours")
@@ -125,9 +201,9 @@ export default function TeacherAttendance() {
           const data = Array.isArray(res) ? res : [];
           setTeachers(
             data
-              .map((t: any) => ({
+              .map((t: TeacherSummary) => ({
                 id: String(t.teacherId || ""),
-                fullName: String(t.teacherName || "")
+                fullName: String(t.teacherName || ""),
               }))
               .filter((t) => t.id && t.fullName)
           );
@@ -137,14 +213,14 @@ export default function TeacherAttendance() {
         .then((res) => {
           const list = Array.isArray(res) ? res : [];
           const unique = new Map<string, { id: string; name: string; gradeLevel: string }>();
-          list.forEach((c: any) => {
+          list.forEach((c: ClassSummary) => {
             const gradeLevel = getClassGradeLevel(c);
             if (!gradeLevel) return;
             const id = `grade:${gradeLevel}`;
             unique.set(id, {
               id,
               name: gradeLevel,
-              gradeLevel
+              gradeLevel,
             });
           });
           setGradeCatalog(Array.from(unique.values()));
@@ -152,11 +228,17 @@ export default function TeacherAttendance() {
         .catch(() => setGradeCatalog([]));
       apiGet("/enrollments?page=0&pageSize=1")
         .then((res) => {
-          const list = Array.isArray(res?.data) ? (res.data as any[]) : Array.isArray(res) ? (res as any[]) : [];
+          const list: EnrollmentSummary[] = Array.isArray(res?.data)
+            ? (res.data as EnrollmentSummary[])
+            : Array.isArray(res)
+              ? (res as EnrollmentSummary[])
+              : [];
           const groups = Array.from(
             new Set<string>(
               list
-                .map((item: any) => normalizeGroupKey(String(item?.student?.studentGroup || "")))
+                .map((item: EnrollmentSummary) =>
+                  normalizeGroupKey(String(item?.student?.studentGroup || ""))
+                )
                 .filter((value): value is string => Boolean(value))
             )
           ).sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
@@ -165,20 +247,22 @@ export default function TeacherAttendance() {
         .catch(() => setAdminGroupOptions([]));
       return;
     }
-    apiGet("/teacher/attendance/windows").then((res) => setTodayWindows(res)).catch(() => undefined);
+    apiGet("/teacher/attendance/windows")
+      .then((res) => setTodayWindows(res))
+      .catch(() => undefined);
     apiGet("/teacher/enrollments?today=1")
       .then((res) => {
         const list = res || [];
         setEnrollments(list);
         const unique = new Map<string, { id: string; name: string; gradeLevel: string }>();
-        list.forEach((e: any) => {
+        list.forEach((e: EnrollmentSummary) => {
           const gradeLevel = getClassGradeLevel(e.class);
           if (!gradeLevel) return;
           const id = `grade:${gradeLevel}`;
           unique.set(id, {
             id,
             name: gradeLevel,
-            gradeLevel
+            gradeLevel,
           });
         });
         setGradeCatalog(Array.from(unique.values()));
@@ -203,12 +287,28 @@ export default function TeacherAttendance() {
 
   useEffect(() => {
     loadHistory();
-  }, [page, statusFilter, historyStudentFilter, historyGradeFilter, historyGroupFilter, historyDateFilter, historyTeacherFilter, isAdminView]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [statusFilter, historyStudentFilter, historyGradeFilter, historyGroupFilter, historyDateFilter, historyTeacherFilter]);
-
+  }, [
+    page,
+    statusFilter,
+    historyStudentFilter,
+    historyGradeFilter,
+    historyGroupFilter,
+    historyDateFilter,
+    historyTeacherFilter,
+    isAdminView,
+  ]);
+  /*
+    useEffect(() => {
+      setPage(1);
+    }, [
+      statusFilter,
+      historyStudentFilter,
+      historyGradeFilter,
+      historyGroupFilter,
+      historyDateFilter,
+      historyTeacherFilter,
+    ]);
+  */
   const isSunday = normalizeGradeKey(todayWindows.dayOfWeek) === "DOMINGO";
   const hasTodayWindows =
     enrollments.length > 0 ||
@@ -236,7 +336,11 @@ export default function TeacherAttendance() {
     const pairs = (todayWindows.gradeGroups || []).map(parseGradeGroupEntry);
     const groups = pairs
       .filter((pair) => pair.group)
-      .filter((pair) => !consultGradeFilter || normalizeGradeKey(pair.grade) === normalizeGradeKey(consultGradeFilter))
+      .filter(
+        (pair) =>
+          !consultGradeFilter ||
+          normalizeGradeKey(pair.grade) === normalizeGradeKey(consultGradeFilter)
+      )
       .map((pair) => normalizeGroupKey(pair.group))
       .filter(Boolean);
     return Array.from(new Set(groups)).sort();
@@ -245,7 +349,11 @@ export default function TeacherAttendance() {
     const pairs = (todayWindows.gradeGroups || []).map(parseGradeGroupEntry);
     const groups = pairs
       .filter((pair) => pair.group)
-      .filter((pair) => !historyGradeFilter || normalizeGradeKey(pair.grade) === normalizeGradeKey(historyGradeFilter))
+      .filter(
+        (pair) =>
+          !historyGradeFilter ||
+          normalizeGradeKey(pair.grade) === normalizeGradeKey(historyGradeFilter)
+      )
       .map((pair) => normalizeGroupKey(pair.group))
       .filter(Boolean);
     return Array.from(new Set(groups)).sort();
@@ -256,7 +364,8 @@ export default function TeacherAttendance() {
         (e) =>
           (!registerGradeFilter || getClassGradeLevel(e.class) === registerGradeFilter) &&
           (!registerGroupFilter ||
-            normalizeGroupKey(String(e.student?.studentGroup || "")) === normalizeGroupKey(registerGroupFilter))
+            normalizeGroupKey(String(e.student?.studentGroup || "")) ===
+              normalizeGroupKey(registerGroupFilter))
       ),
     [enrollments, registerGradeFilter, registerGroupFilter]
   );
@@ -264,7 +373,11 @@ export default function TeacherAttendance() {
     const pairs = (todayWindows.gradeGroups || []).map(parseGradeGroupEntry);
     const groups = pairs
       .filter((pair) => pair.group)
-      .filter((pair) => !registerGradeFilter || normalizeGradeKey(pair.grade) === normalizeGradeKey(registerGradeFilter))
+      .filter(
+        (pair) =>
+          !registerGradeFilter ||
+          normalizeGradeKey(pair.grade) === normalizeGradeKey(registerGradeFilter)
+      )
       .map((pair) => normalizeGroupKey(pair.group))
       .filter(Boolean);
     return Array.from(new Set(groups)).sort();
@@ -273,18 +386,22 @@ export default function TeacherAttendance() {
     () =>
       filteredTodayCourses.map((course) => {
         const students = enrollments
-          .filter((e) => normalizeGradeKey(getClassGradeLevel(e.class)) === normalizeGradeKey(course.gradeLevel))
+          .filter(
+            (e) =>
+              normalizeGradeKey(getClassGradeLevel(e.class)) ===
+              normalizeGradeKey(course.gradeLevel)
+          )
           .map((e) => ({
             enrollmentId: String(e.id || ""),
             fullName: String(e.student?.fullName || ""),
             gradeLevel: getClassGradeLevel(e.class),
-            group: String(e.student?.studentGroup || "")
+            group: String(e.student?.studentGroup || ""),
           }))
           .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
         return {
           ...course,
-          students
+          students,
         };
       }),
     [filteredTodayCourses, enrollments]
@@ -294,9 +411,11 @@ export default function TeacherAttendance() {
       ...course,
       students: consultGroupFilter
         ? course.students.filter(
-            (student) => normalizeGroupKey(String(student.group || "")) === normalizeGroupKey(consultGroupFilter)
+            (student) =>
+              normalizeGroupKey(String(student.group || "")) ===
+              normalizeGroupKey(consultGroupFilter)
           )
-        : course.students
+        : course.students,
     }));
     return consultGroupFilter ? list.filter((course) => course.students.length > 0) : list;
   }, [todayCourseStudents, consultGroupFilter]);
@@ -309,7 +428,7 @@ export default function TeacherAttendance() {
             fullName: student.fullName,
             gradeLevel: student.gradeLevel,
             group: student.group,
-            gradeName: course.name
+            gradeName: course.name,
           }))
         )
         .sort((a, b) => a.fullName.localeCompare(b.fullName)),
@@ -317,24 +436,34 @@ export default function TeacherAttendance() {
   );
 
   useEffect(() => {
+    /*
     if (registerGradeFilter && !validTodayGrades.includes(registerGradeFilter)) {
       setRegisterGradeFilter("");
       setRegisterGroupFilter("");
       setRegisterStatuses({});
     }
-    if (registerGroupFilter && !validRegisterGroups.includes(registerGroupFilter)) {
-      setRegisterGroupFilter("");
-      setRegisterStatuses({});
-    }
+    */
+    /*
+     if (registerGroupFilter && !validRegisterGroups.includes(registerGroupFilter)) {
+       setRegisterGroupFilter("");
+       setRegisterStatuses({});
+     }
+     */
+    /*
     if (consultGradeFilter && !validTodayGrades.includes(consultGradeFilter)) {
       setConsultGradeFilter("");
     }
-    if (consultGroupFilter && !validTodayGroups.includes(consultGroupFilter)) {
-      setConsultGroupFilter("");
-    }
+    */
+    /*
+     if (consultGroupFilter && !validTodayGroups.includes(consultGroupFilter)) {
+       setConsultGroupFilter("");
+     }
+       */
+    /*
     if (historyGroupFilter && !historyValidGroups.includes(historyGroupFilter)) {
       setHistoryGroupFilter("");
     }
+      */
   }, [
     validTodayGrades,
     registerGradeFilter,
@@ -344,12 +473,11 @@ export default function TeacherAttendance() {
     consultGroupFilter,
     validTodayGroups,
     historyGroupFilter,
-    historyValidGroups
+    historyValidGroups,
   ]);
 
   useEffect(() => {
     if (!registerDate) {
-      setRegisterStatuses({});
       return;
     }
 
@@ -364,11 +492,16 @@ export default function TeacherAttendance() {
       .then((res) => {
         const records = res?.data || [];
         const nextStatuses = { ...initial };
-        records.forEach((r: any) => {
+        records.forEach((r: AttendanceRecord) => {
           const enrollmentId = String(r.enrollmentId || "");
           if (!enrollmentId || nextStatuses[enrollmentId] === undefined) return;
           const status = String(r.status || "") as RegisterAttendanceStatus;
-          if (status === "PRESENT" || status === "ABSENT" || status === "LATE" || status === "EXCUSED") {
+          if (
+            status === "PRESENT" ||
+            status === "ABSENT" ||
+            status === "LATE" ||
+            status === "EXCUSED"
+          ) {
             nextStatuses[enrollmentId] = status;
           }
         });
@@ -377,7 +510,9 @@ export default function TeacherAttendance() {
       .catch(() => setRegisterStatuses(initial));
   }, [registerGradeFilter, registerGroupFilter, registerDate, registerEnrollments]);
 
-  const checkedCount = registerEnrollments.filter((e) => registerStatuses[e.id] !== "ABSENT").length;
+  const checkedCount = registerEnrollments.filter(
+    (e) => registerStatuses[e.id] !== "ABSENT"
+  ).length;
 
   const setAllStatus = (status: RegisterAttendanceStatus) => {
     const next: Record<string, RegisterAttendanceStatus> = {};
@@ -404,7 +539,7 @@ export default function TeacherAttendance() {
         return {
           enrollmentId: enrollment.id,
           date: dateIso,
-          status: (registerStatuses[enrollment.id] || "PRESENT") as RegisterAttendanceStatus
+          status: (registerStatuses[enrollment.id] || "PRESENT") as RegisterAttendanceStatus,
         };
       });
 
@@ -417,8 +552,8 @@ export default function TeacherAttendance() {
         setSaveMessage("Asistencia guardada correctamente.");
       }
       loadHistory();
-    } catch (error: any) {
-      setSaveError(error?.message || "No fue posible registrar la asistencia del grado");
+    } catch (error: unknown) {
+      setSaveError(getErrorMessage(error));
     } finally {
       setSaveBusy(false);
     }
@@ -434,7 +569,9 @@ export default function TeacherAttendance() {
         historyGradeFilter ? `gradeLevel=${encodeURIComponent(historyGradeFilter)}` : "",
         historyGroupFilter ? `group=${encodeURIComponent(historyGroupFilter)}` : "",
         historyDateFilter ? `date=${encodeURIComponent(historyDateFilter)}` : "",
-        isAdminView && historyTeacherFilter ? `teacherId=${encodeURIComponent(historyTeacherFilter)}` : ""
+        isAdminView && historyTeacherFilter
+          ? `teacherId=${encodeURIComponent(historyTeacherFilter)}`
+          : "",
       ]
         .filter(Boolean)
         .join("&")}`;
@@ -447,8 +584,8 @@ export default function TeacherAttendance() {
       anchor.click();
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
-    } catch (error: any) {
-      setSaveError(error?.message || "No fue posible exportar la asistencia");
+    } catch (error: unknown) {
+      setSaveError(getErrorMessage(error));
     } finally {
       setExportBusy(false);
     }
@@ -464,7 +601,9 @@ export default function TeacherAttendance() {
         historyGradeFilter ? `gradeLevel=${encodeURIComponent(historyGradeFilter)}` : "",
         historyGroupFilter ? `group=${encodeURIComponent(historyGroupFilter)}` : "",
         historyDateFilter ? `date=${encodeURIComponent(historyDateFilter)}` : "",
-        isAdminView && historyTeacherFilter ? `teacherId=${encodeURIComponent(historyTeacherFilter)}` : ""
+        isAdminView && historyTeacherFilter
+          ? `teacherId=${encodeURIComponent(historyTeacherFilter)}`
+          : "",
       ]
         .filter(Boolean)
         .join("&")}`;
@@ -477,8 +616,8 @@ export default function TeacherAttendance() {
       anchor.click();
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
-    } catch (error: any) {
-      setSaveError(error?.message || "No fue posible exportar la asistencia en PDF");
+    } catch (error: unknown) {
+      setSaveError(getErrorMessage(error));
     } finally {
       setExportPdfBusy(false);
     }
@@ -496,8 +635,8 @@ export default function TeacherAttendance() {
       anchor.click();
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
-    } catch (error: any) {
-      setSaveError(error?.message || "No fue posible exportar el reporte por grado en Excel");
+    } catch (error: unknown) {
+      setSaveError(getErrorMessage(error));
     } finally {
       setExportGradeDatesBusy(false);
     }
@@ -515,8 +654,8 @@ export default function TeacherAttendance() {
       anchor.click();
       document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
-    } catch (error: any) {
-      setSaveError(error?.message || "No fue posible exportar el reporte por grado en PDF");
+    } catch (error: unknown) {
+      setSaveError(getErrorMessage(error));
     } finally {
       setExportGradeDatesPdfBusy(false);
     }
@@ -534,305 +673,370 @@ export default function TeacherAttendance() {
             {todayWindows.gradeGroups && todayWindows.gradeGroups.length > 0
               ? todayWindows.gradeGroups.join(", ")
               : isSunday
-              ? "No aplica los domingos"
-              : "No tienes franjas registradas para hoy"}
+                ? "No aplica los domingos"
+                : "No tienes franjas registradas para hoy"}
           </div>
         )}
         {!isAdminView && !isSunday && !hasTodayWindows && (
           <div style={{ marginTop: 8, color: "#b45309", fontWeight: 600 }}>
-            No tienes franja horaria asignada para hoy. Solicita al administrador la asignacion en Horas docentes.
+            No tienes franja horaria asignada para hoy. Solicita al administrador la asignacion en
+            Horas docentes.
           </div>
         )}
       </div>
-      {!isAdminView && <div className="card">
-        <div className="section-title">Grados y alumnos de la franja de hoy</div>
-        {isSunday ? (
-          <div style={{ color: "#64748b", fontWeight: 600 }}>
-            Hoy es domingo. La consulta y el registro de asistencia no estan disponibles.
-          </div>
-        ) : !isRegisterWindowOpen ? (
-          <div style={{ color: "#b91c1c", fontWeight: 600 }}>
-            El listado de franja del dia solo se visualiza hasta las 11:59 PM.
-          </div>
-        ) : (
-          <>
-            <div style={{ marginBottom: 8 }}>
-              <label>
-                Consultar por grado
-                <select className="input" value={consultGradeFilter} onChange={(e) => setConsultGradeFilter(e.target.value)}>
-                  <option value="">Todos los grados habilitados hoy</option>
-                  {validTodayGrades.map((grade) => (
-                    <option key={grade} value={grade}>{grade}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Consultar por grupo
-                <select className="input" value={consultGroupFilter} onChange={(e) => setConsultGroupFilter(e.target.value)}>
-                  <option value="">Todos los grupos habilitados hoy</option>
-                  {validTodayGroups.map((group) => (
-                    <option key={group} value={group}>{group}</option>
-                  ))}
-                </select>
-              </label>
+      {!isAdminView && (
+        <div className="card">
+          <div className="section-title">Grados y alumnos de la franja de hoy</div>
+          {isSunday ? (
+            <div style={{ color: "#64748b", fontWeight: 600 }}>
+              Hoy es domingo. La consulta y el registro de asistencia no estan disponibles.
             </div>
-            {visibleTodayCourseStudents.length === 0 ? (
-              <div style={{ color: "#64748b" }}>No hay grados habilitados para la franja del dia de hoy.</div>
-            ) : (
-              <div style={{ display: "grid", gap: 10 }}>
-                {visibleTodayCourseStudents.map((course) => (
-                  <div key={course.id} style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 10 }}>
-                    <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                      {course.name} ({course.gradeLevel}) - {course.students.length} alumnos
-                    </div>
-                    {course.students.length === 0 ? (
-                      <div style={{ color: "#64748b" }}>Sin alumnos matriculados en este grado.</div>
-                    ) : (
-                      <div className="table-wrap">
-                        <table className="table">
-                          <thead>
-                            <tr>
-                              <th>Alumno</th>
-                              <th>Grado</th>
-                              <th>Grupo</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {course.students.map((s) => (
-                              <tr key={s.enrollmentId}>
-                                <td>{s.fullName}</td>
-                                <td>{s.gradeLevel}</td>
-                                <td>{s.group || "-"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                ))}
+          ) : !isRegisterWindowOpen ? (
+            <div style={{ color: "#b91c1c", fontWeight: 600 }}>
+              El listado de franja del dia solo se visualiza hasta las 11:59 PM.
+            </div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 8 }}>
+                <label>
+                  Consultar por grado
+                  <select
+                    className="input"
+                    value={consultGradeFilter}
+                    onChange={(e) => {
+                      setConsultGradeFilter(e.target.value);
+                      setConsultGroupFilter("");
+                    }}
+                  >
+                    <option value="">Todos los grados habilitados hoy</option>
+                    {validTodayGrades.map((grade) => (
+                      <option key={grade} value={grade}>
+                        {grade}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Consultar por grupo
+                  <select
+                    className="input"
+                    value={consultGroupFilter}
+                    onChange={(e) => {
+                      setConsultGroupFilter(e.target.value);
+                    }}
+                  >
+                    <option value="">Todos los grupos habilitados hoy</option>
+                    {validTodayGroups.map((group) => (
+                      <option key={group} value={group}>
+                        {group}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
-            )}
-            {(consultGradeFilter || consultGroupFilter) && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                  Listado de alumnos filtrado
+              {visibleTodayCourseStudents.length === 0 ? (
+                <div style={{ color: "#64748b" }}>
+                  No hay grados habilitados para la franja del dia de hoy.
                 </div>
-                {studentsBySelectedFilters.length === 0 ? (
-                  <div style={{ color: "#64748b" }}>No hay alumnos para ese grado y grupo en la franja de hoy.</div>
-                ) : (
-                  <div className="table-wrap">
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Alumno</th>
-                          <th>Grado</th>
-                          <th>Grupo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {studentsBySelectedFilters.map((student) => (
-                          <tr key={student.enrollmentId}>
-                            <td>{student.fullName}</td>
-                            <td>{student.gradeLevel}</td>
-                            <td>{student.group || "-"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </div>}
-
-      {!isAdminView && <form className="card" onSubmit={saveCourseAttendance}>
-        <div className="section-title">Registro de asistencia por grado y grupo (checkbox)</div>
-        <ActionFeedback
-          tone="success"
-          title={feedbackTitles.teacherAttendance.success}
-          message={saveMessage}
-          onDismiss={() => setSaveMessage("")}
-          style={{ marginBottom: 10 }}
-        />
-        <ActionFeedback
-          tone="error"
-          title={feedbackTitles.teacherAttendance.error}
-          message={saveError}
-          onDismiss={() => setSaveError("")}
-          style={{ marginBottom: 10 }}
-        />
-        {isSunday && (
-          <div style={{ marginBottom: 10, color: "#64748b", fontWeight: 600 }}>
-            Registro no disponible en domingo.
-          </div>
-        )}
-
-        <label>
-          Grado (franja valida de hoy)
-          <select
-            className="input"
-            value={registerGradeFilter}
-            onChange={(e) => {
-              setRegisterGradeFilter(e.target.value);
-              setRegisterGroupFilter("");
-              setRegisterStatuses({});
-            }}
-            disabled={validTodayGrades.length === 0}
-          >
-            <option value="">Todos los grados habilitados hoy</option>
-            {validTodayGrades.map((grade) => (
-              <option key={grade} value={grade}>{grade}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Grupo (franja valida de hoy)
-          <select
-            className="input"
-            value={registerGroupFilter}
-            onChange={(e) => {
-              setRegisterGroupFilter(e.target.value);
-              setRegisterStatuses({});
-            }}
-            disabled={validRegisterGroups.length === 0}
-          >
-            <option value="">Todos los grupos habilitados hoy</option>
-            {validRegisterGroups.map((group) => (
-              <option key={group} value={group}>{group}</option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Fecha (solo hoy)
-          <input className="input" type="date" value={registerDate} disabled />
-        </label>
-
-        {!isRegisterWindowOpen && (
-          <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 600 }}>
-            Registro cerrado para hoy. Este formulario solo esta disponible hasta las 11:59 PM del mismo dia.
-          </div>
-        )}
-
-        {registerDate && registerEnrollments.length > 0 && (
-          <div style={{ marginTop: 10 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-              <button type="button" className="button secondary" onClick={() => setAllStatus("PRESENT")}>
-                Todos presente
-              </button>
-              <button type="button" className="button secondary" onClick={() => setAllStatus("ABSENT")}>
-                Todos ausente
-              </button>
-              <button type="button" className="button secondary" onClick={() => setAllStatus("LATE")}>
-                Todos tarde
-              </button>
-              <button type="button" className="button secondary" onClick={() => setAllStatus("EXCUSED")}>
-                Todos justificado
-              </button>
-              <div style={{ color: "#475569" }}>
-                Asistencia (no ausente): {checkedCount} / {registerEnrollments.length}
-              </div>
-            </div>
-
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Estudiante</th>
-                    <th>Grado</th>
-                    <th>Grupo</th>
-                    <th>Presente</th>
-                    <th>Ausente</th>
-                    <th>Tarde</th>
-                    <th>Justificado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {registerEnrollments.map((enrollment) => (
-                    <tr key={enrollment.id}>
-                      <td>{enrollment.student?.fullName || ""}</td>
-                      <td>{getClassGradeLevel(enrollment.class) || "-"}</td>
-                      <td>{String(enrollment.student?.studentGroup || "-")}</td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={(registerStatuses[enrollment.id] || "PRESENT") === "PRESENT"}
-                          onChange={() =>
-                            setRegisterStatuses((prev) => ({
-                              ...prev,
-                              [enrollment.id]: "PRESENT"
-                            }))
-                          }
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={(registerStatuses[enrollment.id] || "PRESENT") === "ABSENT"}
-                          onChange={() =>
-                            setRegisterStatuses((prev) => ({
-                              ...prev,
-                              [enrollment.id]: "ABSENT"
-                            }))
-                          }
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={(registerStatuses[enrollment.id] || "PRESENT") === "LATE"}
-                          onChange={() =>
-                            setRegisterStatuses((prev) => ({
-                              ...prev,
-                              [enrollment.id]: "LATE"
-                            }))
-                          }
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={(registerStatuses[enrollment.id] || "PRESENT") === "EXCUSED"}
-                          onChange={() =>
-                            setRegisterStatuses((prev) => ({
-                              ...prev,
-                              [enrollment.id]: "EXCUSED"
-                            }))
-                          }
-                        />
-                      </td>
-                    </tr>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {visibleTodayCourseStudents.map((course) => (
+                    <div
+                      key={course.id}
+                      style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 10 }}
+                    >
+                      <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                        {course.name} ({course.gradeLevel}) - {course.students.length} alumnos
+                      </div>
+                      {course.students.length === 0 ? (
+                        <div style={{ color: "#64748b" }}>
+                          Sin alumnos matriculados en este grado.
+                        </div>
+                      ) : (
+                        <div className="table-wrap">
+                          <table className="table">
+                            <thead>
+                              <tr>
+                                <th>Alumno</th>
+                                <th>Grado</th>
+                                <th>Grupo</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {course.students.map((s) => (
+                                <tr key={s.enrollmentId}>
+                                  <td>{s.fullName}</td>
+                                  <td>{s.gradeLevel}</td>
+                                  <td>{s.group || "-"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
+              {(consultGradeFilter || consultGroupFilter) && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                    Listado de alumnos filtrado
+                  </div>
+                  {studentsBySelectedFilters.length === 0 ? (
+                    <div style={{ color: "#64748b" }}>
+                      No hay alumnos para ese grado y grupo en la franja de hoy.
+                    </div>
+                  ) : (
+                    <div className="table-wrap">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Alumno</th>
+                            <th>Grado</th>
+                            <th>Grupo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {studentsBySelectedFilters.map((student) => (
+                            <tr key={student.enrollmentId}>
+                              <td>{student.fullName}</td>
+                              <td>{student.gradeLevel}</td>
+                              <td>{student.group || "-"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {!isAdminView && (
+        <form className="card" onSubmit={saveCourseAttendance}>
+          <div className="section-title">Registro de asistencia por grado y grupo (checkbox)</div>
+          <ActionFeedback
+            tone="success"
+            title={feedbackTitles.teacherAttendance.success}
+            message={saveMessage}
+            onDismiss={() => setSaveMessage("")}
+            style={{ marginBottom: 10 }}
+          />
+          <ActionFeedback
+            tone="error"
+            title={feedbackTitles.teacherAttendance.error}
+            message={saveError}
+            onDismiss={() => setSaveError("")}
+            style={{ marginBottom: 10 }}
+          />
+          {isSunday && (
+            <div style={{ marginBottom: 10, color: "#64748b", fontWeight: 600 }}>
+              Registro no disponible en domingo.
             </div>
-          </div>
-        )}
+          )}
 
-        {registerDate && registerEnrollments.length === 0 && (
-          <div style={{ marginTop: 10, color: "#b45309" }}>
-            No hay estudiantes matriculados para los filtros seleccionados en la franja valida de hoy.
-          </div>
-        )}
+          <label>
+            Grado (franja valida de hoy)
+            <select
+              className="input"
+              value={registerGradeFilter}
+              onChange={(e) => {
+                setRegisterGradeFilter(e.target.value);
+                setRegisterGroupFilter("");
+                setRegisterStatuses({});
+              }}
+              disabled={validTodayGrades.length === 0}
+            >
+              <option value="">Todos los grados habilitados hoy</option>
+              {validTodayGrades.map((grade) => (
+                <option key={grade} value={grade}>
+                  {grade}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Grupo (franja valida de hoy)
+            <select
+              className="input"
+              value={registerGroupFilter}
+              onChange={(e) => {
+                setRegisterGroupFilter(e.target.value);
+                setRegisterStatuses({});
+              }}
+              disabled={validRegisterGroups.length === 0}
+            >
+              <option value="">Todos los grupos habilitados hoy</option>
+              {validRegisterGroups.map((group) => (
+                <option key={group} value={group}>
+                  {group}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <button
-          className="button"
-          style={{ marginTop: 10 }}
-          disabled={isSunday || !isRegisterWindowOpen || !registerDate || registerEnrollments.length === 0 || saveBusy}
-        >
-          {saveBusy ? "Guardando..." : "Guardar asistencia"}
-        </button>
-      </form>}
+          <label>
+            Fecha (solo hoy)
+            <input className="input" type="date" value={registerDate} disabled />
+          </label>
+
+          {!isRegisterWindowOpen && (
+            <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 600 }}>
+              Registro cerrado para hoy. Este formulario solo esta disponible hasta las 11:59 PM del
+              mismo dia.
+            </div>
+          )}
+
+          {registerDate && registerEnrollments.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => setAllStatus("PRESENT")}
+                >
+                  Todos presente
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => setAllStatus("ABSENT")}
+                >
+                  Todos ausente
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => setAllStatus("LATE")}
+                >
+                  Todos tarde
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => setAllStatus("EXCUSED")}
+                >
+                  Todos justificado
+                </button>
+                <div style={{ color: "#475569" }}>
+                  Asistencia (no ausente): {checkedCount} / {registerEnrollments.length}
+                </div>
+              </div>
+
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Estudiante</th>
+                      <th>Grado</th>
+                      <th>Grupo</th>
+                      <th>Presente</th>
+                      <th>Ausente</th>
+                      <th>Tarde</th>
+                      <th>Justificado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {registerEnrollments.map((enrollment) => (
+                      <tr key={enrollment.id}>
+                        <td>{enrollment.student?.fullName || ""}</td>
+                        <td>{getClassGradeLevel(enrollment.class) || "-"}</td>
+                        <td>{String(enrollment.student?.studentGroup || "-")}</td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={(registerStatuses[enrollment.id] || "PRESENT") === "PRESENT"}
+                            onChange={() =>
+                              setRegisterStatuses((prev) => ({
+                                ...prev,
+                                [enrollment.id]: "PRESENT",
+                              }))
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={(registerStatuses[enrollment.id] || "PRESENT") === "ABSENT"}
+                            onChange={() =>
+                              setRegisterStatuses((prev) => ({
+                                ...prev,
+                                [enrollment.id]: "ABSENT",
+                              }))
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={(registerStatuses[enrollment.id] || "PRESENT") === "LATE"}
+                            onChange={() =>
+                              setRegisterStatuses((prev) => ({
+                                ...prev,
+                                [enrollment.id]: "LATE",
+                              }))
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={(registerStatuses[enrollment.id] || "PRESENT") === "EXCUSED"}
+                            onChange={() =>
+                              setRegisterStatuses((prev) => ({
+                                ...prev,
+                                [enrollment.id]: "EXCUSED",
+                              }))
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {registerDate && registerEnrollments.length === 0 && (
+            <div style={{ marginTop: 10, color: "#b45309" }}>
+              No hay estudiantes matriculados para los filtros seleccionados en la franja valida de
+              hoy.
+            </div>
+          )}
+
+          <button
+            className="button"
+            style={{ marginTop: 10 }}
+            disabled={
+              isSunday ||
+              !isRegisterWindowOpen ||
+              !registerDate ||
+              registerEnrollments.length === 0 ||
+              saveBusy
+            }
+          >
+            {saveBusy ? "Guardando..." : "Guardar asistencia"}
+          </button>
+        </form>
+      )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         {isAdminView && (
-          <select className="input" value={historyTeacherFilter} onChange={(e) => setHistoryTeacherFilter(e.target.value)}>
+          <select
+            className="input"
+            value={historyTeacherFilter}
+            onChange={(e) => setHistoryTeacherFilter(e.target.value)}
+          >
             <option value="">Todos los docentes</option>
             {teachers.map((teacher) => (
-              <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>
+              <option key={teacher.id} value={teacher.id}>
+                {teacher.fullName}
+              </option>
             ))}
           </select>
         )}
@@ -842,20 +1046,46 @@ export default function TeacherAttendance() {
           value={historyStudentFilter}
           onChange={(e) => setHistoryStudentFilter(e.target.value)}
         />
-        <select className="input" value={historyGradeFilter} onChange={(e) => setHistoryGradeFilter(e.target.value)}>
+        <select
+          className="input"
+          value={historyGradeFilter}
+          onChange={(e) => setHistoryGradeFilter(e.target.value)}
+        >
           <option value="">Todos los grados</option>
           {allTeacherGrades.map((grade) => (
-            <option key={grade} value={grade}>{grade}</option>
+            <option key={grade} value={grade}>
+              {grade}
+            </option>
           ))}
         </select>
-        <select className="input" value={historyGroupFilter} onChange={(e) => setHistoryGroupFilter(e.target.value)}>
+        <select
+          className="input"
+          value={historyGroupFilter}
+          onChange={(e) => {
+            setHistoryGroupFilter(e.target.value);
+          }}
+        >
           <option value="">Todos los grupos</option>
           {(isAdminView ? adminGroupOptions : historyValidGroups).map((group) => (
-            <option key={group} value={group}>{group}</option>
+            <option key={group} value={group}>
+              {group}
+            </option>
           ))}
         </select>
-        <input className="input" type="date" value={historyDateFilter} onChange={(e) => setHistoryDateFilter(e.target.value)} />
-        <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <input
+          className="input"
+          type="date"
+          value={historyDateFilter}
+          onChange={(e) => setHistoryDateFilter(e.target.value)}
+        />
+        <select
+          className="input"
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+        >
           <option value="">Todos los estados</option>
           <option value="PRESENT">Presente</option>
           <option value="ABSENT">Ausente</option>
@@ -884,7 +1114,12 @@ export default function TeacherAttendance() {
         </div>
       )}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-        <button type="button" className="button secondary" onClick={handleExportAttendance} disabled={exportBusy}>
+        <button
+          type="button"
+          className="button secondary"
+          onClick={handleExportAttendance}
+          disabled={exportBusy}
+        >
           {exportBusy ? "Exportando..." : "Exportar asistencia"}
         </button>
         <button
@@ -927,15 +1162,15 @@ export default function TeacherAttendance() {
           { key: "grade", label: "Grado" },
           { key: "group", label: "Grupo" },
           { key: "date", label: "Fecha" },
-          { key: "status", label: "Estado" }
+          { key: "status", label: "Estado" },
         ]}
-        rows={attendance.map((a: any) => ({
+        rows={attendance.map((a: AttendanceHistoryRecord) => ({
           student: a.enrollment?.student?.fullName || "",
           teacher: a.teacherName || a.enrollment?.class?.teacher?.user?.fullName || "",
           grade: getClassGradeLevel(a.enrollment?.class),
           group: a.enrollment?.student?.studentGroup || "",
           date: a.date?.slice(0, 10) || "",
-          status: a.status
+          status: a.status,
         }))}
       />
 
@@ -946,7 +1181,11 @@ export default function TeacherAttendance() {
         <div style={{ alignSelf: "center", color: "#6b7280" }}>
           Pagina {page} de {Math.max(1, Math.ceil(total / 1))} (fecha)
         </div>
-        <button className="button secondary" disabled={page >= Math.ceil(total / 1)} onClick={() => setPage(page + 1)}>
+        <button
+          className="button secondary"
+          disabled={page >= Math.ceil(total / 1)}
+          onClick={() => setPage(page + 1)}
+        >
           Siguiente
         </button>
       </div>

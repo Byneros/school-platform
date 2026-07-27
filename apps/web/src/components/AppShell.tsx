@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet, Link, NavLink } from "react-router-dom";
+
 import { useAuth } from "../context/AuthContext";
 import { apiGet } from "../services/api";
 
@@ -20,7 +21,7 @@ export default function AppShell() {
     logoDataUrl: null,
     primaryColor: "#2563eb",
     secondaryColor: "#0ea5e9",
-    accentColor: "#f59e0b"
+    accentColor: "#f59e0b",
   });
   const [canEditBranding, setCanEditBranding] = useState(false);
   const [pendingCertificateRequests, setPendingCertificateRequests] = useState(0);
@@ -35,7 +36,7 @@ export default function AppShell() {
           logoDataUrl: res.logoDataUrl || null,
           primaryColor: res.primaryColor || "#2563eb",
           secondaryColor: res.secondaryColor || "#0ea5e9",
-          accentColor: res.accentColor || "#f59e0b"
+          accentColor: res.accentColor || "#f59e0b",
         });
       })
       .catch(() => undefined);
@@ -143,7 +144,9 @@ export default function AppShell() {
               {user.role === "PARENT" && <Link to="/parent">Padre</Link>}
               {isDeveloper && <Link to="/dev">Developer</Link>}
               <Link to="/feedback">Feedback</Link>
-              <button className="button warning" onClick={logout}>Salir</button>
+              <button className="button warning" onClick={logout}>
+                Salir
+              </button>
             </div>
           )}
         </div>
@@ -159,7 +162,7 @@ export default function AppShell() {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              gap: 10
+              gap: 10,
             }}
           >
             <div style={{ color: "#9a3412", fontWeight: 600 }}>
@@ -188,7 +191,14 @@ export default function AppShell() {
                   <NavLink to="/admin/asistencia">Asistencia por grado</NavLink>
                   <NavLink to="/admin/observador">Observador</NavLink>
                   <NavLink to="/admin/certificados">
-                    <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                      }}
+                    >
                       <span>Libro de certificados</span>
                       {pendingCertificateRequests > 0 && (
                         <span className="badge badge-warning">{pendingCertificateRequests}</span>
@@ -199,7 +209,14 @@ export default function AppShell() {
                   <NavLink to="/admin/horas-docentes">Horas docentes</NavLink>
                   <NavLink to="/admin/finanzas">Finanzas</NavLink>
                   <NavLink to="/admin/notificaciones">
-                    <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                      }}
+                    >
                       <span>Notificaciones</span>
                       {pendingNotifications > 0 && (
                         <span className="badge badge-warning">{pendingNotifications}</span>
@@ -208,7 +225,9 @@ export default function AppShell() {
                   </NavLink>
                   <NavLink to="/admin/sesiones">Sesiones</NavLink>
                   {isDeveloper && <NavLink to="/admin/cache">Cache</NavLink>}
-                  {canEditBranding && <NavLink to="/admin/personalizacion">Personalizacion</NavLink>}
+                  {canEditBranding && (
+                    <NavLink to="/admin/personalizacion">Personalizacion</NavLink>
+                  )}
                 </>
               )}
               {user.role === "TEACHER" && !isDeveloper && (
@@ -237,34 +256,68 @@ export default function AppShell() {
                   <NavLink to="/feedback">Feedback</NavLink>
                 </>
               )}
-              <div className="sidebar-title" style={{ marginTop: 16 }}>Acciones rapidas</div>
+              <div className="sidebar-title" style={{ marginTop: 16 }}>
+                Acciones rapidas
+              </div>
               {isAdminLike && (
                 <div style={{ display: "grid", gap: 6 }}>
-                  <Link className="button secondary" to="/admin/alertas">Ver alertas</Link>
-                  <Link className="button secondary" to="/admin/admisiones">Nueva admision</Link>
-                  <Link className="button secondary" to="/admin/usuarios">Crear usuario</Link>
-                  <Link className="button secondary" to="/admin/notificaciones">Crear notificacion</Link>
-                  <Link className="button secondary" to="/admin/observador">Registrar observacion</Link>
-                  {isDeveloper && <Link className="button secondary" to="/dev">Abrir consola developer</Link>}
-                  <Link className="button secondary" to="/feedback">Ver feedback</Link>
+                  <Link className="button secondary" to="/admin/alertas">
+                    Ver alertas
+                  </Link>
+                  <Link className="button secondary" to="/admin/admisiones">
+                    Nueva admision
+                  </Link>
+                  <Link className="button secondary" to="/admin/usuarios">
+                    Crear usuario
+                  </Link>
+                  <Link className="button secondary" to="/admin/notificaciones">
+                    Crear notificacion
+                  </Link>
+                  <Link className="button secondary" to="/admin/observador">
+                    Registrar observacion
+                  </Link>
+                  {isDeveloper && (
+                    <Link className="button secondary" to="/dev">
+                      Abrir consola developer
+                    </Link>
+                  )}
+                  <Link className="button secondary" to="/feedback">
+                    Ver feedback
+                  </Link>
                 </div>
               )}
               {user.role === "TEACHER" && !isDeveloper && (
                 <div style={{ display: "grid", gap: 6 }}>
-                  <Link className="button secondary" to="/teacher/asistencia">Registrar asistencia</Link>
-                  <Link className="button secondary" to="/teacher/tareas-calificaciones">Tareas y calificaciones</Link>
+                  <Link className="button secondary" to="/teacher/asistencia">
+                    Registrar asistencia
+                  </Link>
+                  <Link className="button secondary" to="/teacher/tareas-calificaciones">
+                    Tareas y calificaciones
+                  </Link>
                   {teacherHasObserverAccess && (
-                    <Link className="button secondary" to="/teacher/observador">Registrar observacion</Link>
+                    <Link className="button secondary" to="/teacher/observador">
+                      Registrar observacion
+                    </Link>
                   )}
-                  <Link className="button secondary" to="/feedback">Enviar feedback</Link>
+                  <Link className="button secondary" to="/feedback">
+                    Enviar feedback
+                  </Link>
                 </div>
               )}
               {user.role === "PARENT" && !isDeveloper && (
                 <div style={{ display: "grid", gap: 6 }}>
-                  <Link className="button secondary" to="/parent/boletines">Ver boletines</Link>
-                  <Link className="button secondary" to="/parent/pagos">Ver pagos</Link>
-                  <Link className="button secondary" to="/parent/comunicados">Ver comunicados</Link>
-                  <Link className="button secondary" to="/feedback">Enviar feedback</Link>
+                  <Link className="button secondary" to="/parent/boletines">
+                    Ver boletines
+                  </Link>
+                  <Link className="button secondary" to="/parent/pagos">
+                    Ver pagos
+                  </Link>
+                  <Link className="button secondary" to="/parent/comunicados">
+                    Ver comunicados
+                  </Link>
+                  <Link className="button secondary" to="/feedback">
+                    Enviar feedback
+                  </Link>
                 </div>
               )}
             </aside>

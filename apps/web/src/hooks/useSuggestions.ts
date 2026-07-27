@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import useDebounce from "./useDebounce";
+
 import { apiGet } from "../services/api";
+
+import useDebounce from "./useDebounce";
 
 export type SuggestionOption = {
   value: string;

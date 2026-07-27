@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPatch, apiPost } from "../services/api";
-import { useAuth } from "../context/AuthContext";
+
 import ActionFeedback from "../components/ActionFeedback";
+import { useAuth } from "../context/AuthContext";
+import { apiGet, apiPatch, apiPost } from "../services/api";
 import { feedbackTitles } from "../utils/feedback";
 
 type FeedbackItem = {
@@ -23,13 +24,13 @@ type FeedbackItem = {
 const categoryLabel: Record<string, string> = {
   OPINION: "Opinion",
   BUG: "Error",
-  SUGGESTION: "Sugerencia"
+  SUGGESTION: "Sugerencia",
 };
 
 const statusLabel: Record<string, string> = {
   OPEN: "Abierto",
   REVIEWED: "Revisado",
-  CLOSED: "Cerrado"
+  CLOSED: "Cerrado",
 };
 
 export default function FeedbackCenter() {
@@ -44,9 +45,11 @@ export default function FeedbackCenter() {
   const [form, setForm] = useState({
     category: "SUGGESTION",
     title: "",
-    message: ""
+    message: "",
   });
-  const [responses, setResponses] = useState<Record<string, { status: string; response: string }>>({});
+  const [responses, setResponses] = useState<Record<string, { status: string; response: string }>>(
+    {}
+  );
 
   const load = async () => {
     setLoading(true);
@@ -96,7 +99,7 @@ export default function FeedbackCenter() {
     try {
       await apiPatch(`/feedback/${id}/respond`, {
         status: current.status,
-        response: current.response
+        response: current.response,
       });
       setMessage("Respuesta guardada.");
       await load();
@@ -179,13 +182,22 @@ export default function FeedbackCenter() {
                   <span className="badge">{statusLabel[item.status] || item.status}</span>
                 </div>
                 <div style={{ fontWeight: 700 }}>{item.title}</div>
-                <div style={{ color: "#475569", whiteSpace: "pre-wrap", marginTop: 6 }}>{item.message}</div>
+                <div style={{ color: "#475569", whiteSpace: "pre-wrap", marginTop: 6 }}>
+                  {item.message}
+                </div>
                 <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
-                  Registrado: {String(item.createdAt || "").slice(0, 19).replace("T", " ")}
+                  Registrado:{" "}
+                  {String(item.createdAt || "")
+                    .slice(0, 19)
+                    .replace("T", " ")}
                 </div>
                 {item.response && (
-                  <div style={{ marginTop: 10, padding: 10, background: "#f8fafc", borderRadius: 10 }}>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>Respuesta del sistema/equipo</div>
+                  <div
+                    style={{ marginTop: 10, padding: 10, background: "#f8fafc", borderRadius: 10 }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                      Respuesta del sistema/equipo
+                    </div>
                     <div style={{ whiteSpace: "pre-wrap" }}>{item.response}</div>
                   </div>
                 )}
@@ -205,17 +217,23 @@ export default function FeedbackCenter() {
               {all.map((item) => {
                 const current = responses[item.id] || {
                   status: item.status,
-                  response: item.response || ""
+                  response: item.response || "",
                 };
                 return (
                   <div key={item.id} className="card" style={{ boxShadow: "none" }}>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
                       <span className="badge">{categoryLabel[item.category] || item.category}</span>
                       <span className="badge">{statusLabel[item.status] || item.status}</span>
-                      {item.user && <span className="badge">{item.user.fullName} · {item.user.role}</span>}
+                      {item.user && (
+                        <span className="badge">
+                          {item.user.fullName} · {item.user.role}
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontWeight: 700 }}>{item.title}</div>
-                    <div style={{ color: "#475569", whiteSpace: "pre-wrap", marginTop: 6 }}>{item.message}</div>
+                    <div style={{ color: "#475569", whiteSpace: "pre-wrap", marginTop: 6 }}>
+                      {item.message}
+                    </div>
                     {item.user && (
                       <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
                         {item.user.email}
@@ -228,7 +246,7 @@ export default function FeedbackCenter() {
                         onChange={(e) =>
                           setResponses((prev) => ({
                             ...prev,
-                            [item.id]: { ...current, status: e.target.value }
+                            [item.id]: { ...current, status: e.target.value },
                           }))
                         }
                       >
@@ -243,12 +261,17 @@ export default function FeedbackCenter() {
                         onChange={(e) =>
                           setResponses((prev) => ({
                             ...prev,
-                            [item.id]: { ...current, response: e.target.value }
+                            [item.id]: { ...current, response: e.target.value },
                           }))
                         }
                         placeholder="Respuesta interna o para el usuario"
                       />
-                      <button className="button secondary" type="button" onClick={() => respond(item.id)} disabled={saving}>
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => respond(item.id)}
+                        disabled={saving}
+                      >
                         Guardar respuesta
                       </button>
                     </div>

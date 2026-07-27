@@ -12,31 +12,34 @@ type Props = {
   style?: React.CSSProperties;
 };
 
-const toneStyles: Record<Tone, { color: string; background: string; border: string; defaultTitle: string }> = {
+const toneStyles: Record<
+  Tone,
+  { color: string; background: string; border: string; defaultTitle: string }
+> = {
   success: {
     color: "#15803d",
     background: "#f0fdf4",
     border: "#86efac",
-    defaultTitle: "Operacion completada"
+    defaultTitle: "Operacion completada",
   },
   error: {
     color: "#b91c1c",
     background: "#fef2f2",
     border: "#fecaca",
-    defaultTitle: "Ocurrio un error"
+    defaultTitle: "Ocurrio un error",
   },
   info: {
     color: "#1d4ed8",
     background: "#eff6ff",
     border: "#93c5fd",
-    defaultTitle: "Informacion"
+    defaultTitle: "Informacion",
   },
   warning: {
     color: "#b45309",
     background: "#fffbeb",
     border: "#fcd34d",
-    defaultTitle: "Atencion"
-  }
+    defaultTitle: "Atencion",
+  },
 };
 
 export default function ActionFeedback({
@@ -46,7 +49,7 @@ export default function ActionFeedback({
   onDismiss,
   autoHideMs = 5000,
   highlightMs = 2200,
-  style
+  style,
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const onDismissRef = useRef<Props["onDismiss"]>(onDismiss);
@@ -98,7 +101,7 @@ export default function ActionFeedback({
           : "none",
         transform: highlight ? "translateY(-2px)" : "translateY(0)",
         transition: "box-shadow 220ms ease, transform 220ms ease",
-        ...style
+        ...style,
       }}
     >
       <div style={{ fontWeight: 700, marginBottom: 4 }}>{title || palette.defaultTitle}</div>

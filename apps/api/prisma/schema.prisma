@@ -106,31 +106,53 @@ enum GradeLevel {
   ONCE
 }
 
+enum DocumentType {
+  CC
+  TI
+  CE
+  PASSPORT
+  NIT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String
   fullName     String
+  docType      DocumentType?
+  docNumber    String?
+  phone        String?
+  address      String?
+  birthDate    DateTime?
+  gender       Gender?  
+  photoUrl     String?     
   role         RoleName
-  isActive     Boolean  @default(true)
+  isActive     Boolean @default(true)
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  teacher      Teacher?
-  parent       Parent?
-
+  teacher Teacher?
+  parent  Parent?
+  student Student?
+  feedbacks Feedback[] @relation("FeedbackAuthor")
+  feedbackResponses Feedback[] @relation("FeedbackResponder")
+  refreshSessions RefreshSession[]
+  observationsCreated StudentObservation[] @relation("StudentObservationCreator")
+  certificatesIssued CertificateIssue[] @relation("CertificateIssuer")
+  certificateRequests CertificateRequest[] @relation("CertificateRequester")
+  certificateReviews CertificateRequest[] @relation("CertificateReviewer")
+  academicClosures AcademicClosureResult[] @relation("AcademicClosureExecutor")
   notificationsCreated Notification[] @relation("NotificationCreator")
   notificationsApproved Notification[] @relation("NotificationApprover")
   notificationsTargeted Notification[] @relation("NotificationTarget")
-  studentObservationsCreated StudentObservation[] @relation("StudentObservationCreator")
-  certificatesIssued CertificateIssue[] @relation("CertificateIssuer")
-  certificateRequestsRequested CertificateRequest[] @relation("CertificateRequester")
-  certificateRequestsReviewed CertificateRequest[] @relation("CertificateReviewer")
-  academicClosures AcademicClosureResult[] @relation("AcademicClosureExecutor")
-  refreshSessions RefreshSession[]
-  feedbackEntries Feedback[] @relation("FeedbackAuthor")
-  feedbackResponses Feedback[] @relation("FeedbackResponder")
 
-  @@index([role, isActive])
+  @@unique([docType, docNumber])
 }
 
 model Feedback {
@@ -176,20 +198,21 @@ model RefreshSession {
   @@index([userId, expiresAt])
 }
 
-model Teacher {
-  id                  String @id @default(cuid())
-  userId              String @unique
-  professionalProfile String?
-  subjects            Json?
-  subjectHours        Json?
-  subjectHoursMode    Json? // { [subject]: true|false } true = auto
-  subjectSchedules    Json? // { [subject]: [{ dayOfWeek, startTime, endTime }] }
-  cognitiveWeight     Float  @default(60)
-  personalWeight      Float  @default(20)
-  socialWeight        Float  @default(20)
-  user                User   @relation(fields: [userId], references: [id])
-  classes             Class[]
-  tasks               Task[]
+model Teacher{
+
+   id String @id @default(cuid())
+   userId String @unique
+   professionalProfile String?
+   subjects Json?
+   subjectHours Json?
+   subjectHoursMode Json?
+   subjectSchedules Json?
+   cognitiveWeight Float @default(60)
+   personalWeight Float @default(20)
+   socialWeight Float @default(20)
+   user User @relation(fields:[userId],references:[id])
+   classes Class[]
+   tasks Task[]
 }
 
 model Parent {
@@ -201,24 +224,24 @@ model Parent {
 }
 
 model Student {
-  id         String   @id @default(cuid())
-  fullName   String
-  birthDate  DateTime?
+
+  id String @id @default(cuid())
+  userId String? @unique
+  user User? @relation(fields:[userId],references:[id])
+  fullName String
+  birthDate DateTime?
   gradeLevel GradeLevel
   studentGroup String?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
   guardians Guardian[]
   enrollments Enrollment[]
-  invoices Invoice[]
-  notifications Notification[]
   observations StudentObservation[]
   certificates CertificateIssue[]
   certificateRequests CertificateRequest[]
+  invoices Invoice[]
+  notifications Notification[]
 
-  @@index([gradeLevel, studentGroup])
-  @@index([fullName])
 }
 
 model StudentObservation {
@@ -346,13 +369,21 @@ model Guardian {
 }
 
 model Class {
-  id        String @id @default(cuid())
-  teacherId String
-  gradeLevel GradeLevel
-  schedule  Json?
+  id            String @id @default(cuid())
+
+  teacherId      String
+  gradeLevel     GradeLevel
+
+  studentGroup   String
+  academicYear   Int
+
+  schedule       Json?
 
   teacher Teacher @relation(fields: [teacherId], references: [id])
+
   enrollments Enrollment[]
+
+  @@unique([teacherId, gradeLevel, studentGroup, academicYear])
 }
 
 model Enrollment {

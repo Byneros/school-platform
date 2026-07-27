@@ -30,7 +30,7 @@ server.on("error", (error: NodeJS.ErrnoException) => {
         `No se pudo iniciar la API: el puerto ${PORT} ya esta en uso.`,
         "Cierra el proceso que ocupa ese puerto o define otro puerto antes de iniciar:",
         "  PowerShell: $env:PORT=4004; npm.cmd run dev:api",
-        "  CMD: set PORT=4004 && npm.cmd run dev:api"
+        "  CMD: set PORT=4004 && npm.cmd run dev:api",
       ].join("\n")
     );
     process.exit(1);

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import Section from "../components/Section";
-import DataTable from "../components/DataTable";
+
 import ActionFeedback from "../components/ActionFeedback";
+import DataTable from "../components/DataTable";
+import Section from "../components/Section";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "../services/api";
 import { gradeLabel } from "../services/grades";
 import { feedbackTitles } from "../utils/feedback";
@@ -10,7 +11,7 @@ const PERIODS = ["P1", "P2", "P3", "P4"];
 const ASPECTS = [
   { value: "COGNITIVE", label: "Cognitivo" },
   { value: "PERSONAL", label: "Personal" },
-  { value: "SOCIAL", label: "Social" }
+  { value: "SOCIAL", label: "Social" },
 ];
 const GRADE_ORDER: Record<string, number> = {
   PRE_JARDIN: 1,
@@ -26,11 +27,13 @@ const GRADE_ORDER: Record<string, number> = {
   OCTAVO: 11,
   NOVENO: 12,
   DECIMO: 13,
-  ONCE: 14
+  ONCE: 14,
 };
 
 function normalizeGradeKey(value: string) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
 function sortGradesAcademic(values: string[]) {
@@ -85,11 +88,16 @@ export default function TeacherTasks() {
   const [weights, setWeights] = useState({
     cognitiveWeight: "60",
     personalWeight: "20",
-    socialWeight: "20"
+    socialWeight: "20",
   });
   const [weightsMsg, setWeightsMsg] = useState("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [editingForm, setEditingForm] = useState({ title: "", aspect: "COGNITIVE", maxScore: "5", period: "P1" });
+  const [editingForm, setEditingForm] = useState({
+    title: "",
+    aspect: "COGNITIVE",
+    maxScore: "5",
+    period: "P1",
+  });
   const [editingMessage, setEditingMessage] = useState("");
   const [editingError, setEditingError] = useState("");
   const [finalSummary, setFinalSummary] = useState<Array<any>>([]);
@@ -116,7 +124,7 @@ export default function TeacherTasks() {
         setWeights({
           cognitiveWeight: String(profileRes?.cognitiveWeight ?? 60),
           personalWeight: String(profileRes?.personalWeight ?? 20),
-          socialWeight: String(profileRes?.socialWeight ?? 20)
+          socialWeight: String(profileRes?.socialWeight ?? 20),
         });
       })
       .catch(() => setEnrollments([]));
@@ -141,7 +149,7 @@ export default function TeacherTasks() {
     );
     const options = groups.map((g) => ({
       value: g,
-      label: g ? `Grupo ${g}` : "Sin grupo"
+      label: g ? `Grupo ${g}` : "Sin grupo",
     }));
     setGroupOptions(options);
     if (options.length > 0) {
@@ -175,7 +183,8 @@ export default function TeacherTasks() {
       const scoreMap: Record<string, Record<string, string>> = {};
       scoresList.forEach((s) => {
         if (!scoreMap[s.enrollmentId]) scoreMap[s.enrollmentId] = {};
-        scoreMap[s.enrollmentId][s.taskId] = s.score === null || s.score === undefined ? "" : String(s.score);
+        scoreMap[s.enrollmentId][s.taskId] =
+          s.score === null || s.score === undefined ? "" : String(s.score);
       });
 
       setTasks(tasksList);
@@ -259,7 +268,7 @@ export default function TeacherTasks() {
         period,
         title: taskForm.title.trim(),
         aspect: taskForm.aspect,
-        maxScore
+        maxScore,
       });
       setTaskForm((prev) => ({ ...prev, title: "" }));
       setMessage("Tarea creada. Se enviaron notificaciones a los padres.");
@@ -280,7 +289,7 @@ export default function TeacherTasks() {
       await apiPut("/teacher/profile", {
         cognitiveWeight: Number(weights.cognitiveWeight),
         personalWeight: Number(weights.personalWeight),
-        socialWeight: Number(weights.socialWeight)
+        socialWeight: Number(weights.socialWeight),
       });
       setWeightsMsg("Ponderacion guardada.");
     } catch (error: any) {
@@ -294,7 +303,7 @@ export default function TeacherTasks() {
       title: task.title,
       aspect: task.aspect,
       maxScore: String(task.maxScore),
-      period: task.period || period
+      period: task.period || period,
     });
     setEditingMessage("");
     setEditingError("");
@@ -325,7 +334,7 @@ export default function TeacherTasks() {
         title: editingForm.title.trim(),
         aspect: editingForm.aspect,
         maxScore,
-        period: editingForm.period
+        period: editingForm.period,
       });
       setEditingMessage("Tarea actualizada.");
       setEditingTaskId(null);
@@ -357,7 +366,7 @@ export default function TeacherTasks() {
   const setScoreValue = (enrollmentId: string, taskId: string, value: string) => {
     setScores((prev) => ({
       ...prev,
-      [enrollmentId]: { ...(prev[enrollmentId] || {}), [taskId]: value }
+      [enrollmentId]: { ...(prev[enrollmentId] || {}), [taskId]: value },
     }));
     setDirtyScores((prev) => ({ ...prev, [`${enrollmentId}:${taskId}`]: true }));
   };
@@ -384,7 +393,7 @@ export default function TeacherTasks() {
           await apiPost("/teacher/tasks/score", {
             enrollmentId,
             taskId,
-            score: numeric
+            score: numeric,
           });
         })
       );
@@ -426,7 +435,11 @@ export default function TeacherTasks() {
           <div className="grid grid-3">
             <label>
               Grado
-              <select className="input" value={gradeLevel} onChange={(e) => setGradeLevel(e.target.value)}>
+              <select
+                className="input"
+                value={gradeLevel}
+                onChange={(e) => setGradeLevel(e.target.value)}
+              >
                 <option value="">Selecciona un grado</option>
                 {gradeOptions.map((g) => (
                   <option key={g} value={g}>
@@ -437,7 +450,12 @@ export default function TeacherTasks() {
             </label>
             <label>
               Grupo
-              <select className="input" value={group} onChange={(e) => setGroup(e.target.value)} disabled={!gradeLevel}>
+              <select
+                className="input"
+                value={group}
+                onChange={(e) => setGroup(e.target.value)}
+                disabled={!gradeLevel}
+              >
                 {groupOptions.length === 0 && <option value="">Sin grupos</option>}
                 {groupOptions.map((g) => (
                   <option key={`${g.value || "sin-grupo"}`} value={g.value}>
@@ -459,7 +477,8 @@ export default function TeacherTasks() {
           </div>
           {gradeLevel && (
             <div style={{ color: "#64748b" }}>
-              Grupo seleccionado: <strong>{gradeLabel(gradeLevel)}</strong> · <strong>{selectedGroupLabel}</strong>
+              Grupo seleccionado: <strong>{gradeLabel(gradeLevel)}</strong> ·{" "}
+              <strong>{selectedGroupLabel}</strong>
             </div>
           )}
         </div>
@@ -508,19 +527,20 @@ export default function TeacherTasks() {
             </label>
           </div>
           <div style={{ color: "#64748b", marginTop: 8 }}>
-            Ponderacion aplicada: <strong>{getAspectWeight(taskForm.aspect)}%</strong> · Nota maxima 0–5
+            Ponderacion aplicada: <strong>{getAspectWeight(taskForm.aspect)}%</strong> · Nota maxima
+            0–5
           </div>
-            <ActionFeedback
-              tone="error"
-              title={feedbackTitles.teacherTasks.taskError}
-              message={error}
+          <ActionFeedback
+            tone="error"
+            title={feedbackTitles.teacherTasks.taskError}
+            message={error}
             onDismiss={() => setError("")}
             style={{ marginTop: 8, marginBottom: 0 }}
           />
-            <ActionFeedback
-              tone="success"
-              title={feedbackTitles.teacherTasks.taskSuccess}
-              message={message}
+          <ActionFeedback
+            tone="success"
+            title={feedbackTitles.teacherTasks.taskSuccess}
+            message={message}
             onDismiss={() => setMessage("")}
             style={{ marginTop: 8, marginBottom: 0 }}
           />
@@ -567,7 +587,13 @@ export default function TeacherTasks() {
               />
             </label>
           </div>
-          <div style={{ marginTop: 8, color: totalWeight === 100 ? "#15803d" : "#b45309", fontWeight: 600 }}>
+          <div
+            style={{
+              marginTop: 8,
+              color: totalWeight === 100 ? "#15803d" : "#b45309",
+              fontWeight: 600,
+            }}
+          >
             Total: {totalWeight}% {totalWeight === 100 ? "(OK)" : "(debe ser 100)"}
           </div>
           {weightsMsg && <div style={{ marginTop: 8, color: "#64748b" }}>{weightsMsg}</div>}
@@ -613,7 +639,9 @@ export default function TeacherTasks() {
                     max={5}
                     step="0.01"
                     value={editingForm.maxScore}
-                    onChange={(e) => setEditingForm((prev) => ({ ...prev, maxScore: e.target.value }))}
+                    onChange={(e) =>
+                      setEditingForm((prev) => ({ ...prev, maxScore: e.target.value }))
+                    }
                     style={{ maxWidth: 120 }}
                   />
                   <span style={{ color: "#64748b", minWidth: 20, textAlign: "right" }}>/5</span>
@@ -638,17 +666,17 @@ export default function TeacherTasks() {
               <div />
               <div />
             </div>
-              <ActionFeedback
-                tone="error"
-                title={feedbackTitles.teacherTasks.updateError}
-                message={editingError}
+            <ActionFeedback
+              tone="error"
+              title={feedbackTitles.teacherTasks.updateError}
+              message={editingError}
               onDismiss={() => setEditingError("")}
               style={{ marginTop: 8, marginBottom: 0 }}
             />
-              <ActionFeedback
-                tone="success"
-                title={feedbackTitles.teacherTasks.updateSuccess}
-                message={editingMessage}
+            <ActionFeedback
+              tone="success"
+              title={feedbackTitles.teacherTasks.updateSuccess}
+              message={editingMessage}
               onDismiss={() => setEditingMessage("")}
               style={{ marginTop: 8, marginBottom: 0 }}
             />
@@ -665,20 +693,41 @@ export default function TeacherTasks() {
       )}
 
       <Section title="Registro de calificaciones por tarea">
-        {loading && <div className="card" style={{ color: "#64748b" }}>Cargando...</div>}
+        {loading && (
+          <div className="card" style={{ color: "#64748b" }}>
+            Cargando...
+          </div>
+        )}
         {!loading && !gradeLevel && (
-          <div className="card" style={{ color: "#64748b" }}>Selecciona grado y grupo para ver estudiantes.</div>
+          <div className="card" style={{ color: "#64748b" }}>
+            Selecciona grado y grupo para ver estudiantes.
+          </div>
         )}
         {!loading && gradeLevel && students.length === 0 && (
-          <div className="card" style={{ color: "#64748b" }}>No hay estudiantes para este grado/grupo.</div>
+          <div className="card" style={{ color: "#64748b" }}>
+            No hay estudiantes para este grado/grupo.
+          </div>
         )}
         {!loading && gradeLevel && students.length > 0 && (
           <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 10,
+                flexWrap: "wrap",
+                marginBottom: 8,
+              }}
+            >
               <div style={{ color: "#64748b" }}>
                 {students.length} estudiante(s) · {tasks.length} tarea(s)
               </div>
-              <button className="button secondary" type="button" onClick={saveScores} disabled={saving}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={saveScores}
+                disabled={saving}
+              >
                 {saving ? "Guardando..." : "Guardar calificaciones"}
               </button>
             </div>
@@ -693,17 +742,26 @@ export default function TeacherTasks() {
                         left: 0,
                         zIndex: 4,
                         background: "#fff",
-                        boxShadow: "2px 0 0 rgba(226,232,240,0.9)"
+                        boxShadow: "2px 0 0 rgba(226,232,240,0.9)",
                       }}
                     >
                       Estudiante
                     </th>
                     {tasks.map((task) => (
-                      <th key={task.id} style={{ minWidth: 220, background: "#fff", position: "sticky", top: 0, zIndex: 3 }}>
+                      <th
+                        key={task.id}
+                        style={{
+                          minWidth: 220,
+                          background: "#fff",
+                          position: "sticky",
+                          top: 0,
+                          zIndex: 3,
+                        }}
+                      >
                         <div>{task.title}</div>
                         <div style={{ color: "#94a3b8", fontSize: 12 }}>
-                          {ASPECTS.find((a) => a.value === task.aspect)?.label || task.aspect} · {getAspectWeight(task.aspect)}% ·{" "}
-                          {task.maxScore}/5
+                          {ASPECTS.find((a) => a.value === task.aspect)?.label || task.aspect} ·{" "}
+                          {getAspectWeight(task.aspect)}% · {task.maxScore}/5
                         </div>
                         {task.createdAt && (
                           <div style={{ color: "#94a3b8", fontSize: 12 }}>
@@ -741,12 +799,13 @@ export default function TeacherTasks() {
                           left: 0,
                           zIndex: 1,
                           background: "#fff",
-                          boxShadow: "2px 0 0 rgba(226,232,240,0.9)"
+                          boxShadow: "2px 0 0 rgba(226,232,240,0.9)",
                         }}
                       >
                         {student.fullName}
                         <div style={{ color: "#94a3b8", fontSize: 12 }}>
-                          {gradeLabel(student.grade)} {student.group ? `· Grupo ${student.group}` : ""}
+                          {gradeLabel(student.grade)}{" "}
+                          {student.group ? `· Grupo ${student.group}` : ""}
                         </div>
                       </td>
                       {tasks.map((task) => (
@@ -759,11 +818,20 @@ export default function TeacherTasks() {
                               step="0.01"
                               max={Math.min(5, task.maxScore)}
                               value={scores?.[student.enrollmentId]?.[task.id] ?? ""}
-                              onChange={(e) => setScoreValue(student.enrollmentId, task.id, e.target.value)}
+                              onChange={(e) =>
+                                setScoreValue(student.enrollmentId, task.id, e.target.value)
+                              }
                               placeholder="/5"
                               style={{ maxWidth: 110 }}
                             />
-                            <span style={{ color: "#94a3b8", fontSize: 12, minWidth: 20, textAlign: "right" }}>
+                            <span
+                              style={{
+                                color: "#94a3b8",
+                                fontSize: 12,
+                                minWidth: 20,
+                                textAlign: "right",
+                              }}
+                            >
                               /5
                             </span>
                           </div>
@@ -794,7 +862,10 @@ export default function TeacherTasks() {
 
       <Section title="Nota final ponderada por estudiante">
         {gradeLevel && group && finalSummaryError && (
-          <div className="card" style={{ color: "#b91c1c", borderColor: "#fecaca", background: "#fef2f2" }}>
+          <div
+            className="card"
+            style={{ color: "#b91c1c", borderColor: "#fecaca", background: "#fef2f2" }}
+          >
             {finalSummaryError}
           </div>
         )}
@@ -809,28 +880,30 @@ export default function TeacherTasks() {
               { key: "personal", label: "Personal %" },
               { key: "social", label: "Social %" },
               { key: "final100", label: "Final /100" },
-              { key: "final5", label: "Final /5" }
+              { key: "final5", label: "Final /5" },
             ]}
-            rows={finalSummary.map((row: any) => ({
-              id: `${row.enrollmentId}-${row.period}`,
-              student: row.student,
-              grade: gradeLabel(row.grade || ""),
-              group: row.group ? `Grupo ${row.group}` : "Sin grupo",
-              period: row.period,
-              cognitive: `${row.cognitiveAvg}%`,
-              personal: `${row.personalAvg}%`,
-              social: `${row.socialAvg}%`,
-              final100: row.finalOver100,
-              final5: row.finalOver5
-            })).sort((a, b) => {
-              const gradeA = String(a.grade || "");
-              const gradeB = String(b.grade || "");
-              if (gradeA !== gradeB) return gradeA.localeCompare(gradeB, "es");
-              const groupA = String(a.group || "");
-              const groupB = String(b.group || "");
-              if (groupA !== groupB) return groupA.localeCompare(groupB, "es");
-              return String(a.student || "").localeCompare(String(b.student || ""), "es");
-            })}
+            rows={finalSummary
+              .map((row: any) => ({
+                id: `${row.enrollmentId}-${row.period}`,
+                student: row.student,
+                grade: gradeLabel(row.grade || ""),
+                group: row.group ? `Grupo ${row.group}` : "Sin grupo",
+                period: row.period,
+                cognitive: `${row.cognitiveAvg}%`,
+                personal: `${row.personalAvg}%`,
+                social: `${row.socialAvg}%`,
+                final100: row.finalOver100,
+                final5: row.finalOver5,
+              }))
+              .sort((a, b) => {
+                const gradeA = String(a.grade || "");
+                const gradeB = String(b.grade || "");
+                if (gradeA !== gradeB) return gradeA.localeCompare(gradeB, "es");
+                const groupA = String(a.group || "");
+                const groupB = String(b.group || "");
+                if (groupA !== groupB) return groupA.localeCompare(groupB, "es");
+                return String(a.student || "").localeCompare(String(b.student || ""), "es");
+              })}
             rowKey="id"
           />
         )}

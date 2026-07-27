@@ -34,9 +34,9 @@ async function warmUrl(url: string, config: ReturnType<typeof getWarmConfig>) {
       method: "GET",
       headers: {
         ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}),
-        "X-Cache-Warm": "1"
+        "X-Cache-Warm": "1",
       },
-      signal: controller.signal
+      signal: controller.signal,
     });
     if (!res.ok) {
       throw new Error(`Warm failed ${res.status}`);

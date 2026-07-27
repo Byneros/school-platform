@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+
 import ActionFeedback from "../components/ActionFeedback";
-import Section from "../components/Section";
 import DataTable from "../components/DataTable";
+import Section from "../components/Section";
 import { apiDownload, apiGet, apiPost } from "../services/api";
 import { gradeLabel } from "../services/grades";
 import { feedbackTitles } from "../utils/feedback";
@@ -40,7 +41,7 @@ export default function AdminCertificates() {
         ...(fromDate ? { fromDate } : {}),
         ...(toDate ? { toDate } : {}),
         ...(studentFilter ? { student: studentFilter } : {}),
-        ...(issuerFilter ? { issuedBy: issuerFilter } : {})
+        ...(issuerFilter ? { issuedBy: issuerFilter } : {}),
       }).toString(),
     [page, typeFilter, codeFilter, fromDate, toDate, studentFilter, issuerFilter]
   );
@@ -83,7 +84,12 @@ export default function AdminCertificates() {
   }, []);
 
   const download = async (type: "excel" | "pdf") => {
-    const blob = await apiDownload(`/reports/certificates/export/${type}?${query.replace(/(^|&)page=[^&]*/g, "").replace(/(^|&)pageSize=[^&]*/g, "").replace(/^&/, "")}`);
+    const blob = await apiDownload(
+      `/reports/certificates/export/${type}?${query
+        .replace(/(^|&)page=[^&]*/g, "")
+        .replace(/(^|&)pageSize=[^&]*/g, "")
+        .replace(/^&/, "")}`
+    );
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -124,7 +130,7 @@ export default function AdminCertificates() {
         setVerifyFeedback({
           tone: "success",
           code: cert.code || code,
-          text: `Valido: ${cert.type} ${cert.year}-${String(cert.serial).padStart(5, "0")} | Estudiante: ${cert.student?.fullName || "-"}`
+          text: `Valido: ${cert.type} ${cert.year}-${String(cert.serial).padStart(5, "0")} | Estudiante: ${cert.student?.fullName || "-"}`,
         });
       } else {
         setVerifyFeedback({ tone: "success", code, text: "Certificado valido." });
@@ -133,7 +139,7 @@ export default function AdminCertificates() {
       setVerifyFeedback({
         tone: "error",
         code,
-        text: e?.message || "No se pudo verificar el certificado."
+        text: e?.message || "No se pudo verificar el certificado.",
       });
     }
   };
@@ -157,73 +163,148 @@ export default function AdminCertificates() {
             { key: "type", label: "Tipo" },
             { key: "student", label: "Estudiante" },
             { key: "requestedBy", label: "Solicitante" },
-            { key: "actions", label: "Acciones" }
+            { key: "actions", label: "Acciones" },
           ]}
           rows={
             requestLoading
-              ? [{ requestedAt: "Cargando...", type: "", student: "", requestedBy: "", actions: "" }]
+              ? [
+                  {
+                    requestedAt: "Cargando...",
+                    type: "",
+                    student: "",
+                    requestedBy: "",
+                    actions: "",
+                  },
+                ]
               : requestRows.length === 0
-              ? [{ requestedAt: "Sin solicitudes pendientes", type: "", student: "", requestedBy: "", actions: "" }]
-              : requestRows.map((r) => ({
-                  requestedAt: String(r.requestedAt || "").slice(0, 10),
-                  type: r.type === "STUDY" ? "Constancia" : "Matricula",
-                  student: r.student?.fullName || "-",
-                  requestedBy: r.requestedBy?.fullName || "-",
-                  actions: (
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button
-                        className="button secondary"
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await apiPost(`/reports/certificate/requests/${r.id}/approve`, {});
-                            loadRequests();
-                          } catch (e: any) {
-                            setRequestError(e?.message || "No se pudo aprobar la solicitud.");
-                          }
-                        }}
-                      >
-                        Aprobar
-                      </button>
-                      <button
-                        className="button danger"
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await apiPost(`/reports/certificate/requests/${r.id}/reject`, {});
-                            loadRequests();
-                          } catch (e: any) {
-                            setRequestError(e?.message || "No se pudo rechazar la solicitud.");
-                          }
-                        }}
-                      >
-                        Rechazar
-                      </button>
-                    </div>
-                  )
-                }))
+                ? [
+                    {
+                      requestedAt: "Sin solicitudes pendientes",
+                      type: "",
+                      student: "",
+                      requestedBy: "",
+                      actions: "",
+                    },
+                  ]
+                : requestRows.map((r) => ({
+                    requestedAt: String(r.requestedAt || "").slice(0, 10),
+                    type: r.type === "STUDY" ? "Constancia" : "Matricula",
+                    student: r.student?.fullName || "-",
+                    requestedBy: r.requestedBy?.fullName || "-",
+                    actions: (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          className="button secondary"
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await apiPost(`/reports/certificate/requests/${r.id}/approve`, {});
+                              loadRequests();
+                            } catch (e: any) {
+                              setRequestError(e?.message || "No se pudo aprobar la solicitud.");
+                            }
+                          }}
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          className="button danger"
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await apiPost(`/reports/certificate/requests/${r.id}/reject`, {});
+                              loadRequests();
+                            } catch (e: any) {
+                              setRequestError(e?.message || "No se pudo rechazar la solicitud.");
+                            }
+                          }}
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    ),
+                  }))
           }
         />
       </Section>
 
       <Section title="Libro de certificados emitidos">
-        <div className="help-card">Consulta y exporta el historial oficial de certificados emitidos.</div>
+        <div className="help-card">
+          Consulta y exporta el historial oficial de certificados emitidos.
+        </div>
         <div className="card">
-          <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(6, minmax(120px, 1fr))" }}>
-            <select className="input" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}>
+          <div
+            style={{
+              display: "grid",
+              gap: 8,
+              gridTemplateColumns: "repeat(6, minmax(120px, 1fr))",
+            }}
+          >
+            <select
+              className="input"
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                setPage(1);
+              }}
+            >
               <option value="">Todos los tipos</option>
               <option value="STUDY">Constancia de estudio</option>
               <option value="ENROLLMENT">Certificado de matricula</option>
             </select>
-            <input className="input" placeholder="Filtrar por codigo" value={codeFilter} onChange={(e) => { setCodeFilter(e.target.value); setPage(1); }} />
-            <input className="input" type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1); }} />
-            <input className="input" type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1); }} />
-            <input className="input" placeholder="Filtrar por estudiante" value={studentFilter} onChange={(e) => { setStudentFilter(e.target.value); setPage(1); }} />
-            <input className="input" placeholder="Filtrar por emisor" value={issuerFilter} onChange={(e) => { setIssuerFilter(e.target.value); setPage(1); }} />
+            <input
+              className="input"
+              placeholder="Filtrar por codigo"
+              value={codeFilter}
+              onChange={(e) => {
+                setCodeFilter(e.target.value);
+                setPage(1);
+              }}
+            />
+            <input
+              className="input"
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setPage(1);
+              }}
+            />
+            <input
+              className="input"
+              type="date"
+              value={toDate}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setPage(1);
+              }}
+            />
+            <input
+              className="input"
+              placeholder="Filtrar por estudiante"
+              value={studentFilter}
+              onChange={(e) => {
+                setStudentFilter(e.target.value);
+                setPage(1);
+              }}
+            />
+            <input
+              className="input"
+              placeholder="Filtrar por emisor"
+              value={issuerFilter}
+              onChange={(e) => {
+                setIssuerFilter(e.target.value);
+                setPage(1);
+              }}
+            />
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <button className="button secondary" type="button" onClick={() => download("excel")}>Exportar Excel</button>
-            <button className="button secondary" type="button" onClick={() => download("pdf")}>Exportar PDF</button>
+            <button className="button secondary" type="button" onClick={() => download("excel")}>
+              Exportar Excel
+            </button>
+            <button className="button secondary" type="button" onClick={() => download("pdf")}>
+              Exportar PDF
+            </button>
           </div>
           {verifyFeedback && (
             <div
@@ -233,11 +314,21 @@ export default function AdminCertificates() {
                 gap: 8,
                 alignItems: "center",
                 flexWrap: "wrap",
-                color: verifyFeedback.tone === "success" ? "#166534" : verifyFeedback.tone === "error" ? "#b91c1c" : "#1e40af",
-                background: verifyFeedback.tone === "success" ? "#f0fdf4" : verifyFeedback.tone === "error" ? "#fef2f2" : "#eff6ff",
+                color:
+                  verifyFeedback.tone === "success"
+                    ? "#166534"
+                    : verifyFeedback.tone === "error"
+                      ? "#b91c1c"
+                      : "#1e40af",
+                background:
+                  verifyFeedback.tone === "success"
+                    ? "#f0fdf4"
+                    : verifyFeedback.tone === "error"
+                      ? "#fef2f2"
+                      : "#eff6ff",
                 border: `1px solid ${verifyFeedback.tone === "success" ? "#86efac" : verifyFeedback.tone === "error" ? "#fecaca" : "#93c5fd"}`,
                 borderRadius: 8,
-                padding: "8px 10px"
+                padding: "8px 10px",
               }}
             >
               <span>{verifyFeedback.text}</span>
@@ -274,42 +365,73 @@ export default function AdminCertificates() {
             { key: "student", label: "Estudiante" },
             { key: "grade", label: "Grado" },
             { key: "group", label: "Grupo" },
-            { key: "issuedBy", label: "Emitido por" }
+            { key: "issuedBy", label: "Emitido por" },
           ]}
           rows={
             loading
-              ? [{ issuedAt: "Cargando...", type: "", serial: "", code: "", copy: "", verify: "", student: "", grade: "", group: "", issuedBy: "" }]
+              ? [
+                  {
+                    issuedAt: "Cargando...",
+                    type: "",
+                    serial: "",
+                    code: "",
+                    copy: "",
+                    verify: "",
+                    student: "",
+                    grade: "",
+                    group: "",
+                    issuedBy: "",
+                  },
+                ]
               : rows.map((r) => ({
                   issuedAt: String(r.issuedAt || "").slice(0, 10),
                   type: r.type === "STUDY" ? "Constancia" : "Matricula",
                   serial: `${r.year}-${String(r.serial).padStart(5, "0")}`,
                   code: r.code,
                   copy: (
-                    <button className="button secondary" type="button" onClick={() => copyCode(r.code)} style={{ padding: "4px 8px", fontSize: 12 }}>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => copyCode(r.code)}
+                      style={{ padding: "4px 8px", fontSize: 12 }}
+                    >
                       {copiedCode === r.code ? "Copiado" : "Copiar"}
                     </button>
                   ),
                   verify: (
-                    <button className="button secondary" type="button" onClick={() => verifyCode(r.code)} style={{ padding: "4px 8px", fontSize: 12 }}>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => verifyCode(r.code)}
+                      style={{ padding: "4px 8px", fontSize: 12 }}
+                    >
                       Verificar
                     </button>
                   ),
                   student: r.student?.fullName || "-",
                   grade: r.student?.gradeLevel ? gradeLabel(r.student.gradeLevel) : "-",
                   group: r.student?.studentGroup || "-",
-                  issuedBy: r.issuedBy?.fullName || "-"
+                  issuedBy: r.issuedBy?.fullName || "-",
                 }))
           }
         />
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-          <button className="button secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+          <button
+            className="button secondary"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
             Anterior
           </button>
           <div style={{ alignSelf: "center", color: "#6b7280" }}>
             Pagina {page} de {Math.max(1, Math.ceil(total / 10))}
           </div>
-          <button className="button secondary" disabled={page >= Math.ceil(total / 10)} onClick={() => setPage(page + 1)}>
+          <button
+            className="button secondary"
+            disabled={page >= Math.ceil(total / 10)}
+            onClick={() => setPage(page + 1)}
+          >
             Siguiente
           </button>
         </div>

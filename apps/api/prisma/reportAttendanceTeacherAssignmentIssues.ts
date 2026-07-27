@@ -34,11 +34,15 @@ function normalizeDayOfWeek(value: unknown) {
 }
 
 function normalizeGrade(value: unknown) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
 function normalizeGroup(value: unknown) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
 function dayOfWeekInSpanishUpper(date: Date, timeZone = "America/Bogota") {
@@ -51,14 +55,16 @@ function dayOfWeekInSpanishUpper(date: Date, timeZone = "America/Bogota") {
     MIERCOLES: "MIERCOLES",
     JUEVES: "JUEVES",
     VIERNES: "VIERNES",
-    SABADO: "SABADO"
+    SABADO: "SABADO",
   };
   return map[normalized] || normalized;
 }
 
 function normalizeTeacherSlots(teacherId: string, teacherName: string, rawSchedules: unknown) {
   const schedulesMap =
-    rawSchedules && typeof rawSchedules === "object" ? (rawSchedules as Record<string, unknown>) : {};
+    rawSchedules && typeof rawSchedules === "object"
+      ? (rawSchedules as Record<string, unknown>)
+      : {};
   const slots: TeacherSlot[] = [];
 
   Object.values(schedulesMap).forEach((entry) => {
@@ -71,7 +77,7 @@ function normalizeTeacherSlots(teacherId: string, teacherName: string, rawSchedu
           teacherName,
           dayOfWeek: normalizeDayOfWeek(slot?.dayOfWeek),
           gradeLevel,
-          group: normalizeGroup(slot?.group)
+          group: normalizeGroup(slot?.group),
         });
       });
       return;
@@ -84,7 +90,7 @@ function normalizeTeacherSlots(teacherId: string, teacherName: string, rawSchedu
         teacherName,
         dayOfWeek: normalizeDayOfWeek((entry as any)?.dayOfWeek),
         gradeLevel,
-        group: normalizeGroup((entry as any)?.group)
+        group: normalizeGroup((entry as any)?.group),
       });
     }
   });
@@ -102,7 +108,7 @@ function toCsv(rows: IssueRow[]) {
     "student",
     "classTeacher",
     "issueType",
-    "candidateTeacherNames"
+    "candidateTeacherNames",
   ];
   const escape = (value: string) => `"${String(value || "").replace(/"/g, '""')}"`;
   const lines = [headers.join(",")];
@@ -117,7 +123,7 @@ function toCsv(rows: IssueRow[]) {
         r.student,
         r.classTeacher,
         r.issueType,
-        r.candidateTeacherNames
+        r.candidateTeacherNames,
       ]
         .map(escape)
         .join(",")
@@ -131,8 +137,8 @@ async function main() {
     select: {
       id: true,
       subjectSchedules: true,
-      user: { select: { fullName: true } }
-    }
+      user: { select: { fullName: true } },
+    },
   });
   const allSlots = teachers.flatMap((t) =>
     normalizeTeacherSlots(t.id, String(t.user?.fullName || ""), t.subjectSchedules)
@@ -143,10 +149,10 @@ async function main() {
       enrollment: {
         include: {
           class: { include: { teacher: { include: { user: { select: { fullName: true } } } } } },
-          student: { select: { fullName: true, studentGroup: true } }
-        }
-      }
-    }
+          student: { select: { fullName: true, studentGroup: true } },
+        },
+      },
+    },
   });
 
   const noMatchRows: IssueRow[] = [];
@@ -175,7 +181,9 @@ async function main() {
           .map((s) => `${s.teacherId}::${s.teacherName}`)
       )
     );
-    const candidates = (exactTeachers.length > 0 ? exactTeachers : genericTeachers).map((t) => t.split("::")[1] || "");
+    const candidates = (exactTeachers.length > 0 ? exactTeachers : genericTeachers).map(
+      (t) => t.split("::")[1] || ""
+    );
 
     if (dayGradeSlots.length === 0 || candidates.length === 0) {
       noMatchRows.push({
@@ -187,7 +195,7 @@ async function main() {
         student,
         classTeacher,
         issueType: "NO_MATCH",
-        candidateTeacherNames: ""
+        candidateTeacherNames: "",
       });
       return;
     }
@@ -202,7 +210,7 @@ async function main() {
         student,
         classTeacher,
         issueType: "AMBIGUOUS",
-        candidateTeacherNames: candidates.join(" | ")
+        candidateTeacherNames: candidates.join(" | "),
       });
     }
   });
@@ -227,14 +235,14 @@ async function main() {
           ambiguous: ambiguousRows.length,
           files: {
             noMatchCsv: noMatchCsvPath,
-            ambiguousCsv: ambiguousCsvPath
-          }
+            ambiguousCsv: ambiguousCsvPath,
+          },
         },
         null,
         2
       ),
       "utf8"
-    )
+    ),
   ]);
 
   console.log(`Reporte generado: ${summaryPath}`);
@@ -250,4 +258,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

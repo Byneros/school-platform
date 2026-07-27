@@ -1,5 +1,5 @@
-﻿import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+﻿import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
@@ -8,13 +8,13 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     headers: {
-      "Cache-Control": "no-store"
+      "Cache-Control": "no-store",
     },
     proxy: {
       "/api": {
         target: process.env.VITE_DEV_API_PROXY_TARGET || "http://localhost:4003",
-        changeOrigin: true
-      }
-    }
-  }
+        changeOrigin: true,
+      },
+    },
+  },
 });

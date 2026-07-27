@@ -21,7 +21,7 @@ const gradeLabels: Record<string, string> = {
   OCTAVO: "Octavo",
   NOVENO: "Noveno",
   DECIMO: "Decimo",
-  ONCE: "Once"
+  ONCE: "Once",
 };
 
 const gradeOptions = Object.entries(gradeLabels).map(([value, label]) => ({ value, label }));
@@ -68,32 +68,43 @@ function normalizeDayOfWeek(value: unknown) {
 }
 
 function normalizeGradeGroup(gradeLevelRaw: unknown, groupRaw: unknown) {
-  const gradeRaw = String(gradeLevelRaw || "").trim().toUpperCase();
+  const gradeRaw = String(gradeLevelRaw || "")
+    .trim()
+    .toUpperCase();
   const groupValue = String(groupRaw || "").trim();
   if (gradeRaw.includes("-") && !groupValue) {
-    const [grade, ...rest] = gradeRaw.split("-").map((p) => p.trim()).filter(Boolean);
+    const [grade, ...rest] = gradeRaw
+      .split("-")
+      .map((p) => p.trim())
+      .filter(Boolean);
     return {
       gradeLevel: grade || "",
-      group: rest.join("-") || ""
+      group: rest.join("-") || "",
     };
   }
   return {
     gradeLevel: gradeRaw,
-    group: groupValue
+    group: groupValue,
   };
 }
 
 function normalizeGradeKey(value: unknown) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
 function normalizeGroupKey(value: unknown) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
 function normalizeTeacherSlots(rawSchedules: unknown) {
   const schedulesMap =
-    rawSchedules && typeof rawSchedules === "object" ? (rawSchedules as Record<string, unknown>) : {};
+    rawSchedules && typeof rawSchedules === "object"
+      ? (rawSchedules as Record<string, unknown>)
+      : {};
   const slots: Array<{ dayOfWeek: string; gradeLevel: string; group: string }> = [];
 
   Object.values(schedulesMap).forEach((entry) => {
@@ -103,7 +114,7 @@ function normalizeTeacherSlots(rawSchedules: unknown) {
         slots.push({
           dayOfWeek: normalizeDayOfWeek(slot?.dayOfWeek),
           gradeLevel: normalized.gradeLevel,
-          group: normalized.group
+          group: normalized.group,
         });
       });
       return;
@@ -113,7 +124,7 @@ function normalizeTeacherSlots(rawSchedules: unknown) {
       slots.push({
         dayOfWeek: normalizeDayOfWeek((entry as any)?.dayOfWeek),
         gradeLevel: normalized.gradeLevel,
-        group: normalized.group
+        group: normalized.group,
       });
     }
   });
@@ -131,7 +142,7 @@ function dayOfWeekInSpanishUpper(date = new Date(), timeZone = "America/Bogota")
     MIERCOLES: "MIERCOLES",
     JUEVES: "JUEVES",
     VIERNES: "VIERNES",
-    SABADO: "SABADO"
+    SABADO: "SABADO",
   };
   return map[normalized] || normalized;
 }
@@ -168,18 +179,18 @@ router.get("/", requireAuth, async (req, res) => {
       where: q ? { fullName: { contains: q, mode: "insensitive" } } : {},
       select: { id: true, fullName: true, gradeLevel: true, studentGroup: true },
       orderBy: { fullName: "asc" },
-      take: limit
+      take: limit,
     });
     const options = students.map((s) => ({
       id: s.id,
       value: s.fullName,
       label: `${s.fullName}${s.gradeLevel ? ` - ${gradeLabel(s.gradeLevel)}${s.studentGroup ? s.studentGroup : ""}` : ""}`,
       gradeLevel: s.gradeLevel,
-      studentGroup: s.studentGroup
+      studentGroup: s.studentGroup,
     }));
     const gradeSuggestions = filterGradeSuggestions(q).map((g) => ({
       value: g.value,
-      label: `Grado: ${g.label}`
+      label: `Grado: ${g.label}`,
     }));
     return respond(dedupeOptions([...options, ...gradeSuggestions]).slice(0, limit));
   }
@@ -197,39 +208,41 @@ router.get("/", requireAuth, async (req, res) => {
           where: q ? { fullName: { contains: q, mode: "insensitive" } } : {},
           select: { id: true, fullName: true, gradeLevel: true, studentGroup: true },
           orderBy: { fullName: "asc" },
-          take: normalizedLimit
+          take: normalizedLimit,
         }),
         prisma.user.findMany({
           where: q
             ? {
                 OR: [
                   { fullName: { contains: q, mode: "insensitive" } },
-                  { email: { contains: q, mode: "insensitive" } }
+                  { email: { contains: q, mode: "insensitive" } },
                 ],
-                ...(!isDeveloper ? { role: { not: "DEVELOPER" } } : {})
+                ...(!isDeveloper ? { role: { not: "DEVELOPER" } } : {}),
               }
             : !isDeveloper
-            ? { role: { not: "DEVELOPER" } }
-            : {},
+              ? { role: { not: "DEVELOPER" } }
+              : {},
           select: { id: true, fullName: true, email: true, role: true },
           orderBy: { fullName: "asc" },
-          take: normalizedLimit
+          take: normalizedLimit,
         }),
         prisma.admission.findMany({
           where: q ? { studentName: { contains: q, mode: "insensitive" } } : {},
           select: { id: true, studentName: true, gradeLevel: true },
           orderBy: { studentName: "asc" },
-          take: normalizedLimit
-        })
+          take: normalizedLimit,
+        }),
       ]);
 
       students.forEach((s) => {
         results.push({
           value: s.fullName,
           label: `Estudiante: ${s.fullName}${
-            s.gradeLevel ? ` â€” ${gradeLabel(s.gradeLevel)}${s.studentGroup ? s.studentGroup : ""}` : ""
+            s.gradeLevel
+              ? ` â€” ${gradeLabel(s.gradeLevel)}${s.studentGroup ? s.studentGroup : ""}`
+              : ""
           }`,
-          route: `/admin/observador?studentId=${s.id}`
+          route: `/admin/observador?studentId=${s.id}`,
         });
       });
 
@@ -237,13 +250,13 @@ router.get("/", requireAuth, async (req, res) => {
         results.push({
           value: u.fullName,
           label: `Usuario: ${u.fullName} â€” ${u.role}`,
-          route: `/admin/usuarios?search=${encodeURIComponent(u.fullName)}`
+          route: `/admin/usuarios?search=${encodeURIComponent(u.fullName)}`,
         });
         if (u.email) {
           results.push({
             value: u.email,
             label: `Correo: ${u.email}`,
-            route: `/admin/usuarios?search=${encodeURIComponent(u.email)}`
+            route: `/admin/usuarios?search=${encodeURIComponent(u.email)}`,
           });
         }
       });
@@ -252,7 +265,7 @@ router.get("/", requireAuth, async (req, res) => {
         results.push({
           value: a.studentName,
           label: `Admision: ${a.studentName}${a.gradeLevel ? ` â€” ${gradeLabel(a.gradeLevel)}` : ""}`,
-          route: `/admin/admisiones?search=${encodeURIComponent(a.studentName)}`
+          route: `/admin/admisiones?search=${encodeURIComponent(a.studentName)}`,
         });
       });
 
@@ -263,19 +276,21 @@ router.get("/", requireAuth, async (req, res) => {
       const students = await prisma.student.findMany({
         where: {
           enrollments: { some: { class: { teacher: { userId: auth.userId } } } },
-          ...(q ? { fullName: { contains: q, mode: "insensitive" } } : {})
+          ...(q ? { fullName: { contains: q, mode: "insensitive" } } : {}),
         },
         select: { id: true, fullName: true, gradeLevel: true, studentGroup: true },
         orderBy: { fullName: "asc" },
-        take: normalizedLimit
+        take: normalizedLimit,
       });
       students.forEach((s) => {
         results.push({
           value: s.fullName,
           label: `Estudiante: ${s.fullName}${
-            s.gradeLevel ? ` â€” ${gradeLabel(s.gradeLevel)}${s.studentGroup ? s.studentGroup : ""}` : ""
+            s.gradeLevel
+              ? ` â€” ${gradeLabel(s.gradeLevel)}${s.studentGroup ? s.studentGroup : ""}`
+              : ""
           }`,
-          route: `/teacher/observador?studentId=${s.id}`
+          route: `/teacher/observador?studentId=${s.id}`,
         });
       });
       return respond(dedupeOptions(results).slice(0, limit));
@@ -286,23 +301,28 @@ router.get("/", requireAuth, async (req, res) => {
       if (!parent) return respond([]);
       const guardians = await prisma.guardian.findMany({
         where: { parentId: parent.id },
-        select: { studentId: true }
+        select: { studentId: true },
       });
       const studentIds = guardians.map((g) => g.studentId);
       if (studentIds.length === 0) return respond([]);
       const students = await prisma.student.findMany({
-        where: { id: { in: studentIds }, ...(q ? { fullName: { contains: q, mode: "insensitive" } } : {}) },
+        where: {
+          id: { in: studentIds },
+          ...(q ? { fullName: { contains: q, mode: "insensitive" } } : {}),
+        },
         select: { id: true, fullName: true, gradeLevel: true, studentGroup: true },
         orderBy: { fullName: "asc" },
-        take: normalizedLimit
+        take: normalizedLimit,
       });
       students.forEach((s) => {
         results.push({
           value: s.fullName,
           label: `Estudiante: ${s.fullName}${
-            s.gradeLevel ? ` â€” ${gradeLabel(s.gradeLevel)}${s.studentGroup ? s.studentGroup : ""}` : ""
+            s.gradeLevel
+              ? ` â€” ${gradeLabel(s.gradeLevel)}${s.studentGroup ? s.studentGroup : ""}`
+              : ""
           }`,
-          route: `/parent/observador?studentId=${s.id}`
+          route: `/parent/observador?studentId=${s.id}`,
         });
       });
       return respond(dedupeOptions(results).slice(0, limit));
@@ -316,20 +336,20 @@ router.get("/", requireAuth, async (req, res) => {
         ? {
             OR: [
               { fullName: { contains: q, mode: "insensitive" } },
-              { email: { contains: q, mode: "insensitive" } }
+              { email: { contains: q, mode: "insensitive" } },
             ],
-            ...(!isDeveloper ? { role: { not: "DEVELOPER" } } : {})
+            ...(!isDeveloper ? { role: { not: "DEVELOPER" } } : {}),
           }
         : !isDeveloper
-        ? { role: { not: "DEVELOPER" } }
-        : {},
+          ? { role: { not: "DEVELOPER" } }
+          : {},
       select: { id: true, fullName: true, email: true, role: true },
       orderBy: { fullName: "asc" },
-      take: limit
+      take: limit,
     });
     const options = users.flatMap((u) => [
       { id: u.id, value: u.fullName, label: `Nombre: ${u.fullName} — ${u.role}` },
-      { id: u.id, value: u.email, label: `Correo: ${u.email}` }
+      { id: u.id, value: u.email, label: `Correo: ${u.email}` },
     ]);
     return respond(dedupeOptions(options).slice(0, limit));
   }
@@ -343,20 +363,20 @@ router.get("/", requireAuth, async (req, res) => {
           ? {
               OR: [
                 { fullName: { contains: q, mode: "insensitive" } },
-                { email: { contains: q, mode: "insensitive" } }
-              ]
+                { email: { contains: q, mode: "insensitive" } },
+              ],
             }
-          : {})
+          : {}),
       },
       select: { id: true, fullName: true, email: true },
       orderBy: { fullName: "asc" },
-      take: limit
+      take: limit,
     });
     const options = teachers.map((t) => ({
       id: t.id,
       value: t.fullName,
       label: `${t.fullName} (${t.email})`,
-      email: t.email
+      email: t.email,
     }));
     return respond(dedupeOptions(options).slice(0, limit));
   }
@@ -367,12 +387,12 @@ router.get("/", requireAuth, async (req, res) => {
       where: q ? { studentName: { contains: q, mode: "insensitive" } } : {},
       select: { id: true, studentName: true, gradeLevel: true },
       orderBy: { studentName: "asc" },
-      take: limit
+      take: limit,
     });
     const options = admissions.map((a) => ({
       id: a.id,
       value: a.studentName,
-      label: `${a.studentName}${a.gradeLevel ? ` — ${gradeLabel(a.gradeLevel)}` : ""}`
+      label: `${a.studentName}${a.gradeLevel ? ` — ${gradeLabel(a.gradeLevel)}` : ""}`,
     }));
     return respond(dedupeOptions(options).slice(0, limit));
   }
@@ -384,8 +404,8 @@ router.get("/", requireAuth, async (req, res) => {
         ? {
             OR: [
               { studentFullName: { contains: q, mode: "insensitive" } },
-              { guardianFullName: { contains: q, mode: "insensitive" } }
-            ]
+              { guardianFullName: { contains: q, mode: "insensitive" } },
+            ],
           }
         : {},
       select: {
@@ -393,10 +413,10 @@ router.get("/", requireAuth, async (req, res) => {
         studentFullName: true,
         guardianFullName: true,
         studentGradeLevel: true,
-        student: { select: { studentGroup: true } }
+        student: { select: { studentGroup: true } },
       },
       orderBy: { studentFullName: "asc" },
-      take: limit
+      take: limit,
     });
     const options = enrollments.flatMap((e) => {
       const gradeText = e.studentGradeLevel ? gradeLabel(e.studentGradeLevel) : "";
@@ -405,18 +425,18 @@ router.get("/", requireAuth, async (req, res) => {
         {
           id: e.id,
           value: e.studentFullName,
-          label: `Estudiante: ${e.studentFullName}${gradeText || group ? ` — ${[gradeText, group].filter(Boolean).join(" ")}` : ""}`
+          label: `Estudiante: ${e.studentFullName}${gradeText || group ? ` — ${[gradeText, group].filter(Boolean).join(" ")}` : ""}`,
         },
         {
           id: e.id,
           value: e.guardianFullName || "",
-          label: e.guardianFullName ? `Acudiente: ${e.guardianFullName}` : ""
-        }
+          label: e.guardianFullName ? `Acudiente: ${e.guardianFullName}` : "",
+        },
       ].filter((item) => item.value && item.label);
     });
     const gradeSuggestions = filterGradeSuggestions(q).map((g) => ({
       value: g.value,
-      label: `Grado: ${g.label}`
+      label: `Grado: ${g.label}`,
     }));
     return respond(dedupeOptions([...options, ...gradeSuggestions]).slice(0, limit));
   }
@@ -427,7 +447,7 @@ router.get("/", requireAuth, async (req, res) => {
       where: q ? { student: { is: { fullName: { contains: q, mode: "insensitive" } } } } : {},
       select: { id: true, status: true, dueDate: true, student: { select: { fullName: true } } },
       orderBy: { dueDate: "desc" },
-      take: limit
+      take: limit,
     });
     const options = invoices.map((inv) => {
       const name = inv.student?.fullName || "";
@@ -436,7 +456,7 @@ router.get("/", requireAuth, async (req, res) => {
       return {
         id: inv.id,
         value: name,
-        label: suffix ? `${name} — ${suffix}` : name
+        label: suffix ? `${name} — ${suffix}` : name,
       };
     });
     return respond(dedupeOptions(options).slice(0, limit));
@@ -449,19 +469,23 @@ router.get("/", requireAuth, async (req, res) => {
         ? {
             OR: [
               { id: { contains: q, mode: "insensitive" } },
-              { invoice: { student: { fullName: { contains: q, mode: "insensitive" } } } }
-            ]
+              { invoice: { student: { fullName: { contains: q, mode: "insensitive" } } } },
+            ],
           }
         : {},
-      select: { id: true, paidAt: true, invoice: { select: { student: { select: { fullName: true } } } } },
+      select: {
+        id: true,
+        paidAt: true,
+        invoice: { select: { student: { select: { fullName: true } } } },
+      },
       orderBy: { paidAt: "desc" },
-      take: limit
+      take: limit,
     });
     const options = payments.flatMap((p) => {
       const name = p.invoice?.student?.fullName || "";
       return [
         { id: p.id, value: p.id, label: name ? `Pago: ${p.id} — ${name}` : `Pago: ${p.id}` },
-        { id: p.id, value: name, label: name ? `Estudiante: ${name}` : "" }
+        { id: p.id, value: name, label: name ? `Estudiante: ${name}` : "" },
       ].filter((item) => item.value && item.label);
     });
     return respond(dedupeOptions(options).slice(0, limit));
@@ -471,9 +495,14 @@ router.get("/", requireAuth, async (req, res) => {
     if (!isAdminLike) return res.status(403).json({ message: "Sin permisos" });
     const enrollments = await prisma.enrollment.findMany({
       where: q ? { studentFullName: { contains: q, mode: "insensitive" } } : {},
-      select: { id: true, studentFullName: true, studentGradeLevel: true, student: { select: { studentGroup: true } } },
+      select: {
+        id: true,
+        studentFullName: true,
+        studentGradeLevel: true,
+        student: { select: { studentGroup: true } },
+      },
       orderBy: { studentFullName: "asc" },
-      take: limit
+      take: limit,
     });
     const options = enrollments.map((e) => {
       const gradeText = e.studentGradeLevel ? gradeLabel(e.studentGradeLevel) : "";
@@ -482,7 +511,7 @@ router.get("/", requireAuth, async (req, res) => {
       return {
         id: e.id,
         value: e.studentFullName,
-        label: suffix ? `${e.studentFullName} — ${suffix}` : e.studentFullName
+        label: suffix ? `${e.studentFullName} — ${suffix}` : e.studentFullName,
       };
     });
     return respond(dedupeOptions(options).slice(0, limit));
@@ -495,11 +524,11 @@ router.get("/", requireAuth, async (req, res) => {
     const grades = await prisma.grade.findMany({
       where: {
         enrollment: { class: { teacherId: teacher.id } },
-        ...(q ? { name: { contains: q, mode: "insensitive" } } : {})
+        ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
       },
       include: { enrollment: { include: { class: true } } },
       orderBy: { createdAt: "desc" },
-      take: Math.max(limit * 4, 20)
+      take: Math.max(limit * 4, 20),
     });
     const options: Array<{ value: string; label: string }> = [];
     grades.forEach((g) => {
@@ -513,7 +542,11 @@ router.get("/", requireAuth, async (req, res) => {
         gradeText.toLowerCase().includes(qLower);
       if (!matchesQuery) return;
       if (name) options.push({ value: name, label: `Evaluacion: ${name}` });
-      if (gradeValue) options.push({ value: gradeText || gradeValue, label: `Grado: ${gradeText || gradeValue}` });
+      if (gradeValue)
+        options.push({
+          value: gradeText || gradeValue,
+          label: `Grado: ${gradeText || gradeValue}`,
+        });
     });
     const unique = dedupeOptions(options);
     const recentFirst = unique.slice(0, limit);
@@ -524,7 +557,7 @@ router.get("/", requireAuth, async (req, res) => {
     if (auth?.role !== "TEACHER") return res.status(403).json({ message: "Sin permisos" });
     const teacher = await prisma.teacher.findUnique({
       where: { userId: auth.userId },
-      select: { id: true, subjectSchedules: true }
+      select: { id: true, subjectSchedules: true },
     });
     if (!teacher) return respond([]);
     const dayOfWeek = dayOfWeekInSpanishUpper();
@@ -534,7 +567,11 @@ router.get("/", requireAuth, async (req, res) => {
     if (targetSlots.length === 0) return respond([]);
 
     const uniquePairs = Array.from(
-      new Set(targetSlots.map((s) => `${normalizeGradeKey(s.gradeLevel)}::${normalizeGroupKey(s.group || "")}`))
+      new Set(
+        targetSlots.map(
+          (s) => `${normalizeGradeKey(s.gradeLevel)}::${normalizeGroupKey(s.group || "")}`
+        )
+      )
     ).map((key) => {
       const [gradeLevel, group] = key.split("::");
       return { gradeLevel, group };
@@ -546,10 +583,10 @@ router.get("/", requireAuth, async (req, res) => {
           class: { gradeLevel: pair.gradeLevel as any },
           ...(pair.group && pair.group !== "-"
             ? { student: { studentGroup: { equals: pair.group, mode: "insensitive" as const } } }
-            : {})
-        }))
+            : {}),
+        })),
       },
-      include: { student: true, class: true }
+      include: { student: true, class: true },
     });
 
     const options: Array<{ value: string; label: string }> = [];
@@ -557,18 +594,21 @@ router.get("/", requireAuth, async (req, res) => {
       const studentName = String(e.student?.fullName || e.studentFullName || "").trim();
       const grade = String(getEnrollmentGradeLevel(e) || e.studentGradeLevel || "").trim();
       const group = String(e.student?.studentGroup || "").trim();
-      const matchesQuery = !qLower || studentName.toLowerCase().includes(qLower) || grade.toLowerCase().includes(qLower);
+      const matchesQuery =
+        !qLower ||
+        studentName.toLowerCase().includes(qLower) ||
+        grade.toLowerCase().includes(qLower);
       if (!matchesQuery) return;
       if (studentName) {
         options.push({
           value: studentName,
-          label: `Estudiante: ${studentName}${grade || group ? ` — ${[grade, group].filter(Boolean).join(" ")}` : ""}`
+          label: `Estudiante: ${studentName}${grade || group ? ` — ${[grade, group].filter(Boolean).join(" ")}` : ""}`,
         });
       }
       if (grade) {
         options.push({
           value: grade,
-          label: `Grado: ${grade}`
+          label: `Grado: ${grade}`,
         });
       }
     });
@@ -581,7 +621,7 @@ router.get("/", requireAuth, async (req, res) => {
     if (!parent) return respond([]);
     const guardians = await prisma.guardian.findMany({
       where: { parentId: parent.id },
-      select: { studentId: true }
+      select: { studentId: true },
     });
     const studentIds = guardians.map((g) => g.studentId);
     if (studentIds.length === 0) return respond([]);
@@ -589,18 +629,21 @@ router.get("/", requireAuth, async (req, res) => {
       where: { enrollment: { studentId: { in: studentIds } } },
       include: { enrollment: { include: { class: true, student: true } } },
       orderBy: { createdAt: "desc" },
-      take: Math.max(limit * 6, 30)
+      take: Math.max(limit * 6, 30),
     });
-    const grouped = new Map<string, {
-      student: string;
-      grade: string;
-      group: string;
-      period: string;
-      subject: string;
-      maxScore: number;
-      sum: number;
-      count: number;
-    }>();
+    const grouped = new Map<
+      string,
+      {
+        student: string;
+        grade: string;
+        group: string;
+        period: string;
+        subject: string;
+        maxScore: number;
+        sum: number;
+        count: number;
+      }
+    >();
     grades.forEach((g) => {
       const enrollment = g.enrollment;
       if (!enrollment) return;
@@ -609,7 +652,9 @@ router.get("/", requireAuth, async (req, res) => {
       const gradeValue = getEnrollmentGradeLevel(enrollment);
       const gradeText = gradeValue ? gradeLabel(gradeValue) : "";
       const groupText = String(enrollment.student?.studentGroup || "").trim();
-      const studentName = String(enrollment.student?.fullName || enrollment.studentFullName || "").trim();
+      const studentName = String(
+        enrollment.student?.fullName || enrollment.studentFullName || ""
+      ).trim();
       const key = `${enrollment.id}::${g.period}::${subject}`;
       if (!grouped.has(key)) {
         grouped.set(key, {
@@ -620,7 +665,7 @@ router.get("/", requireAuth, async (req, res) => {
           subject,
           maxScore: Number(g.maxScore || 0),
           sum: 0,
-          count: 0
+          count: 0,
         });
       }
       const entry = grouped.get(key)!;
@@ -645,10 +690,12 @@ router.get("/", requireAuth, async (req, res) => {
         entry.period.toLowerCase().includes(qLower) ||
         scoreText.toLowerCase().includes(qLower);
       if (!matchesQuery) return;
-      if (entry.student) options.push({ value: entry.student, label: `Estudiante: ${entry.student}` });
+      if (entry.student)
+        options.push({ value: entry.student, label: `Estudiante: ${entry.student}` });
       if (entry.grade) options.push({ value: entry.grade, label: `Grado: ${entry.grade}` });
       if (entry.group) options.push({ value: entry.group, label: `Grupo: ${entry.group}` });
-      if (entry.subject) options.push({ value: entry.subject, label: `Asignatura: ${entry.subject}` });
+      if (entry.subject)
+        options.push({ value: entry.subject, label: `Asignatura: ${entry.subject}` });
       if (entry.period) options.push({ value: entry.period, label: `Periodo: ${entry.period}` });
       options.push({ value: scoreText, label: `Nota definitiva: ${scoreText}` });
     });
@@ -663,14 +710,14 @@ router.get("/", requireAuth, async (req, res) => {
     if (!parent) return respond([]);
     const guardians = await prisma.guardian.findMany({
       where: { parentId: parent.id },
-      select: { studentId: true }
+      select: { studentId: true },
     });
     const studentIds = guardians.map((g) => g.studentId);
     if (studentIds.length === 0) return respond([]);
     const invoices = await prisma.invoice.findMany({
       where: { studentId: { in: studentIds } },
       orderBy: { createdAt: "desc" },
-      take: Math.max(limit * 4, 20)
+      take: Math.max(limit * 4, 20),
     });
     const options: Array<{ value: string; label: string }> = [];
     invoices.forEach((inv) => {
@@ -698,7 +745,7 @@ router.get("/", requireAuth, async (req, res) => {
       where: { parentId: parent.id },
       include: { notification: true },
       orderBy: { notification: { createdAt: "desc" } },
-      take: Math.max(limit * 4, 20)
+      take: Math.max(limit * 4, 20),
     });
     const options: Array<{ value: string; label: string }> = [];
     items.forEach((item) => {
@@ -726,4 +773,3 @@ router.get("/", requireAuth, async (req, res) => {
 });
 
 export default router;
-

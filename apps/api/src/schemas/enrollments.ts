@@ -10,7 +10,7 @@ const guardianRelationSchema = z.enum([
   "TIA",
   "HERMANO",
   "HERMANA",
-  "ACUDIENTE_LEGAL"
+  "ACUDIENTE_LEGAL",
 ]);
 
 export const createEnrollmentSchema = z.object({
@@ -42,16 +42,16 @@ export const createEnrollmentSchema = z.object({
         residenceProof: z.boolean().optional(),
         healthCertificate: z.boolean().optional(),
         vaccinationCard: z.boolean().optional(),
-        previousReport: z.boolean().optional()
+        previousReport: z.boolean().optional(),
       })
       .optional(),
-    documentsNotes: z.string().optional()
-  })
+    documentsNotes: z.string().optional(),
+  }),
 });
 
 export const updateEnrollmentSchema = z.object({
   params: z.object({
-    id: z.string().min(1)
+    id: z.string().min(1),
   }),
   body: z.object({
     classId: z.string().min(1).optional(),
@@ -79,9 +79,9 @@ export const updateEnrollmentSchema = z.object({
         residenceProof: z.boolean().optional(),
         healthCertificate: z.boolean().optional(),
         vaccinationCard: z.boolean().optional(),
-        previousReport: z.boolean().optional()
+        previousReport: z.boolean().optional(),
       })
       .optional(),
-    documentsNotes: z.string().optional()
-  })
+    documentsNotes: z.string().optional(),
+  }),
 });

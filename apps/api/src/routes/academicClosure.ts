@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
@@ -29,9 +29,9 @@ async function computeResultsForYear(
     include: {
       class: { select: { gradeLevel: true } },
       student: { select: { fullName: true, studentGroup: true } },
-      grades: true
+      grades: true,
     },
-    orderBy: [{ studentFullName: "asc" }]
+    orderBy: [{ studentFullName: "asc" }],
   });
 
   return enrollments.map((enrollment) => {
@@ -46,13 +46,15 @@ async function computeResultsForYear(
 
     const subjectAverages = Array.from(bySubject.entries()).map(([subject, scores]) => ({
       subject,
-      average: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+      average: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
     }));
 
     const totalSubjects = subjectAverages.length;
     const failedSubjects = subjectAverages.filter((s) => s.average < rules.minAverage).length;
     const finalAverage = round2(
-      subjectAverages.length ? subjectAverages.reduce((a, s) => a + s.average, 0) / subjectAverages.length : 0
+      subjectAverages.length
+        ? subjectAverages.reduce((a, s) => a + s.average, 0) / subjectAverages.length
+        : 0
     );
 
     let status: "PROMOTED" | "NOT_PROMOTED" | "PENDING" = "PENDING";
@@ -77,7 +79,7 @@ async function computeResultsForYear(
       totalSubjects,
       failedSubjects,
       status,
-      notes
+      notes,
     };
   });
 }
@@ -93,7 +95,9 @@ router.get("/settings/history", requireAuth, requireRole(["ADMIN"]), async (req,
   const page = Number(req.query.page || 1);
   const pageSize = Number(req.query.pageSize || 20);
   const branding = await getBrandingSettings();
-  const history = Array.isArray(branding.promotionRulesHistory) ? branding.promotionRulesHistory : [];
+  const history = Array.isArray(branding.promotionRulesHistory)
+    ? branding.promotionRulesHistory
+    : [];
   const total = history.length;
   const start = Math.max(0, (page - 1) * pageSize);
   const data = history.slice(start, start + pageSize).map((item: any) => {
@@ -107,9 +111,9 @@ router.get("/settings/history", requireAuth, requireRole(["ADMIN"]), async (req,
             id: source.id,
             changedAt: source.changedAt,
             changedByName: source.changedByName,
-            next: source.next
+            next: source.next,
           }
-        : null
+        : null,
     };
   });
   res.json({ data, total, page, pageSize });
@@ -123,16 +127,18 @@ router.put("/settings", requireAuth, requireRole(["ADMIN"]), async (req, res) =>
     return res.status(400).json({ message: "El promedio minimo debe estar entre 0 y 100" });
   }
   if (!Number.isInteger(maxFailedSubjects) || maxFailedSubjects < 0 || maxFailedSubjects > 20) {
-    return res.status(400).json({ message: "Las asignaturas reprobadas maximas deben ser un entero entre 0 y 20" });
+    return res
+      .status(400)
+      .json({ message: "Las asignaturas reprobadas maximas deben ser un entero entre 0 y 20" });
   }
   const current = await getBrandingSettings();
   const currentRules = {
     minAverage: Number(current.promotionRules?.minAverage ?? 60),
-    maxFailedSubjects: Number(current.promotionRules?.maxFailedSubjects ?? 2)
+    maxFailedSubjects: Number(current.promotionRules?.maxFailedSubjects ?? 2),
   };
   const user = await prisma.user.findUnique({
     where: { id: auth.userId },
-    select: { fullName: true }
+    select: { fullName: true },
   });
 
   const changed =
@@ -146,20 +152,20 @@ router.put("/settings", requireAuth, requireRole(["ADMIN"]), async (req, res) =>
           changedById: auth.userId,
           changedByName: user?.fullName || "Administrador",
           previous: currentRules,
-          next: { minAverage, maxFailedSubjects }
+          next: { minAverage, maxFailedSubjects },
         },
-        ...(Array.isArray(current.promotionRulesHistory) ? current.promotionRulesHistory : [])
+        ...(Array.isArray(current.promotionRulesHistory) ? current.promotionRulesHistory : []),
       ].slice(0, 200)
     : Array.isArray(current.promotionRulesHistory)
-    ? current.promotionRulesHistory
-    : [];
+      ? current.promotionRulesHistory
+      : [];
 
   const updated = await saveBrandingSettings({
     promotionRules: {
       minAverage,
-      maxFailedSubjects
+      maxFailedSubjects,
     },
-    promotionRulesHistory: nextHistory
+    promotionRulesHistory: nextHistory,
   } as any);
   res.json(updated.promotionRules);
 });
@@ -176,16 +182,16 @@ router.post("/settings/restore", requireAuth, requireRole(["ADMIN"]), async (req
 
   const currentRules = {
     minAverage: Number(current.promotionRules?.minAverage ?? 60),
-    maxFailedSubjects: Number(current.promotionRules?.maxFailedSubjects ?? 2)
+    maxFailedSubjects: Number(current.promotionRules?.maxFailedSubjects ?? 2),
   };
   const nextRules = {
     minAverage: Number(target.next?.minAverage ?? 60),
-    maxFailedSubjects: Number(target.next?.maxFailedSubjects ?? 2)
+    maxFailedSubjects: Number(target.next?.maxFailedSubjects ?? 2),
   };
 
   const user = await prisma.user.findUnique({
     where: { id: auth.userId },
-    select: { fullName: true }
+    select: { fullName: true },
   });
 
   const restoredHistory = [
@@ -196,20 +202,20 @@ router.post("/settings/restore", requireAuth, requireRole(["ADMIN"]), async (req
       changedByName: user?.fullName || "Administrador",
       restoredFromId: versionId,
       previous: currentRules,
-      next: nextRules
+      next: nextRules,
     },
-    ...history
+    ...history,
   ].slice(0, 200);
 
   const updated = await saveBrandingSettings({
     promotionRules: nextRules,
-    promotionRulesHistory: restoredHistory
+    promotionRulesHistory: restoredHistory,
   } as any);
 
   res.json({
     ok: true,
     restoredFromId: versionId,
-    promotionRules: updated.promotionRules
+    promotionRules: updated.promotionRules,
   });
 });
 
@@ -221,7 +227,7 @@ router.get("/preview", requireAuth, requireRole(["ADMIN"]), async (req, res) => 
   const branding = await getBrandingSettings();
   const data = await computeResultsForYear(year, {
     minAverage: Number(branding.promotionRules?.minAverage ?? 60),
-    maxFailedSubjects: Number(branding.promotionRules?.maxFailedSubjects ?? 2)
+    maxFailedSubjects: Number(branding.promotionRules?.maxFailedSubjects ?? 2),
   });
   res.json({ year, data, total: data.length });
 });
@@ -236,7 +242,7 @@ router.post("/run", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const branding = await getBrandingSettings();
   const rules = {
     minAverage: Number(branding.promotionRules?.minAverage ?? 60),
-    maxFailedSubjects: Number(branding.promotionRules?.maxFailedSubjects ?? 2)
+    maxFailedSubjects: Number(branding.promotionRules?.maxFailedSubjects ?? 2),
   };
   const computed = await computeResultsForYear(year, rules);
   const result = await prisma.$transaction(async (tx) => {
@@ -251,7 +257,7 @@ router.post("/run", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
           failedSubjects: row.failedSubjects,
           status: row.status,
           notes: row.notes,
-          closedById: auth.userId
+          closedById: auth.userId,
         },
         update: {
           finalAverage: row.finalAverage,
@@ -260,8 +266,8 @@ router.post("/run", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
           status: row.status,
           notes: row.notes,
           closedById: auth.userId,
-          closedAt: new Date()
-        }
+          closedAt: new Date(),
+        },
       });
     }
     return computed.length;
@@ -287,13 +293,13 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
         ? {
             OR: [
               { studentFullName: { contains: search, mode: "insensitive" } },
-              { student: { fullName: { contains: search, mode: "insensitive" } } }
-            ]
+              { student: { fullName: { contains: search, mode: "insensitive" } } },
+            ],
           }
         : {}),
       ...(gradeLevel ? { class: { gradeLevel: gradeLevel as any } } : {}),
-      ...(group ? { student: { studentGroup: group } } : {})
-    }
+      ...(group ? { student: { studentGroup: group } } : {}),
+    },
   };
 
   const [data, total] = await Promise.all([
@@ -301,13 +307,13 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
       where,
       include: {
         enrollment: { include: { student: true, class: true } },
-        closedBy: { select: { fullName: true, role: true } }
+        closedBy: { select: { fullName: true, role: true } },
       },
       orderBy: [{ status: "asc" }, { finalAverage: "desc" }],
       skip: (page - 1) * pageSize,
-      take: pageSize
+      take: pageSize,
     }),
-    prisma.academicClosureResult.count({ where })
+    prisma.academicClosureResult.count({ where }),
   ]);
   res.json({ data, total, page, pageSize, year });
 });
@@ -326,24 +332,24 @@ router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (req, res
         ? {
             OR: [
               { studentFullName: { contains: search, mode: "insensitive" } },
-              { student: { fullName: { contains: search, mode: "insensitive" } } }
-            ]
+              { student: { fullName: { contains: search, mode: "insensitive" } } },
+            ],
           }
         : {}),
       ...(gradeLevel ? { class: { gradeLevel: gradeLevel as any } } : {}),
-      ...(group ? { student: { studentGroup: group } } : {})
-    }
+      ...(group ? { student: { studentGroup: group } } : {}),
+    },
   };
   const data = await prisma.academicClosureResult.findMany({
     where,
     include: {
       enrollment: { include: { student: true, class: true } },
-      closedBy: { select: { fullName: true } }
+      closedBy: { select: { fullName: true } },
     },
-    orderBy: [{ status: "asc" }, { finalAverage: "desc" }]
+    orderBy: [{ status: "asc" }, { finalAverage: "desc" }],
   });
   const branding = await getBrandingSettings();
-  const xlsx = buildXlsxReportBuffer({
+  const xlsx = await buildXlsxReportBuffer({
     title: `Cierre Academico y Promocion ${year}`,
     institutionName: branding.schoolName,
     columns: [
@@ -355,7 +361,7 @@ router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (req, res
       { key: "failedSubjects", label: "Reprobadas" },
       { key: "status", label: "Estado final" },
       { key: "closedBy", label: "Cerrado por" },
-      { key: "closedAt", label: "Fecha cierre" }
+      { key: "closedAt", label: "Fecha cierre" },
     ],
     rows: data.map((r) => ({
       student: r.enrollment?.student?.fullName || r.enrollment?.studentFullName || "-",
@@ -366,11 +372,14 @@ router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (req, res
       failedSubjects: r.failedSubjects,
       status: r.status,
       closedBy: r.closedBy?.fullName || "-",
-      closedAt: r.closedAt.toISOString().slice(0, 10)
-    }))
+      closedAt: r.closedAt.toISOString().slice(0, 10),
+    })),
   });
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", `attachment; filename=\"cierre-academico-${year}.xlsx\"`);
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader("Content-Disposition", `attachment; filename="cierre-academico-${year}.xlsx"`);
   res.send(xlsx);
 });
 
@@ -388,21 +397,21 @@ router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (req, res) 
         ? {
             OR: [
               { studentFullName: { contains: search, mode: "insensitive" } },
-              { student: { fullName: { contains: search, mode: "insensitive" } } }
-            ]
+              { student: { fullName: { contains: search, mode: "insensitive" } } },
+            ],
           }
         : {}),
       ...(gradeLevel ? { class: { gradeLevel: gradeLevel as any } } : {}),
-      ...(group ? { student: { studentGroup: group } } : {})
-    }
+      ...(group ? { student: { studentGroup: group } } : {}),
+    },
   };
   const data = await prisma.academicClosureResult.findMany({
     where,
     include: {
       enrollment: { include: { student: true, class: true } },
-      closedBy: { select: { fullName: true } }
+      closedBy: { select: { fullName: true } },
     },
-    orderBy: [{ status: "asc" }, { finalAverage: "desc" }]
+    orderBy: [{ status: "asc" }, { finalAverage: "desc" }],
   });
   const branding = await getBrandingSettings();
   sendTabularPdf(res, {
@@ -417,7 +426,7 @@ router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (req, res) 
       { key: "failedSubjects", label: "Rep.", width: 35, align: "center" },
       { key: "status", label: "Estado", width: 72, align: "center" },
       { key: "closedBy", label: "Cerrado por", width: 95 },
-      { key: "closedAt", label: "Fecha", width: 55, align: "center" }
+      { key: "closedAt", label: "Fecha", width: 55, align: "center" },
     ],
     rows: data.map((r) => ({
       student: r.enrollment?.student?.fullName || r.enrollment?.studentFullName || "-",
@@ -427,8 +436,8 @@ router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (req, res) 
       failedSubjects: r.failedSubjects,
       status: r.status,
       closedBy: r.closedBy?.fullName || "-",
-      closedAt: r.closedAt.toISOString().slice(0, 10)
-    }))
+      closedAt: r.closedAt.toISOString().slice(0, 10),
+    })),
   });
 });
 

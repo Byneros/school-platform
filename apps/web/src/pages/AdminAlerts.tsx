@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import ActionFeedback from "../components/ActionFeedback";
-import Section from "../components/Section";
-import KpiCard from "../components/KpiCard";
 import DataTable from "../components/DataTable";
+import KpiCard from "../components/KpiCard";
+import Section from "../components/Section";
 import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
 import { gradeLabel } from "../services/grades";
-import { isDueProcessNotification, prioritizeDueProcess } from "../utils/notificationPriority";
 import { feedbackTitles, inferFeedbackTone } from "../utils/feedback";
+import { isDueProcessNotification, prioritizeDueProcess } from "../utils/notificationPriority";
 
 type Admission = {
   id: string;
@@ -83,36 +84,44 @@ export default function AdminAlerts() {
       apiGet(`/admissions?page=1&pageSize=80${statusParam}`),
       apiGet(`/notifications?page=1&pageSize=80${statusParam}`),
       apiGet(`/reports/certificate/requests?page=1&pageSize=80${statusParam}`),
-      statusFilter === "PENDING" ? apiGet("/invoices?page=1&pageSize=200&status=PENDING") : Promise.resolve({ data: [] }),
-      statusFilter === "PENDING" ? apiGet("/student-observations/follow-ups?days=7&status=PENDING") : Promise.resolve({ data: [] }),
-      statusFilter === "PENDING" ? apiGet("/users/parents/pending-account") : Promise.resolve({ data: [] })
+      statusFilter === "PENDING"
+        ? apiGet("/invoices?page=1&pageSize=200&status=PENDING")
+        : Promise.resolve({ data: [] }),
+      statusFilter === "PENDING"
+        ? apiGet("/student-observations/follow-ups?days=7&status=PENDING")
+        : Promise.resolve({ data: [] }),
+      statusFilter === "PENDING"
+        ? apiGet("/users/parents/pending-account")
+        : Promise.resolve({ data: [] }),
     ])
-      .then(([admissionsRes, notificationsRes, certificateRes, invoicesRes, followRes, parentsRes]) => {
-        const admissions = admissionsRes?.data || [];
-        const notifications = notificationsRes?.data || [];
-        const certificates = certificateRes?.data || [];
-        const invoices = invoicesRes?.data || [];
-        const follow = followRes?.data || [];
-        const parents = parentsRes?.data || [];
+      .then(
+        ([admissionsRes, notificationsRes, certificateRes, invoicesRes, followRes, parentsRes]) => {
+          const admissions = admissionsRes?.data || [];
+          const notifications = notificationsRes?.data || [];
+          const certificates = certificateRes?.data || [];
+          const invoices = invoicesRes?.data || [];
+          const follow = followRes?.data || [];
+          const parents = parentsRes?.data || [];
 
-        setPendingAdmissions(admissions);
+          setPendingAdmissions(admissions);
 
-        setPendingNotifications(notifications);
+          setPendingNotifications(notifications);
 
-        setPendingCertificates(certificates);
+          setPendingCertificates(certificates);
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const overdue = invoices.filter((inv: Invoice) => {
-          if (!inv?.dueDate) return false;
-          const due = new Date(inv.dueDate);
-          return !Number.isNaN(due.getTime()) && due < today;
-        });
-        setOverdueInvoices(overdue.slice(0, 8));
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const overdue = invoices.filter((inv: Invoice) => {
+            if (!inv?.dueDate) return false;
+            const due = new Date(inv.dueDate);
+            return !Number.isNaN(due.getTime()) && due < today;
+          });
+          setOverdueInvoices(overdue.slice(0, 8));
 
-        setFollowUps(follow);
-        setPendingParents(parents);
-      })
+          setFollowUps(follow);
+          setPendingParents(parents);
+        }
+      )
       .catch((err: any) => {
         setMessage(err?.message || "No se pudo cargar el centro de alertas.");
       })
@@ -171,7 +180,7 @@ export default function AdminAlerts() {
     const query = new URLSearchParams({
       ...(statusFilter ? { status: statusFilter } : {}),
       ...(fromDate ? { fromDate } : {}),
-      ...(toDate ? { toDate } : {})
+      ...(toDate ? { toDate } : {}),
     }).toString();
     try {
       const blob = await apiDownload(`/reports/alerts/pdf${query ? `?${query}` : ""}`);
@@ -192,7 +201,7 @@ export default function AdminAlerts() {
     const query = new URLSearchParams({
       ...(statusFilter ? { status: statusFilter } : {}),
       ...(fromDate ? { fromDate } : {}),
-      ...(toDate ? { toDate } : {})
+      ...(toDate ? { toDate } : {}),
     }).toString();
     try {
       const blob = await apiDownload(`/reports/alerts/excel${query ? `?${query}` : ""}`);
@@ -276,75 +285,97 @@ export default function AdminAlerts() {
     }
   };
 
-  const summaryCards = useMemo(() => [
-    {
-      title: "Admisiones pendientes",
-      value: String(filteredAdmissions.length),
-      trend: "Por revisar",
-      tone: "warning" as const,
-      onClick: () => navigate("/admin/admisiones")
-    },
-    {
-      title: "Certificados pendientes",
-      value: String(filteredCertificates.length),
-      trend: "Solicitudes",
-      tone: "warning" as const,
-      onClick: () => navigate("/admin/certificados")
-    },
-    {
-      title: "Notificaciones pendientes",
-      value: String(filteredNotifications.length),
-      trend: "Por aprobar",
-      tone: "danger" as const,
-      onClick: () => navigate("/admin/notificaciones")
-    },
-    {
-      title: "Facturas vencidas",
-      value: String(visibleInvoices.length),
-      trend: "Pendientes de pago",
-      tone: "danger" as const,
-      onClick: () => navigate("/admin/finanzas")
-    },
-    {
-      title: "Seguimientos pendientes",
-      value: String(visibleFollowUps.length),
-      trend: "Proximos 7 dias",
-      tone: "warning" as const,
-      onClick: () => navigate("/admin/observador")
-    },
-    {
-      title: "Acudientes sin cuenta",
-      value: String(visibleParents.length),
-      trend: "Por crear usuario",
-      tone: "primary" as const,
-      onClick: () => navigate("/admin/usuarios")
-    }
-  ], [
-    filteredAdmissions.length,
-    filteredCertificates.length,
-    filteredNotifications.length,
-    visibleInvoices.length,
-    visibleFollowUps.length,
-    visibleParents.length,
-    navigate
-  ]);
+  const summaryCards = useMemo(
+    () => [
+      {
+        title: "Admisiones pendientes",
+        value: String(filteredAdmissions.length),
+        trend: "Por revisar",
+        tone: "warning" as const,
+        onClick: () => navigate("/admin/admisiones"),
+      },
+      {
+        title: "Certificados pendientes",
+        value: String(filteredCertificates.length),
+        trend: "Solicitudes",
+        tone: "warning" as const,
+        onClick: () => navigate("/admin/certificados"),
+      },
+      {
+        title: "Notificaciones pendientes",
+        value: String(filteredNotifications.length),
+        trend: "Por aprobar",
+        tone: "danger" as const,
+        onClick: () => navigate("/admin/notificaciones"),
+      },
+      {
+        title: "Facturas vencidas",
+        value: String(visibleInvoices.length),
+        trend: "Pendientes de pago",
+        tone: "danger" as const,
+        onClick: () => navigate("/admin/finanzas"),
+      },
+      {
+        title: "Seguimientos pendientes",
+        value: String(visibleFollowUps.length),
+        trend: "Proximos 7 dias",
+        tone: "warning" as const,
+        onClick: () => navigate("/admin/observador"),
+      },
+      {
+        title: "Acudientes sin cuenta",
+        value: String(visibleParents.length),
+        trend: "Por crear usuario",
+        tone: "primary" as const,
+        onClick: () => navigate("/admin/usuarios"),
+      },
+    ],
+    [
+      filteredAdmissions.length,
+      filteredCertificates.length,
+      filteredNotifications.length,
+      visibleInvoices.length,
+      visibleFollowUps.length,
+      visibleParents.length,
+      navigate,
+    ]
+  );
 
   return (
     <div className="grid" style={{ gap: 20 }}>
       <Section title="Centro de alertas">
         <div className="help-card">
-          Consolidado de pendientes criticos y recordatorios operativos para el equipo administrativo.
+          Consolidado de pendientes criticos y recordatorios operativos para el equipo
+          administrativo.
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-          <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select
+            className="input"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
             <option value="PENDING">Estado: Pendiente</option>
             <option value="APPROVED">Estado: Aprobado</option>
             <option value="REJECTED">Estado: Rechazado</option>
           </select>
-          <input type="date" className="input" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-          <input type="date" className="input" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-          <button className="button secondary" type="button" onClick={exportPdf}>Exportar PDF</button>
-          <button className="button secondary" type="button" onClick={exportExcel}>Exportar Excel</button>
+          <input
+            type="date"
+            className="input"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+          />
+          <input
+            type="date"
+            className="input"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+          />
+          <button className="button secondary" type="button" onClick={exportPdf}>
+            Exportar PDF
+          </button>
+          <button className="button secondary" type="button" onClick={exportExcel}>
+            Exportar Excel
+          </button>
           <button
             className="button"
             type="button"
@@ -361,10 +392,34 @@ export default function AdminAlerts() {
           <button className="button secondary" type="button" onClick={load} disabled={loading}>
             {loading ? "Actualizando..." : "Actualizar alertas"}
           </button>
-          <button className="button secondary" type="button" onClick={() => navigate("/admin/notificaciones")}>Ir a Notificaciones</button>
-          <button className="button secondary" type="button" onClick={() => navigate("/admin/certificados")}>Ir a Certificados</button>
-          <button className="button secondary" type="button" onClick={() => navigate("/admin/admisiones")}>Ir a Admisiones</button>
-          <button className="button secondary" type="button" onClick={() => navigate("/admin/finanzas")}>Ir a Finanzas</button>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => navigate("/admin/notificaciones")}
+          >
+            Ir a Notificaciones
+          </button>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => navigate("/admin/certificados")}
+          >
+            Ir a Certificados
+          </button>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => navigate("/admin/admisiones")}
+          >
+            Ir a Admisiones
+          </button>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => navigate("/admin/finanzas")}
+          >
+            Ir a Finanzas
+          </button>
         </div>
         <ActionFeedback
           tone={inferFeedbackTone(message)}
@@ -391,11 +446,19 @@ export default function AdminAlerts() {
             { key: "student", label: "Estudiante" },
             { key: "requestedBy", label: "Solicitante" },
             { key: "date", label: "Fecha" },
-            { key: "actions", label: "Acciones" }
+            { key: "actions", label: "Acciones" },
           ]}
           rows={
             filteredCertificates.length === 0
-              ? [{ kind: "Sin solicitudes pendientes", student: "", requestedBy: "", date: "", actions: "" }]
+              ? [
+                  {
+                    kind: "Sin solicitudes pendientes",
+                    student: "",
+                    requestedBy: "",
+                    date: "",
+                    actions: "",
+                  },
+                ]
               : filteredCertificates.map((r) => ({
                   kind: r.type === "STUDY" ? "Constancia" : "Matricula",
                   student: r.student?.fullName || "-",
@@ -403,14 +466,22 @@ export default function AdminAlerts() {
                   date: String(r.requestedAt || "").slice(0, 10),
                   actions: (
                     <div style={{ display: "flex", gap: 6 }}>
-                      <button className="button secondary" type="button" onClick={() => approveCertificate(r.id)}>
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => approveCertificate(r.id)}
+                      >
                         Aprobar
                       </button>
-                      <button className="button danger" type="button" onClick={() => rejectCertificate(r.id)}>
+                      <button
+                        className="button danger"
+                        type="button"
+                        onClick={() => rejectCertificate(r.id)}
+                      >
                         Rechazar
                       </button>
                     </div>
-                  )
+                  ),
                 }))
           }
         />
@@ -422,7 +493,7 @@ export default function AdminAlerts() {
             { key: "title", label: "Titulo" },
             { key: "audience", label: "Audiencia" },
             { key: "date", label: "Fecha" },
-            { key: "actions", label: "Acciones" }
+            { key: "actions", label: "Acciones" },
           ]}
           rowStyle={(row) =>
             (row as any).__priority
@@ -440,26 +511,42 @@ export default function AdminAlerts() {
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                         <span>{n.title || "-"}</span>
                         {dueProcess && (
-                          <span style={{ padding: "2px 8px", borderRadius: 999, background: "#fee2e2", color: "#b91c1c", fontSize: 12 }}>
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              background: "#fee2e2",
+                              color: "#b91c1c",
+                              fontSize: 12,
+                            }}
+                          >
                             Prioridad
                           </span>
                         )}
                       </div>
                     ),
-                  audience: n.audience || "-",
-                  date: String(n.createdAt || "").slice(0, 10),
-                  actions: (
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button className="button secondary" type="button" onClick={() => approveNotification(n.id)}>
-                        Aprobar
-                      </button>
-                      <button className="button danger" type="button" onClick={() => rejectNotification(n.id)}>
-                        Rechazar
-                      </button>
-                    </div>
-                  )
-                };
-              })
+                    audience: n.audience || "-",
+                    date: String(n.createdAt || "").slice(0, 10),
+                    actions: (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          className="button secondary"
+                          type="button"
+                          onClick={() => approveNotification(n.id)}
+                        >
+                          Aprobar
+                        </button>
+                        <button
+                          className="button danger"
+                          type="button"
+                          onClick={() => rejectNotification(n.id)}
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    ),
+                  };
+                })
           }
         />
       </Section>
@@ -471,11 +558,19 @@ export default function AdminAlerts() {
             { key: "grade", label: "Grado" },
             { key: "date", label: "Solicitud" },
             { key: "due", label: "Vence" },
-            { key: "actions", label: "Acciones" }
+            { key: "actions", label: "Acciones" },
           ]}
           rows={
             filteredAdmissions.length === 0
-              ? [{ student: "Sin admisiones pendientes", grade: "", date: "", due: "", actions: "" }]
+              ? [
+                  {
+                    student: "Sin admisiones pendientes",
+                    grade: "",
+                    date: "",
+                    due: "",
+                    actions: "",
+                  },
+                ]
               : filteredAdmissions.map((a) => ({
                   student: a.studentName,
                   grade: gradeLabel(a.gradeLevel),
@@ -483,14 +578,22 @@ export default function AdminAlerts() {
                   due: a.enrollmentDueAt ? String(a.enrollmentDueAt).slice(0, 10) : "-",
                   actions: (
                     <div style={{ display: "flex", gap: 6 }}>
-                      <button className="button secondary" type="button" onClick={() => approveAdmission(a.id)}>
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => approveAdmission(a.id)}
+                      >
                         Aprobar
                       </button>
-                      <button className="button danger" type="button" onClick={() => rejectAdmission(a.id)}>
+                      <button
+                        className="button danger"
+                        type="button"
+                        onClick={() => rejectAdmission(a.id)}
+                      >
                         Rechazar
                       </button>
                     </div>
-                  )
+                  ),
                 }))
           }
         />
@@ -508,11 +611,20 @@ export default function AdminAlerts() {
                 { key: "grade", label: "Grado" },
                 { key: "type", label: "Tipo" },
                 { key: "detail", label: "Detalle" },
-                { key: "actions", label: "Acciones" }
+                { key: "actions", label: "Acciones" },
               ]}
               rows={
                 visibleFollowUps.length === 0
-                  ? [{ date: "Sin seguimientos pendientes", student: "", grade: "", type: "", detail: "", actions: "" }]
+                  ? [
+                      {
+                        date: "Sin seguimientos pendientes",
+                        student: "",
+                        grade: "",
+                        type: "",
+                        detail: "",
+                        actions: "",
+                      },
+                    ]
                   : visibleFollowUps.map((f) => ({
                       date: f.followUpDate ? String(f.followUpDate).slice(0, 10) : "-",
                       student: f.student?.fullName || "-",
@@ -520,10 +632,14 @@ export default function AdminAlerts() {
                       type: f.type || "-",
                       detail: f.detail || "-",
                       actions: (
-                        <button className="button secondary" type="button" onClick={() => markFollowUpDone(f.id)}>
+                        <button
+                          className="button secondary"
+                          type="button"
+                          onClick={() => markFollowUpDone(f.id)}
+                        >
                           Marcar hecho
                         </button>
-                      )
+                      ),
                     }))
               }
             />
@@ -537,21 +653,33 @@ export default function AdminAlerts() {
                 { key: "student", label: "Estudiante" },
                 { key: "amount", label: "Monto" },
                 { key: "status", label: "Estado" },
-                { key: "actions", label: "Acciones" }
+                { key: "actions", label: "Acciones" },
               ]}
               rows={
                 visibleInvoices.length === 0
-                  ? [{ due: "Sin facturas vencidas", student: "", amount: "", status: "", actions: "" }]
+                  ? [
+                      {
+                        due: "Sin facturas vencidas",
+                        student: "",
+                        amount: "",
+                        status: "",
+                        actions: "",
+                      },
+                    ]
                   : visibleInvoices.map((inv) => ({
                       due: inv.dueDate ? String(inv.dueDate).slice(0, 10) : "-",
                       student: inv.student?.fullName || "-",
                       amount: `$ ${inv.amount}`,
                       status: inv.status,
                       actions: (
-                        <button className="button secondary" type="button" onClick={() => navigate("/admin/finanzas")}>
+                        <button
+                          className="button secondary"
+                          type="button"
+                          onClick={() => navigate("/admin/finanzas")}
+                        >
                           Ver finanzas
                         </button>
-                      )
+                      ),
                     }))
               }
             />
@@ -567,18 +695,30 @@ export default function AdminAlerts() {
             { key: "email", label: "Correo" },
             { key: "relation", label: "Parentesco" },
             { key: "students", label: "Estudiantes" },
-            { key: "actions", label: "Acciones" }
+            { key: "actions", label: "Acciones" },
           ]}
           rows={
             visibleParents.length === 0
-              ? [{ guardian: "Sin acudientes pendientes", email: "", relation: "", students: "", actions: "" }]
+              ? [
+                  {
+                    guardian: "Sin acudientes pendientes",
+                    email: "",
+                    relation: "",
+                    students: "",
+                    actions: "",
+                  },
+                ]
               : visibleParents.map((p) => ({
                   guardian: p.guardianFullName,
                   email: p.contactEmail || "-",
                   relation: p.relation || "-",
                   students: p.studentsCount ? `${p.studentsCount} estudiante(s)` : "-",
                   actions: (
-                    <button className="button secondary" type="button" onClick={() => navigate("/admin/usuarios")}>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => navigate("/admin/usuarios")}
+                    >
                       Crear usuario
                     </button>
                   ),

@@ -54,4 +54,3 @@ El script genera secretos (`JWT_SECRET`, `POSTGRES_PASSWORD`) automaticamente y 
 
 - `infra/.env.production.<college-code>`
 - `infra/nginx/edge/schools-map.example.json`
-

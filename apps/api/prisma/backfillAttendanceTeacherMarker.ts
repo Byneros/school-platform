@@ -19,11 +19,15 @@ function normalizeDayOfWeek(value: unknown) {
 }
 
 function normalizeGrade(value: unknown) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
 function normalizeGroup(value: unknown) {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
 function dayOfWeekInSpanishUpper(date: Date, timeZone = "America/Bogota") {
@@ -36,7 +40,7 @@ function dayOfWeekInSpanishUpper(date: Date, timeZone = "America/Bogota") {
     MIERCOLES: "MIERCOLES",
     JUEVES: "JUEVES",
     VIERNES: "VIERNES",
-    SABADO: "SABADO"
+    SABADO: "SABADO",
   };
   return map[normalized] || normalized;
 }
@@ -64,7 +68,9 @@ function composeAttendanceNotes(teacherId: string, notes?: string | null) {
 
 function normalizeTeacherSlots(teacherId: string, rawSchedules: unknown) {
   const schedulesMap =
-    rawSchedules && typeof rawSchedules === "object" ? (rawSchedules as Record<string, unknown>) : {};
+    rawSchedules && typeof rawSchedules === "object"
+      ? (rawSchedules as Record<string, unknown>)
+      : {};
   const slots: TeacherSlot[] = [];
 
   Object.values(schedulesMap).forEach((entry) => {
@@ -76,7 +82,7 @@ function normalizeTeacherSlots(teacherId: string, rawSchedules: unknown) {
           teacherId,
           dayOfWeek: normalizeDayOfWeek(slot?.dayOfWeek),
           gradeLevel,
-          group: normalizeGroup(slot?.group)
+          group: normalizeGroup(slot?.group),
         });
       });
       return;
@@ -88,7 +94,7 @@ function normalizeTeacherSlots(teacherId: string, rawSchedules: unknown) {
         teacherId,
         dayOfWeek: normalizeDayOfWeek((entry as any)?.dayOfWeek),
         gradeLevel,
-        group: normalizeGroup((entry as any)?.group)
+        group: normalizeGroup((entry as any)?.group),
       });
     }
   });
@@ -98,7 +104,7 @@ function normalizeTeacherSlots(teacherId: string, rawSchedules: unknown) {
 
 async function main() {
   const teachers = await prisma.teacher.findMany({
-    select: { id: true, subjectSchedules: true }
+    select: { id: true, subjectSchedules: true },
   });
 
   const allSlots = teachers.flatMap((t) => normalizeTeacherSlots(t.id, t.subjectSchedules));
@@ -108,10 +114,10 @@ async function main() {
       enrollment: {
         include: {
           class: true,
-          student: { select: { studentGroup: true } }
-        }
-      }
-    }
+          student: { select: { studentGroup: true } },
+        },
+      },
+    },
   });
 
   let updated = 0;
@@ -138,11 +144,7 @@ async function main() {
       )
     );
     const genericTeachers = Array.from(
-      new Set(
-        dayGradeSlots
-          .filter((s) => !s.group || s.group === "-")
-          .map((s) => s.teacherId)
-      )
+      new Set(dayGradeSlots.filter((s) => !s.group || s.group === "-").map((s) => s.teacherId))
     );
 
     let inferredTeacherId = "";
@@ -167,7 +169,7 @@ async function main() {
 
     await prisma.attendance.update({
       where: { id: row.id },
-      data: { notes: composeAttendanceNotes(inferredTeacherId, row.notes) }
+      data: { notes: composeAttendanceNotes(inferredTeacherId, row.notes) },
     });
     updated += 1;
   }
@@ -187,4 +189,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

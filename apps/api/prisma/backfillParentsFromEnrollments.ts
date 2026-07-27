@@ -42,7 +42,9 @@ function parentKeyFromEnrollment(enr: any) {
 }
 
 async function uniqueParentEmail(baseEmail: string) {
-  const normalizedBase = String(baseEmail || "").trim().toLowerCase();
+  const normalizedBase = String(baseEmail || "")
+    .trim()
+    .toLowerCase();
   if (!normalizedBase) throw new Error("Email base invalido");
 
   const [localPartRaw, domainRaw] = normalizedBase.split("@");
@@ -51,11 +53,11 @@ async function uniqueParentEmail(baseEmail: string) {
 
   let candidate = `${localPart}@${domain}`;
   let i = 1;
-  // eslint-disable-next-line no-constant-condition
+
   while (true) {
     const existing = await prisma.user.findUnique({
       where: { email: candidate },
-      select: { id: true, role: true }
+      select: { id: true, role: true },
     });
     if (!existing) return candidate;
     if (existing.role === "PARENT") return candidate;
@@ -70,9 +72,9 @@ async function main() {
 
   const enrollments = await prisma.enrollment.findMany({
     include: {
-      student: { select: { id: true, fullName: true } }
+      student: { select: { id: true, fullName: true } },
     },
-    orderBy: [{ year: "desc" }, { studentFullName: "asc" }]
+    orderBy: [{ year: "desc" }, { studentFullName: "asc" }],
   });
 
   let createdUsers = 0;
@@ -88,19 +90,21 @@ async function main() {
 
     if (!userId) {
       const doc = digitsOnly(enr.guardianDocNumber);
-      const contactEmail = String(enr.contactEmail || "").trim().toLowerCase();
+      const contactEmail = String(enr.contactEmail || "")
+        .trim()
+        .toLowerCase();
       const preferredEmail = isEmailLike(contactEmail)
         ? contactEmail
         : doc
-        ? `padre.${doc}@colegio.edu`
-        : `${slugify(enr.guardianFullName || "acudiente") || "acudiente"}.${digitsOnly(enr.contactPhone) || "0000"}@colegio.edu`;
+          ? `padre.${doc}@colegio.edu`
+          : `${slugify(enr.guardianFullName || "acudiente") || "acudiente"}.${digitsOnly(enr.contactPhone) || "0000"}@colegio.edu`;
 
       const email = await uniqueParentEmail(preferredEmail);
       const fullName = String(enr.guardianFullName || "Acudiente").trim() || "Acudiente";
 
-      let user = await prisma.user.findUnique({
+      const user = await prisma.user.findUnique({
         where: { email },
-        select: { id: true, role: true }
+        select: { id: true, role: true },
       });
 
       if (user && user.role === "PARENT") {
@@ -113,9 +117,9 @@ async function main() {
             passwordHash,
             fullName,
             role: "PARENT",
-            isActive: true
+            isActive: true,
           },
-          select: { id: true }
+          select: { id: true },
         });
         userId = created.id;
         createdUsers += 1;
@@ -130,9 +134,9 @@ async function main() {
             passwordHash,
             fullName,
             role: "PARENT",
-            isActive: true
+            isActive: true,
           },
-          select: { id: true }
+          select: { id: true },
         });
         userId = created.id;
         createdUsers += 1;
@@ -147,7 +151,7 @@ async function main() {
       where: { userId },
       update: {},
       create: { userId },
-      select: { id: true }
+      select: { id: true },
     });
     parentIdsTouched.add(parent.id);
 
@@ -156,15 +160,15 @@ async function main() {
       where: {
         parentId_studentId: {
           parentId: parent.id,
-          studentId: enr.studentId
-        }
+          studentId: enr.studentId,
+        },
       },
       update: { relation },
       create: {
         parentId: parent.id,
         studentId: enr.studentId,
-        relation
-      }
+        relation,
+      },
     });
     createdGuardians += 1;
   }

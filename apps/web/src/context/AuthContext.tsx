@@ -1,24 +1,18 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+
 import { ApiError, apiGet, apiPost, clearDeveloperAccessToken } from "../services/api";
-import { getAuth, setAuth, clearAuth, AuthUser } from "../services/auth";
+import type { AuthUser } from "../services/auth";
+import { getAuth, setAuth, clearAuth } from "../services/auth";
 
 type LoginResult =
   | { status: "ok"; user: AuthUser }
-  | { status: "2fa"; token: string; email: string; role?: AuthUser["role"]; expiresAt?: string; devCode?: string };
-
-type LoginApiResponse =
   | {
-      requiresTwoFactor: true;
-      twoFactorToken: string;
+      status: "2fa";
+      token: string;
       email: string;
       role?: AuthUser["role"];
       expiresAt?: string;
       devCode?: string;
-    }
-  | {
-      token: string;
-      role: AuthUser["role"];
-      fullName: string;
     };
 
 type AuthContextValue = {
@@ -55,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const next: AuthUser = {
           token: user.token,
           role: data.role,
-          fullName: data.fullName
+          fullName: data.fullName,
         };
         setAuth(next);
         setUser(next);
@@ -88,7 +82,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const INACTIVITY_MS = 15 * 60 * 1000;
     const WARNING_MS = INACTIVITY_MS - 60 * 1000;
-    const events: Array<keyof WindowEventMap> = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"];
+    const events: Array<keyof WindowEventMap> = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "scroll",
+      "touchstart",
+    ];
 
     const clearTimers = () => {
       if (warningTimerRef.current) window.clearTimeout(warningTimerRef.current);
@@ -110,7 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const onActivity = () => scheduleTimers();
 
-    events.forEach((eventName) => window.addEventListener(eventName, onActivity, { passive: true }));
+    events.forEach((eventName) =>
+      window.addEventListener(eventName, onActivity, { passive: true })
+    );
     scheduleTimers();
 
     return () => {
@@ -126,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const refreshed: AuthUser = {
           token: data.token,
           role: data.role,
-          fullName: data.fullName
+          fullName: data.fullName,
         };
         setAuth(refreshed);
         setUser(refreshed);
@@ -149,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const data = await apiPost<any>("/auth/login", {
       email: email.trim().toLowerCase(),
-      password: password.trim()
+      password: password.trim(),
     });
     if (data?.requiresTwoFactor) {
       return {
@@ -158,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: data.email,
         role: data.role,
         expiresAt: data.expiresAt,
-        devCode: data.devCode
+        devCode: data.devCode,
       };
     }
     const authUser: AuthUser = { token: data.token, role: data.role, fullName: data.fullName };
@@ -171,7 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyTwoFactor = async (token: string, code: string) => {
     const data = await apiPost<any>("/auth/2fa/verify", {
       token,
-      code: code.trim()
+      code: code.trim(),
     });
     const authUser: AuthUser = { token: data.token, role: data.role, fullName: data.fullName };
     setAuth(authUser);
@@ -201,7 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       verifyTwoFactor,
       resendTwoFactor,
-      logout
+      logout,
     }),
     [user, initializing, inactivityWarning]
   );

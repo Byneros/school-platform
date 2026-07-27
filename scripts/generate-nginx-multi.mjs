@@ -24,7 +24,7 @@ function usage() {
     [
       "Uso:",
       "  node scripts/generate-nginx-multi.mjs [--input infra/nginx/edge/schools-map.example.json] [--output infra/nginx/edge/school-multi.conf]",
-    ].join("\n"),
+    ].join("\n")
   );
 }
 
@@ -91,7 +91,9 @@ function buildConfig(items) {
     lines.push("  add_header X-Frame-Options SAMEORIGIN always;");
     lines.push("  add_header X-Content-Type-Options nosniff always;");
     lines.push("  add_header Referrer-Policy strict-origin-when-cross-origin always;");
-    lines.push('  add_header Permissions-Policy "geolocation=(), camera=(), microphone=()" always;');
+    lines.push(
+      '  add_header Permissions-Policy "geolocation=(), camera=(), microphone=()" always;'
+    );
     lines.push("");
     lines.push("  location / {");
     lines.push(`    proxy_pass http://127.0.0.1:${webPort};`);
@@ -135,4 +137,3 @@ try {
   usage();
   process.exit(1);
 }
-

@@ -1,35 +1,36 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 import "./styles.css";
 import AppShell from "./components/AppShell";
-import LoginPage from "./pages/LoginPage";
-import AdminDashboard from "./pages/AdminDashboard";
-import AdminAlerts from "./pages/AdminAlerts";
-import TeacherDashboard from "./pages/TeacherDashboard";
-import ParentDashboard from "./pages/ParentDashboard";
-import AdminUsers from "./pages/AdminUsers";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { AuthProvider } from "./context/AuthContext";
+import AdminAcademicClosure from "./pages/AdminAcademicClosure";
 import AdminAdmissions from "./pages/AdminAdmissions";
+import AdminAlerts from "./pages/AdminAlerts";
+import AdminBranding from "./pages/AdminBranding";
+import AdminCacheMetrics from "./pages/AdminCacheMetrics";
+import AdminCertificates from "./pages/AdminCertificates";
+import AdminDashboard from "./pages/AdminDashboard";
+import ParentDashboard from "./pages/ParentDashboard";
+import TeacherAttendance from "./pages/TeacherAttendance";
+import TeacherDashboard from "./pages/TeacherDashboard";
+import AdminUsers from "./pages/AdminUsers";
 import AdminFinance from "./pages/AdminFinance";
 import AdminNotifications from "./pages/AdminNotifications";
-import AdminBranding from "./pages/AdminBranding";
 import AdminTeacherHours from "./pages/AdminTeacherHours";
-import AdminCertificates from "./pages/AdminCertificates";
-import AdminAcademicClosure from "./pages/AdminAcademicClosure";
-import AdminCacheMetrics from "./pages/AdminCacheMetrics";
 import DeveloperZone from "./pages/DeveloperZone";
 import FeedbackCenter from "./pages/FeedbackCenter";
-import TeacherAttendance from "./pages/TeacherAttendance";
+import LoginPage from "./pages/LoginPage";
 import TeacherComms from "./pages/TeacherComms";
 import TeacherTasks from "./pages/TeacherTasks";
-import TeacherGrades from "./pages/TeacherGrades";
 import ParentBoletines from "./pages/ParentBoletines";
 import ParentPagos from "./pages/ParentPagos";
 import ParentComunicados from "./pages/ParentComunicados";
 import StudentFollowup from "./pages/StudentFollowup";
 import SessionsPage from "./pages/SessionsPage";
-import { AuthProvider } from "./context/AuthContext";
-import ProtectedRoute from "./components/ProtectedRoute";
+import TeacherGrades from "./pages/TeacherGrades";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

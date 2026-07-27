@@ -6,6 +6,6 @@ export const createPaymentSchema = z.object({
     amount: z.number(),
     paidAt: z.string().datetime(),
     method: z.string().min(1),
-    reference: z.string().optional()
-  })
+    reference: z.string().optional(),
+  }),
 });

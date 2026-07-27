@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
-import { PrismaClient, RoleName } from "@prisma/client";
+import type { RoleName } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -89,7 +90,11 @@ async function resetOne(def: DefaultCredential) {
 }
 
 async function main() {
-  const results = [];
+  const results: Array<{
+    role: RoleName;
+    email: string;
+    isActive: boolean;
+  }> = [];
   for (const def of defaults) {
     const result = await resetOne(def);
     results.push(result);

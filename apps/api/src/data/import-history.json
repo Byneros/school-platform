@@ -1,5 +1,289 @@
 [
   {
+    "id": "640f56c9-fc6f-4a1f-9480-44ebc8274515",
+    "createdAt": "2026-07-21T16:51:42.249Z",
+    "createdById": "cmrfep3o50002xkvw188mvrne",
+    "createdByName": "Dev. Nelson Julio",
+    "createdByEmail": "ing.nelsonjulio@gmail.com",
+    "mode": "import",
+    "summary": {
+      "created": {
+        "users": 14,
+        "teachers": 13,
+        "parents": 0,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0,
+        "guardians": 0,
+        "admissions": 0,
+        "invoices": 0,
+        "payments": 0
+      },
+      "updated": {
+        "users": 0,
+        "teachers": 7,
+        "students": 0,
+        "classes": 0,
+        "enrollments": 0
+      },
+      "skipped": 4006,
+      "errorsCount": 4006,
+      "defaultPasswordUsed": false
+    },
+    "errors": [
+      {
+        "sheet": "DOCENTES",
+        "row": 3,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 4,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 5,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 8,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 11,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "DOCENTES",
+        "row": 12,
+        "message": "Usuario no encontrado para el docente."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 2,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 3,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 4,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 5,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 6,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 7,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 8,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 9,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 10,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 11,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 12,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 13,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 14,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 15,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 16,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 17,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 18,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 19,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 20,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 21,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 22,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 23,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 24,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 25,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 26,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 27,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 28,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 29,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 30,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 31,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 32,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 33,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 34,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 35,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 36,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 37,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 38,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 39,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 40,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 41,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 42,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 43,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 44,
+        "message": "Nombre o grado invalido."
+      },
+      {
+        "sheet": "ESTUDIANTES",
+        "row": 45,
+        "message": "Nombre o grado invalido."
+      }
+    ]
+  },
+  {
     "id": "90dede46-563f-4207-90dd-d10123e3a587",
     "createdAt": "2026-07-06T15:32:42.941Z",
     "createdById": "cmr8fns9a00058pjmuatvukfx",

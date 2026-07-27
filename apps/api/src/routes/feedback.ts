@@ -17,7 +17,7 @@ router.post("/", validate(createFeedbackSchema), async (req, res) => {
       userId: auth.userId,
       category: body.category,
       title: body.title.trim(),
-      message: body.message.trim()
+      message: body.message.trim(),
     },
     select: {
       id: true,
@@ -28,8 +28,8 @@ router.post("/", validate(createFeedbackSchema), async (req, res) => {
       response: true,
       respondedAt: true,
       createdAt: true,
-      updatedAt: true
-    }
+      updatedAt: true,
+    },
   });
 
   res.json(created);
@@ -52,24 +52,28 @@ router.get("/mine", async (req, res) => {
       respondedBy: {
         select: {
           fullName: true,
-          role: true
-        }
-      }
+          role: true,
+        },
+      },
     },
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
   });
 
   res.json({ data });
 });
 
 router.get("/", requireRole(["DEVELOPER"]), async (req, res) => {
-  const status = String(req.query.status || "").trim().toUpperCase();
-  const category = String(req.query.category || "").trim().toUpperCase();
+  const status = String(req.query.status || "")
+    .trim()
+    .toUpperCase();
+  const category = String(req.query.category || "")
+    .trim()
+    .toUpperCase();
 
   const data = await prisma.feedback.findMany({
     where: {
       ...(status ? { status: status as any } : {}),
-      ...(category ? { category: category as any } : {})
+      ...(category ? { category: category as any } : {}),
     },
     select: {
       id: true,
@@ -86,50 +90,55 @@ router.get("/", requireRole(["DEVELOPER"]), async (req, res) => {
           id: true,
           fullName: true,
           email: true,
-          role: true
-        }
+          role: true,
+        },
       },
       respondedBy: {
         select: {
           id: true,
           fullName: true,
-          role: true
-        }
-      }
+          role: true,
+        },
+      },
     },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-    take: 300
+    take: 300,
   });
 
   res.json({ data });
 });
 
-router.patch("/:id/respond", requireRole(["DEVELOPER"]), validate(reviewFeedbackSchema), async (req, res) => {
-  const auth = (req as any).auth;
-  const { params, body } = (req as any).validated;
+router.patch(
+  "/:id/respond",
+  requireRole(["DEVELOPER"]),
+  validate(reviewFeedbackSchema),
+  async (req, res) => {
+    const auth = (req as any).auth;
+    const { params, body } = (req as any).validated;
 
-  const updated = await prisma.feedback.update({
-    where: { id: params.id },
-    data: {
-      status: body.status,
-      response: body.response.trim(),
-      respondedById: auth.userId,
-      respondedAt: new Date()
-    },
-    select: {
-      id: true,
-      category: true,
-      title: true,
-      message: true,
-      status: true,
-      response: true,
-      respondedAt: true,
-      createdAt: true,
-      updatedAt: true
-    }
-  });
+    const updated = await prisma.feedback.update({
+      where: { id: params.id },
+      data: {
+        status: body.status,
+        response: body.response.trim(),
+        respondedById: auth.userId,
+        respondedAt: new Date(),
+      },
+      select: {
+        id: true,
+        category: true,
+        title: true,
+        message: true,
+        status: true,
+        response: true,
+        respondedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
-  res.json(updated);
-});
+    res.json(updated);
+  }
+);
 
 export default router;

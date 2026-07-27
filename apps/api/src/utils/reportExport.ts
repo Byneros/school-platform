@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import PDFDocument from "pdfkit";
-import XLSX from "xlsx";
+import writeXlsxFile from "write-excel-file/node";
+import type { SheetData } from "write-excel-file/node";
 
 type CsvColumn<T> = {
   key: keyof T;
@@ -29,7 +30,7 @@ function toDisplayDate(date = new Date()) {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
   });
 }
 
@@ -47,7 +48,9 @@ export function buildCsvReport<T extends Record<string, unknown>>(opts: {
 }) {
   const institutionName = opts.institutionName || "Institucion Educativa";
   const header = opts.columns.map((c) => escapeCsvValue(c.label)).join(",");
-  const dataRows = opts.rows.map((row) => opts.columns.map((c) => escapeCsvValue(row[c.key])).join(","));
+  const dataRows = opts.rows.map((row) =>
+    opts.columns.map((c) => escapeCsvValue(row[c.key])).join(",")
+  );
 
   const lines = [
     escapeCsvValue(institutionName),
@@ -55,11 +58,11 @@ export function buildCsvReport<T extends Record<string, unknown>>(opts: {
     `Fecha de generacion,${escapeCsvValue(toDisplayDate())}`,
     "",
     header,
-    ...dataRows
+    ...dataRows,
   ];
 
   // BOM UTF-8 para mejor compatibilidad en Excel
-  return "\uFEFF" + lines.join("\n");
+  return `\uFEFF${lines.join("\n")}`;
 }
 
 export function buildExcelHtmlReport<T extends Record<string, unknown>>(opts: {
@@ -105,7 +108,7 @@ export function buildExcelHtmlReport<T extends Record<string, unknown>>(opts: {
 </html>`;
 }
 
-export function buildXlsxReportBuffer<T extends Record<string, unknown>>(opts: {
+export async function buildXlsxReportBuffer<T extends Record<string, unknown>>(opts: {
   title: string;
   columns: CsvColumn<T>[];
   rows: T[];
@@ -113,35 +116,36 @@ export function buildXlsxReportBuffer<T extends Record<string, unknown>>(opts: {
 }) {
   const institutionName = opts.institutionName || "Institucion Educativa";
   const generatedAt = toDisplayDate();
-  const worksheetData: unknown[][] = [
+  const worksheetData: SheetData = [
     [institutionName],
     [opts.title],
     ["Fecha de generacion", generatedAt],
     [],
     opts.columns.map((c) => c.label),
-    ...opts.rows.map((row) => opts.columns.map((c) => row[c.key] ?? ""))
+    ...opts.rows.map((row) => opts.columns.map((c) => row[c.key] ?? "")),
   ];
 
-  const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Reporte");
-  const raw = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer | Uint8Array;
+  const raw = await writeXlsxFile(worksheetData).toBuffer();
   return Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
 }
 
-export function sendTabularPdf<T extends Record<string, unknown>>(res: Response, opts: {
-  fileName: string;
-  title: string;
-  subtitle?: string;
-  branding?: BrandingForExport;
-  columns: PdfColumn<T>[];
-  rows: T[];
-}) {
+export function sendTabularPdf<T extends Record<string, unknown>>(
+  res: Response,
+  opts: {
+    fileName: string;
+    title: string;
+    subtitle?: string;
+    branding?: BrandingForExport;
+    columns: PdfColumn<T>[];
+    rows: T[];
+  }
+) {
   const institutionName = opts.branding?.schoolName || "Institucion Educativa";
   const primary = opts.branding?.primaryColor || "#1e3a8a";
   const secondary = opts.branding?.secondaryColor || "#475569";
   const accent = opts.branding?.accentColor || "#0ea5e9";
-  const footer = opts.branding?.footerText || "Comprometidos con la excelencia academica y formacion integral.";
+  const footer =
+    opts.branding?.footerText || "Comprometidos con la excelencia academica y formacion integral.";
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${opts.fileName}"`);
 
@@ -156,7 +160,7 @@ export function sendTabularPdf<T extends Record<string, unknown>>(res: Response,
   const defaultColWidth = tableWidth / opts.columns.length;
   const computedCols = opts.columns.map((c) => ({
     ...c,
-    width: c.width || defaultColWidth
+    width: c.width || defaultColWidth,
   }));
 
   const drawFooter = () => {
@@ -182,7 +186,10 @@ export function sendTabularPdf<T extends Record<string, unknown>>(res: Response,
     doc.moveDown(0.1);
     doc.fillColor(primary).fontSize(18).text(opts.title, { align: "center" });
     doc.moveDown(0.2);
-    doc.fillColor(secondary).fontSize(10).text(opts.subtitle || `Generado: ${toDisplayDate()}`, { align: "center" });
+    doc
+      .fillColor(secondary)
+      .fontSize(10)
+      .text(opts.subtitle || `Generado: ${toDisplayDate()}`, { align: "center" });
     doc.moveDown(0.8);
     drawFooter();
   };
@@ -197,7 +204,10 @@ export function sendTabularPdf<T extends Record<string, unknown>>(res: Response,
       doc
         .fillColor("#ffffff")
         .fontSize(10)
-        .text(c.label, x + 6, y + 6, { width: (c.width || defaultColWidth) - 12, align: c.align || "left" });
+        .text(c.label, x + 6, y + 6, {
+          width: (c.width || defaultColWidth) - 12,
+          align: c.align || "left",
+        });
       x += c.width || defaultColWidth;
     });
   };
@@ -217,7 +227,7 @@ export function sendTabularPdf<T extends Record<string, unknown>>(res: Response,
         .text(String(value), x + 6, y + 6, {
           width: (c.width || defaultColWidth) - 12,
           align: c.align || "left",
-          ellipsis: true
+          ellipsis: true,
         });
       x += c.width || defaultColWidth;
     });

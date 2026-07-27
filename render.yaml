@@ -54,6 +54,8 @@ services:
         value: "true"
       - key: TWO_FACTOR_ROLES
         value: "ADMIN,TEACHER,PARENT"
+      - key: ADMIN_2FA_CODE_SECRET
+        sync: false
       - key: SMTP_HOST
         value: smtp.yourprovider.com
       - key: SMTP_PORT

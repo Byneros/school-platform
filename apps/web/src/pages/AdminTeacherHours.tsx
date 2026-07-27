@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+
 import ActionFeedback from "../components/ActionFeedback";
-import Section from "../components/Section";
 import DataTable from "../components/DataTable";
+import Section from "../components/Section";
 import { apiDownload, apiGet, apiPut } from "../services/api";
 import { gradeOptions } from "../services/grades";
 import { feedbackTitles, inferFeedbackTone } from "../utils/feedback";
@@ -9,7 +10,13 @@ import { feedbackTitles, inferFeedbackTone } from "../utils/feedback";
 type SubjectHour = {
   subject: string;
   hoursPerWeek: number;
-  slots: Array<{ dayOfWeek: string; startTime: string; endTime: string; gradeLevel: string; group: string }>;
+  slots: Array<{
+    dayOfWeek: string;
+    startTime: string;
+    endTime: string;
+    gradeLevel: string;
+    group: string;
+  }>;
   autoMode?: boolean;
 };
 
@@ -27,9 +34,7 @@ function toMinutes(time: string) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
-function toHoursFromSlots(
-  slots: Array<{ dayOfWeek: string; startTime: string; endTime: string }>
-) {
+function toHoursFromSlots(slots: Array<{ dayOfWeek: string; startTime: string; endTime: string }>) {
   const totalMinutes = slots.reduce((sum, slot) => {
     const start = toMinutes(slot.startTime || "");
     const end = toMinutes(slot.endTime || "");
@@ -102,7 +107,9 @@ export default function AdminTeacherHours() {
   }, [collapsedSlots]);
 
   const MAX_RECOMMENDED_HOURS = 40;
-  const visibleRows = selectedTeacherId ? rows.filter((r) => r.teacherId === selectedTeacherId) : rows;
+  const visibleRows = selectedTeacherId
+    ? rows.filter((r) => r.teacherId === selectedTeacherId)
+    : rows;
 
   const totals = useMemo(() => {
     const map = new Map<string, { teacherName: string; total: number }>();
@@ -118,7 +125,7 @@ export default function AdminTeacherHours() {
     });
     return Array.from(map.values()).map((t) => ({
       ...t,
-      overload: t.total > MAX_RECOMMENDED_HOURS
+      overload: t.total > MAX_RECOMMENDED_HOURS,
     }));
   }, [rows, hoursDraft]);
 
@@ -143,7 +150,13 @@ export default function AdminTeacherHours() {
         const hoursKey = `${r.teacherId}::${s.subject}`;
         const hours = Number(hoursDraft[hoursKey] ?? s.hoursPerWeek ?? 0);
         const key = `${r.teacherId}::${s.subject}::slots`;
-        let slots: Array<{ dayOfWeek: string; startTime: string; endTime: string; gradeLevel: string; group: string }> = [];
+        let slots: Array<{
+          dayOfWeek: string;
+          startTime: string;
+          endTime: string;
+          gradeLevel: string;
+          group: string;
+        }> = [];
         try {
           slots = JSON.parse(hoursDraft[key] || "[]");
         } catch {
@@ -179,7 +192,7 @@ export default function AdminTeacherHours() {
                 endTime: slot.endTime,
                 subject: s.subject,
                 gradeLevel: slot.gradeLevel,
-                group: slot.group
+                group: slot.group,
               });
             }
           }
@@ -193,7 +206,7 @@ export default function AdminTeacherHours() {
             const id = `${r.teacherId}::${s.subject}::${idx}`;
             slotErrors[id] = {
               fields,
-              message: Object.values(fields).join(", ")
+              message: Object.values(fields).join(", "),
             };
             teacherHasErrors[r.teacherId] = true;
           }
@@ -205,9 +218,7 @@ export default function AdminTeacherHours() {
             const prev = slotErrors[id];
             slotErrors[id] = {
               fields: { ...(prev?.fields || {}), duplicate: "Franja duplicada" },
-              message: prev?.message
-                ? `${prev.message}, franja duplicada`
-                : "Franja duplicada"
+              message: prev?.message ? `${prev.message}, franja duplicada` : "Franja duplicada",
             };
             teacherHasErrors[r.teacherId] = true;
           });
@@ -223,9 +234,7 @@ export default function AdminTeacherHours() {
               const prev = slotErrors[id];
               slotErrors[id] = {
                 fields: { ...(prev?.fields || {}), overlap: "Cruce de horario" },
-                message: prev?.message
-                  ? `${prev.message}, ${message}`
-                  : message
+                message: prev?.message ? `${prev.message}, ${message}` : message,
               };
               teacherHasErrors[r.teacherId] = true;
             };
@@ -246,9 +255,17 @@ export default function AdminTeacherHours() {
 
     return rows.map((r) => {
       const totalsByDay: Record<string, number> = Object.fromEntries(days.map((d) => [d, 0]));
-      const gradeGroupByDay: Record<string, Set<string>> = Object.fromEntries(days.map((d) => [d, new Set<string>()]));
+      const gradeGroupByDay: Record<string, Set<string>> = Object.fromEntries(
+        days.map((d) => [d, new Set<string>()])
+      );
       r.subjects.forEach((s) => {
-        let slots: Array<{ dayOfWeek: string; startTime: string; endTime: string; gradeLevel?: string; group?: string }> = [];
+        let slots: Array<{
+          dayOfWeek: string;
+          startTime: string;
+          endTime: string;
+          gradeLevel?: string;
+          group?: string;
+        }> = [];
         try {
           const raw = hoursDraft[`${r.teacherId}::${s.subject}::slots`];
           slots = raw ? JSON.parse(raw) : s.slots || [];
@@ -278,7 +295,15 @@ export default function AdminTeacherHours() {
         return (
           <div>
             <div>{hours}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12, color: "#64748b" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                fontSize: 12,
+                color: "#64748b",
+              }}
+            >
               {grades.map((g) => (
                 <span key={g}>{g}</span>
               ))}
@@ -293,7 +318,7 @@ export default function AdminTeacherHours() {
         MIERCOLES: formatDay("MIERCOLES"),
         JUEVES: formatDay("JUEVES"),
         VIERNES: formatDay("VIERNES"),
-        SABADO: formatDay("SABADO")
+        SABADO: formatDay("SABADO"),
       };
     });
   }, [rows, hoursDraft]);
@@ -301,7 +326,13 @@ export default function AdminTeacherHours() {
   const weeklyDetails = useMemo(() => {
     return rows.flatMap((r) => {
       return r.subjects.flatMap((s) => {
-        let slots: Array<{ dayOfWeek: string; startTime: string; endTime: string; gradeLevel: string; group: string }> = [];
+        let slots: Array<{
+          dayOfWeek: string;
+          startTime: string;
+          endTime: string;
+          gradeLevel: string;
+          group: string;
+        }> = [];
         try {
           const raw = hoursDraft[`${r.teacherId}::${s.subject}::slots`];
           slots = raw ? JSON.parse(raw) : s.slots || [];
@@ -338,7 +369,7 @@ export default function AdminTeacherHours() {
         } catch {
           return s.slots || [];
         }
-      })()
+      })(),
     }));
   };
 
@@ -382,36 +413,57 @@ export default function AdminTeacherHours() {
         <button
           type="button"
           className="button secondary"
-          onClick={() => downloadFile("/teacher/admin-subject-hours/export/excel", "horario-docentes.xlsx")}
+          onClick={() =>
+            downloadFile("/teacher/admin-subject-hours/export/excel", "horario-docentes.xlsx")
+          }
         >
           Exportar horario docentes
         </button>
         <button
           type="button"
           className="button secondary"
-          onClick={() => downloadFile("/teacher/admin-students-format/export/excel", "formato-estudiantes.xlsx")}
+          onClick={() =>
+            downloadFile("/teacher/admin-students-format/export/excel", "formato-estudiantes.xlsx")
+          }
         >
           Exportar formato estudiantes
         </button>
         <button
           type="button"
           className="button secondary"
-          onClick={() => downloadFile("/teacher/admin-subject-hours/export/pdf", "horario-docentes.pdf")}
+          onClick={() =>
+            downloadFile("/teacher/admin-subject-hours/export/pdf", "horario-docentes.pdf")
+          }
         >
           PDF horario docentes
         </button>
         <button
           type="button"
           className="button secondary"
-          onClick={() => downloadFile("/teacher/admin-students-format/export/pdf", "formato-estudiantes.pdf")}
+          onClick={() =>
+            downloadFile("/teacher/admin-students-format/export/pdf", "formato-estudiantes.pdf")
+          }
         >
           PDF formato estudiantes
         </button>
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 12,
+          alignItems: "center",
+          marginBottom: 10,
+        }}
+      >
         <label style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 260 }}>
           Docente
-          <select className="input" value={selectedTeacherId} onChange={(e) => setSelectedTeacherId(e.target.value)} style={{ maxWidth: 420 }}>
+          <select
+            className="input"
+            value={selectedTeacherId}
+            onChange={(e) => setSelectedTeacherId(e.target.value)}
+            style={{ maxWidth: 420 }}
+          >
             {rows.map((r) => (
               <option key={r.teacherId} value={r.teacherId}>
                 {r.teacherName}
@@ -444,7 +496,9 @@ export default function AdminTeacherHours() {
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 {validation.teacherHasErrors[r.teacherId] && (
-                  <span style={{ fontSize: 12, color: "#dc2626" }}>Corrige los campos resaltados.</span>
+                  <span style={{ fontSize: 12, color: "#dc2626" }}>
+                    Corrige los campos resaltados.
+                  </span>
                 )}
                 <button
                   className="button secondary"
@@ -460,7 +514,7 @@ export default function AdminTeacherHours() {
                 { key: "teacher", label: "Docente" },
                 { key: "subject", label: "Asignatura" },
                 { key: "hours", label: "Horas/semana" },
-                { key: "slots", label: "Grado / Grupo / Horario" }
+                { key: "slots", label: "Grado / Grupo / Horario" },
               ]}
               rows={r.subjects.map((s) => ({
                 teacher: r.teacherName,
@@ -477,29 +531,44 @@ export default function AdminTeacherHours() {
                       onChange={(e) =>
                         setHoursDraft((prev) => ({
                           ...prev,
-                          [`${r.teacherId}::${s.subject}`]: e.target.value
+                          [`${r.teacherId}::${s.subject}`]: e.target.value,
                         }))
                       }
                       style={{
                         maxWidth: 120,
                         textAlign: "center",
                         background:
-                          hoursDraft[`${r.teacherId}::${s.subject}::auto`] !== "0" ? "#f8fafc" : "white"
+                          hoursDraft[`${r.teacherId}::${s.subject}::auto`] !== "0"
+                            ? "#f8fafc"
+                            : "white",
                       }}
                     />
-                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#64748b" }}>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: 12,
+                        color: "#64748b",
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={hoursDraft[`${r.teacherId}::${s.subject}::auto`] !== "0"}
                         onChange={(e) => {
                           const auto = e.target.checked;
                           setHoursDraft((prev) => {
-                            const next = { ...prev, [`${r.teacherId}::${s.subject}::auto`]: auto ? "1" : "0" };
+                            const next = {
+                              ...prev,
+                              [`${r.teacherId}::${s.subject}::auto`]: auto ? "1" : "0",
+                            };
                             if (auto) {
                               const raw = prev[`${r.teacherId}::${s.subject}::slots`];
                               try {
                                 const parsed = raw ? JSON.parse(raw) : [];
-                                next[`${r.teacherId}::${s.subject}`] = String(toHoursFromSlots(parsed));
+                                next[`${r.teacherId}::${s.subject}`] = String(
+                                  toHoursFromSlots(parsed)
+                                );
                               } catch {
                                 // ignore
                               }
@@ -514,7 +583,13 @@ export default function AdminTeacherHours() {
                 ),
                 slots: (() => {
                   const key = `${r.teacherId}::${s.subject}::slots`;
-                  let slots: Array<{ dayOfWeek: string; startTime: string; endTime: string; gradeLevel: string; group: string }> = [];
+                  let slots: Array<{
+                    dayOfWeek: string;
+                    startTime: string;
+                    endTime: string;
+                    gradeLevel: string;
+                    group: string;
+                  }> = [];
                   try {
                     slots = JSON.parse(hoursDraft[key] || "[]");
                   } catch {
@@ -526,13 +601,24 @@ export default function AdminTeacherHours() {
                       [key]: JSON.stringify(next),
                       ...(prev[`${r.teacherId}::${s.subject}::auto`] !== "0"
                         ? { [`${r.teacherId}::${s.subject}`]: String(toHoursFromSlots(next)) }
-                        : {})
+                        : {}),
                     }));
                   };
                   return (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {slots.map((slot, idx) => (
-                        <div key={`${s.subject}-${idx}`} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "6px 8px", border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc" }}>
+                        <div
+                          key={`${s.subject}-${idx}`}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                            padding: "6px 8px",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: 8,
+                            background: "#f8fafc",
+                          }}
+                        >
                           <div
                             className="teacher-hours-slot-grid"
                             style={{
@@ -540,149 +626,174 @@ export default function AdminTeacherHours() {
                               gridTemplateColumns:
                                 "minmax(140px, 1.2fr) minmax(80px, 0.6fr) minmax(120px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) minmax(170px, 1fr)",
                               gap: 6,
-                              alignItems: "center"
+                              alignItems: "center",
                             }}
                           >
-                          {(() => {
-                            const errorKey = `${r.teacherId}::${s.subject}::${idx}`;
-                            const err = validation.slotErrors[errorKey];
-                            const errorStyle = (field: string) =>
-                              err?.fields?.[field] || err?.fields?.duplicate
-                                ? { borderColor: "#dc2626", boxShadow: "0 0 0 1px rgba(220,38,38,0.25)" }
-                                : undefined;
-                            const collapseKey = `${r.teacherId}::${s.subject}::${idx}`;
-                            const isCollapsed = collapsedSlots[collapseKey];
-                            if (isCollapsed) {
-                              return (
-                                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                                  <span style={{ fontSize: 12, color: "#64748b" }}>
-                                    {slot.gradeLevel || "Grado"}-{slot.group || "Grupo"} {slot.dayOfWeek || "Dia"} {slot.startTime || "--:--"}-{slot.endTime || "--:--"}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className="button secondary"
-                                    onClick={() => setCollapsedSlots((prev) => ({ ...prev, [collapseKey]: false }))}
-                                  >
-                                    Mostrar
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="button danger"
-                                    onClick={() => {
-                                      const ok = window.confirm(
-                                        `Quitar la franja ${slot.gradeLevel || "-"}-${slot.group || "-"} ${slot.dayOfWeek || "-"} ${slot.startTime || "--:--"}-${slot.endTime || "--:--"} de ${s.subject}?`
-                                      );
-                                      if (!ok) return;
-                                      updateSlots(slots.filter((_, i) => i !== idx));
+                            {(() => {
+                              const errorKey = `${r.teacherId}::${s.subject}::${idx}`;
+                              const err = validation.slotErrors[errorKey];
+                              const errorStyle = (field: string) =>
+                                err?.fields?.[field] || err?.fields?.duplicate
+                                  ? {
+                                      borderColor: "#dc2626",
+                                      boxShadow: "0 0 0 1px rgba(220,38,38,0.25)",
+                                    }
+                                  : undefined;
+                              const collapseKey = `${r.teacherId}::${s.subject}::${idx}`;
+                              const isCollapsed = collapsedSlots[collapseKey];
+                              if (isCollapsed) {
+                                return (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: 8,
+                                      alignItems: "center",
+                                      flexWrap: "wrap",
                                     }}
                                   >
-                                    Quitar
-                                  </button>
-                                </div>
-                              );
-                            }
-                            return (
-                              <>
-                          <select
-                            className="input"
-                            value={slot.gradeLevel}
-                            onChange={(e) => {
-                              const next = [...slots];
-                              next[idx] = { ...next[idx], gradeLevel: e.target.value };
-                              updateSlots(next);
-                            }}
-                            style={{ minWidth: 140, ...errorStyle("gradeLevel") }}
-                          >
-                            <option value="">Grado</option>
-                            {gradeOptions.map((g) => (
-                              <option key={g.value} value={g.value}>{g.label}</option>
-                            ))}
-                          </select>
-                          <input
-                            className="input"
-                            value={slot.group}
-                            onChange={(e) => {
-                              const next = [...slots];
-                              next[idx] = { ...next[idx], group: e.target.value };
-                              updateSlots(next);
-                            }}
-                            placeholder="Grupo"
-                            style={{ maxWidth: 90, ...errorStyle("group") }}
-                          />
-                          <select
-                            className="input"
-                            value={slot.dayOfWeek}
-                            onChange={(e) => {
-                              const next = [...slots];
-                              next[idx] = { ...next[idx], dayOfWeek: e.target.value };
-                              updateSlots(next);
-                            }}
-                            style={{ minWidth: 120, ...errorStyle("dayOfWeek") }}
-                          >
-                            <option value="">Selecciona</option>
-                            <option value="LUNES">Lunes</option>
-                            <option value="MARTES">Martes</option>
-                            <option value="MIERCOLES">Miercoles</option>
-                            <option value="JUEVES">Jueves</option>
-                            <option value="VIERNES">Viernes</option>
-                            <option value="SABADO">Sabado</option>
-                          </select>
-                          <input
-                            className="input"
-                            type="time"
-                            value={slot.startTime}
-                            onChange={(e) => {
-                              const next = [...slots];
-                              next[idx] = { ...next[idx], startTime: e.target.value };
-                              updateSlots(next);
-                            }}
-                            style={{ maxWidth: 110, ...errorStyle("startTime") }}
-                          />
-                          <input
-                            className="input"
-                            type="time"
-                            value={slot.endTime}
-                            onChange={(e) => {
-                              const next = [...slots];
-                              next[idx] = { ...next[idx], endTime: e.target.value };
-                              updateSlots(next);
-                            }}
-                            style={{ maxWidth: 110, ...errorStyle("endTime") }}
-                          />
-                          <div className="teacher-hours-actions" style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                            <button
-                              type="button"
-                              className="button secondary"
-                              onClick={() => setCollapsedSlots((prev) => ({ ...prev, [collapseKey]: true }))}
-                            >
-                              Ocultar
-                            </button>
-                            <button
-                              type="button"
-                              className="button danger"
-                              onClick={() => {
-                                const ok = window.confirm(
-                                  `Quitar la franja ${slot.gradeLevel || "-"}-${slot.group || "-"} ${slot.dayOfWeek || "-"} ${slot.startTime || "--:--"}-${slot.endTime || "--:--"} de ${s.subject}?`
+                                    <span style={{ fontSize: 12, color: "#64748b" }}>
+                                      {slot.gradeLevel || "Grado"}-{slot.group || "Grupo"}{" "}
+                                      {slot.dayOfWeek || "Dia"} {slot.startTime || "--:--"}-
+                                      {slot.endTime || "--:--"}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="button secondary"
+                                      onClick={() =>
+                                        setCollapsedSlots((prev) => ({
+                                          ...prev,
+                                          [collapseKey]: false,
+                                        }))
+                                      }
+                                    >
+                                      Mostrar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="button danger"
+                                      onClick={() => {
+                                        const ok = window.confirm(
+                                          `Quitar la franja ${slot.gradeLevel || "-"}-${slot.group || "-"} ${slot.dayOfWeek || "-"} ${slot.startTime || "--:--"}-${slot.endTime || "--:--"} de ${s.subject}?`
+                                        );
+                                        if (!ok) return;
+                                        updateSlots(slots.filter((_, i) => i !== idx));
+                                      }}
+                                    >
+                                      Quitar
+                                    </button>
+                                  </div>
                                 );
-                                if (!ok) return;
-                                updateSlots(slots.filter((_, i) => i !== idx));
-                              }}
-                            >
-                              Quitar
-                            </button>
-                          </div>
-                              </>
-                            );
-                          })()}
+                              }
+                              return (
+                                <>
+                                  <select
+                                    className="input"
+                                    value={slot.gradeLevel}
+                                    onChange={(e) => {
+                                      const next = [...slots];
+                                      next[idx] = { ...next[idx], gradeLevel: e.target.value };
+                                      updateSlots(next);
+                                    }}
+                                    style={{ minWidth: 140, ...errorStyle("gradeLevel") }}
+                                  >
+                                    <option value="">Grado</option>
+                                    {gradeOptions.map((g) => (
+                                      <option key={g.value} value={g.value}>
+                                        {g.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    className="input"
+                                    value={slot.group}
+                                    onChange={(e) => {
+                                      const next = [...slots];
+                                      next[idx] = { ...next[idx], group: e.target.value };
+                                      updateSlots(next);
+                                    }}
+                                    placeholder="Grupo"
+                                    style={{ maxWidth: 90, ...errorStyle("group") }}
+                                  />
+                                  <select
+                                    className="input"
+                                    value={slot.dayOfWeek}
+                                    onChange={(e) => {
+                                      const next = [...slots];
+                                      next[idx] = { ...next[idx], dayOfWeek: e.target.value };
+                                      updateSlots(next);
+                                    }}
+                                    style={{ minWidth: 120, ...errorStyle("dayOfWeek") }}
+                                  >
+                                    <option value="">Selecciona</option>
+                                    <option value="LUNES">Lunes</option>
+                                    <option value="MARTES">Martes</option>
+                                    <option value="MIERCOLES">Miercoles</option>
+                                    <option value="JUEVES">Jueves</option>
+                                    <option value="VIERNES">Viernes</option>
+                                    <option value="SABADO">Sabado</option>
+                                  </select>
+                                  <input
+                                    className="input"
+                                    type="time"
+                                    value={slot.startTime}
+                                    onChange={(e) => {
+                                      const next = [...slots];
+                                      next[idx] = { ...next[idx], startTime: e.target.value };
+                                      updateSlots(next);
+                                    }}
+                                    style={{ maxWidth: 110, ...errorStyle("startTime") }}
+                                  />
+                                  <input
+                                    className="input"
+                                    type="time"
+                                    value={slot.endTime}
+                                    onChange={(e) => {
+                                      const next = [...slots];
+                                      next[idx] = { ...next[idx], endTime: e.target.value };
+                                      updateSlots(next);
+                                    }}
+                                    style={{ maxWidth: 110, ...errorStyle("endTime") }}
+                                  />
+                                  <div
+                                    className="teacher-hours-actions"
+                                    style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}
+                                  >
+                                    <button
+                                      type="button"
+                                      className="button secondary"
+                                      onClick={() =>
+                                        setCollapsedSlots((prev) => ({
+                                          ...prev,
+                                          [collapseKey]: true,
+                                        }))
+                                      }
+                                    >
+                                      Ocultar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="button danger"
+                                      onClick={() => {
+                                        const ok = window.confirm(
+                                          `Quitar la franja ${slot.gradeLevel || "-"}-${slot.group || "-"} ${slot.dayOfWeek || "-"} ${slot.startTime || "--:--"}-${slot.endTime || "--:--"} de ${s.subject}?`
+                                        );
+                                        if (!ok) return;
+                                        updateSlots(slots.filter((_, i) => i !== idx));
+                                      }}
+                                    >
+                                      Quitar
+                                    </button>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                           {(() => {
                             const errorKey = `${r.teacherId}::${s.subject}::${idx}`;
                             const err = validation.slotErrors[errorKey];
                             if (!err) return null;
                             return (
-                              <div style={{ fontSize: 12, color: "#dc2626" }}>
-                                {err.message}
-                              </div>
+                              <div style={{ fontSize: 12, color: "#dc2626" }}>{err.message}</div>
                             );
                           })()}
                         </div>
@@ -695,24 +806,37 @@ export default function AdminTeacherHours() {
                       <button
                         type="button"
                         className="button secondary"
-                        onClick={() => updateSlots([...slots, { dayOfWeek: "", startTime: "", endTime: "", gradeLevel: "", group: "" }])}
+                        onClick={() =>
+                          updateSlots([
+                            ...slots,
+                            {
+                              dayOfWeek: "",
+                              startTime: "",
+                              endTime: "",
+                              gradeLevel: "",
+                              group: "",
+                            },
+                          ])
+                        }
                       >
                         Agregar franja
                       </button>
                     </div>
                   );
-                })()
+                })(),
               }))}
             />
           </div>
         ))}
       </div>
-      <div className="section-title" style={{ marginTop: 12 }}>Total por docente</div>
+      <div className="section-title" style={{ marginTop: 12 }}>
+        Total por docente
+      </div>
       <DataTable
         columns={[
           { key: "teacher", label: "Docente" },
           { key: "total", label: "Total horas/semana" },
-          { key: "alert", label: "Estado" }
+          { key: "alert", label: "Estado" },
         ]}
         rows={totals.map((t) => ({
           teacher: t.teacherName,
@@ -721,13 +845,15 @@ export default function AdminTeacherHours() {
             <span className="status-badge status-rejected">Sobrecarga</span>
           ) : (
             <span className="status-badge status-approved">Normal</span>
-          )
+          ),
         }))}
       />
       <div style={{ marginTop: 8, color: "#64748b" }}>
         Limite recomendado: {MAX_RECOMMENDED_HOURS} horas por semana.
       </div>
-      <div className="section-title" style={{ marginTop: 12 }}>Resumen semanal por docente</div>
+      <div className="section-title" style={{ marginTop: 12 }}>
+        Resumen semanal por docente
+      </div>
       <DataTable
         columns={[
           { key: "teacher", label: "Docente" },
@@ -736,11 +862,13 @@ export default function AdminTeacherHours() {
           { key: "MIERCOLES", label: "Miercoles (h / grado-grupo)" },
           { key: "JUEVES", label: "Jueves (h / grado-grupo)" },
           { key: "VIERNES", label: "Viernes (h / grado-grupo)" },
-          { key: "SABADO", label: "Sabado (h / grado-grupo)" }
+          { key: "SABADO", label: "Sabado (h / grado-grupo)" },
         ]}
         rows={weeklySummary}
       />
-      <div className="section-title" style={{ marginTop: 12 }}>Detalle de franjas (vista inmediata)</div>
+      <div className="section-title" style={{ marginTop: 12 }}>
+        Detalle de franjas (vista inmediata)
+      </div>
       <DataTable
         columns={[
           { key: "teacher", label: "Docente" },
@@ -750,7 +878,7 @@ export default function AdminTeacherHours() {
           { key: "day", label: "Dia" },
           { key: "start", label: "Inicio" },
           { key: "end", label: "Fin" },
-          { key: "actions", label: "Acciones" }
+          { key: "actions", label: "Acciones" },
         ]}
         rows={weeklyDetails.map((row) => ({
           ...row,
@@ -764,7 +892,13 @@ export default function AdminTeacherHours() {
                 );
                 if (!ok) return;
                 const key = `${row.teacherId}::${row.subject}::slots`;
-                let slots: Array<{ dayOfWeek: string; startTime: string; endTime: string; gradeLevel: string; group: string }> = [];
+                let slots: Array<{
+                  dayOfWeek: string;
+                  startTime: string;
+                  endTime: string;
+                  gradeLevel: string;
+                  group: string;
+                }> = [];
                 try {
                   slots = JSON.parse(hoursDraft[key] || "[]");
                 } catch {
@@ -780,7 +914,7 @@ export default function AdminTeacherHours() {
             >
               Eliminar
             </button>
-          )
+          ),
         }))}
       />
     </Section>

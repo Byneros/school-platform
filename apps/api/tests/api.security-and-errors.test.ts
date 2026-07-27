@@ -41,7 +41,7 @@ test("POST /api/auth/login con JSON invalido responde 400 consistente", async ()
     const res = await fetch(`${baseUrl}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: "{bad-json"
+      body: "{bad-json",
     });
     const body = (await res.json()) as { message?: string };
     assert.equal(res.status, 400);
@@ -59,8 +59,8 @@ test("POST /api/auth/login sin DATABASE_URL responde 503 claro", async () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: "ing.nelsonjulio@gmail.com",
-          password: "Password123"
-        })
+          password: "Password123",
+        }),
       });
       const body = (await res.json()) as { message?: string };
       assert.equal(res.status, 503);
@@ -83,8 +83,8 @@ test("POST /api/attendance sin token responde 401", async () => {
       body: JSON.stringify({
         enrollmentId: "x",
         date: new Date().toISOString(),
-        status: "PRESENT"
-      })
+        status: "PRESENT",
+      }),
     });
     const body = (await res.json()) as { error?: string };
     assert.equal(res.status, 401);
@@ -99,13 +99,13 @@ test("POST /api/attendance con rol ADMIN responde 403", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         enrollmentId: "x",
         date: new Date().toISOString(),
-        status: "PRESENT"
-      })
+        status: "PRESENT",
+      }),
     });
     const body = (await res.json()) as { error?: string };
     assert.equal(res.status, 403);
@@ -120,9 +120,9 @@ test("POST /api/attendance con rol TEACHER y body invalido responde 400", async 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({})
+      body: JSON.stringify({}),
     });
     const body = (await res.json()) as { error?: string; issues?: unknown[] };
     assert.equal(res.status, 400);

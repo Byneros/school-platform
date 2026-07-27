@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import ActionFeedback from "../components/ActionFeedback";
 import { apiGet } from "../services/api";
 import { feedbackTitles } from "../utils/feedback";
@@ -55,7 +56,9 @@ export default function AdminCacheMetrics() {
 
   return (
     <div className="card" style={{ padding: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+      <div
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}
+      >
         <div>
           <h2 style={{ marginTop: 0 }}>Cache metrics</h2>
           {metrics && (
@@ -64,7 +67,9 @@ export default function AdminCacheMetrics() {
             </div>
           )}
         </div>
-        <button className="button secondary" onClick={load}>Recargar</button>
+        <button className="button secondary" onClick={load}>
+          Recargar
+        </button>
       </div>
 
       <ActionFeedback
@@ -78,7 +83,14 @@ export default function AdminCacheMetrics() {
 
       {metrics && !loading && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginTop: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 12,
+              marginTop: 16,
+            }}
+          >
             <div className="card">
               <div style={{ color: "#64748b" }}>Total</div>
               <div style={{ fontSize: 20, fontWeight: 700 }}>{metrics.total}</div>
@@ -105,7 +117,14 @@ export default function AdminCacheMetrics() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 20 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: 16,
+              marginTop: 20,
+            }}
+          >
             <div>
               <h3>Por prefijo</h3>
               <div style={{ overflowX: "auto" }}>
@@ -120,7 +139,9 @@ export default function AdminCacheMetrics() {
                   </thead>
                   <tbody>
                     {byPrefix.length === 0 && (
-                      <tr><td colSpan={4}>Sin datos.</td></tr>
+                      <tr>
+                        <td colSpan={4}>Sin datos.</td>
+                      </tr>
                     )}
                     {byPrefix.map((row) => (
                       <tr key={row.key}>
@@ -148,7 +169,9 @@ export default function AdminCacheMetrics() {
                   </thead>
                   <tbody>
                     {byTag.length === 0 && (
-                      <tr><td colSpan={4}>Sin datos.</td></tr>
+                      <tr>
+                        <td colSpan={4}>Sin datos.</td>
+                      </tr>
                     )}
                     {byTag.slice(0, 20).map((row) => (
                       <tr key={row.key}>

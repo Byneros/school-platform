@@ -22,12 +22,19 @@ const globalMetrics = {
   readErr: 0,
   writeErr: 0,
   byPrefix: new Map<string, MetricBucket>(),
-  byTag: new Map<string, MetricBucket>()
+  byTag: new Map<string, MetricBucket>(),
 };
 
 function bumpBucket(map: Map<string, MetricBucket>, key: string, field: keyof MetricBucket) {
-  const bucket =
-    map.get(key) || { total: 0, hit: 0, miss: 0, bypass: 0, set: 0, readErr: 0, writeErr: 0 };
+  const bucket = map.get(key) || {
+    total: 0,
+    hit: 0,
+    miss: 0,
+    bypass: 0,
+    set: 0,
+    readErr: 0,
+    writeErr: 0,
+  };
   bucket.total += field === "total" ? 1 : 0;
   bucket[field] += 1;
   map.set(key, bucket);
@@ -43,8 +50,12 @@ function recordMetric(prefix: string, field: keyof MetricBucket, tags: string[])
 export function getCacheMetrics() {
   const mapToObj = (map: Map<string, MetricBucket>) =>
     Object.fromEntries(Array.from(map.entries()));
-  const hitRate = globalMetrics.total ? Math.round((globalMetrics.hit / globalMetrics.total) * 100) : 0;
-  const missRate = globalMetrics.total ? Math.round((globalMetrics.miss / globalMetrics.total) * 100) : 0;
+  const hitRate = globalMetrics.total
+    ? Math.round((globalMetrics.hit / globalMetrics.total) * 100)
+    : 0;
+  const missRate = globalMetrics.total
+    ? Math.round((globalMetrics.miss / globalMetrics.total) * 100)
+    : 0;
   return {
     startedAt: globalMetrics.startedAt,
     total: globalMetrics.total,
@@ -57,7 +68,7 @@ export function getCacheMetrics() {
     hitRate,
     missRate,
     byPrefix: mapToObj(globalMetrics.byPrefix),
-    byTag: mapToObj(globalMetrics.byTag)
+    byTag: mapToObj(globalMetrics.byTag),
   };
 }
 
@@ -149,7 +160,7 @@ export function cacheResponse(options: CacheMiddlewareOptions) {
       res.setHeader("X-Cache", "BYPASS");
     }
 
-      const originalJson = res.json.bind(res);
+    const originalJson = res.json.bind(res);
     res.json = (body: unknown) => {
       try {
         if (res.statusCode >= 200 && res.statusCode < 300) {

@@ -12,12 +12,12 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: "production",
-        PORT: process.env.PORT || "4001"
+        PORT: process.env.PORT || "4001",
       },
       env_production: {
         NODE_ENV: "production",
-        PORT: process.env.PORT || "4001"
-      }
+        PORT: process.env.PORT || "4001",
+      },
     },
     {
       name: "school-web",
@@ -30,11 +30,11 @@ module.exports = {
       max_memory_restart: "256M",
       time: true,
       env: {
-        NODE_ENV: "production"
+        NODE_ENV: "production",
       },
       env_production: {
-        NODE_ENV: "production"
-      }
-    }
-  ]
+        NODE_ENV: "production",
+      },
+    },
+  ],
 };

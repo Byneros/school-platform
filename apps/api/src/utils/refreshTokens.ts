@@ -59,22 +59,31 @@ function isPrivateIp(ip: string) {
 
 function deriveDeviceLabel(userAgent: string) {
   const ua = userAgent.toLowerCase();
-  const os =
-    ua.includes("windows") ? "Windows" :
-    ua.includes("android") ? "Android" :
-    ua.includes("iphone") ? "iPhone" :
-    ua.includes("ipad") ? "iPad" :
-    ua.includes("mac os x") ? "macOS" :
-    ua.includes("linux") ? "Linux" :
-    "Dispositivo";
+  const os = ua.includes("windows")
+    ? "Windows"
+    : ua.includes("android")
+      ? "Android"
+      : ua.includes("iphone")
+        ? "iPhone"
+        : ua.includes("ipad")
+          ? "iPad"
+          : ua.includes("mac os x")
+            ? "macOS"
+            : ua.includes("linux")
+              ? "Linux"
+              : "Dispositivo";
 
-  const browser =
-    ua.includes("edg") ? "Edge" :
-    ua.includes("chrome") && !ua.includes("edg") ? "Chrome" :
-    ua.includes("safari") && !ua.includes("chrome") ? "Safari" :
-    ua.includes("firefox") ? "Firefox" :
-    ua.includes("opera") || ua.includes("opr/") ? "Opera" :
-    "";
+  const browser = ua.includes("edg")
+    ? "Edge"
+    : ua.includes("chrome") && !ua.includes("edg")
+      ? "Chrome"
+      : ua.includes("safari") && !ua.includes("chrome")
+        ? "Safari"
+        : ua.includes("firefox")
+          ? "Firefox"
+          : ua.includes("opera") || ua.includes("opr/")
+            ? "Opera"
+            : "";
 
   return browser ? `${browser} en ${os}` : os;
 }
@@ -104,9 +113,13 @@ async function fetchGeo(ip: string) {
     const data = await res.json();
 
     const city = normalizeGeoValue(data.city || data.city_name || data.location?.city);
-    const region = normalizeGeoValue(data.region || data.region_name || data.regionName || data.subdivision);
+    const region = normalizeGeoValue(
+      data.region || data.region_name || data.regionName || data.subdivision
+    );
     const country = normalizeGeoValue(data.country_name || data.country || data.countryName);
-    let countryCode = normalizeGeoValue(data.country_code || data.countryCode || data.country_code2 || data.country_code3);
+    let countryCode = normalizeGeoValue(
+      data.country_code || data.countryCode || data.country_code2 || data.country_code3
+    );
     if (!countryCode && typeof data.country === "string" && data.country.length <= 3) {
       countryCode = data.country;
     }
@@ -129,7 +142,7 @@ export function setRefreshCookie(res: Response, token: string, expiresAt: Date) 
     secure: isProd,
     sameSite,
     expires: expiresAt,
-    path: "/api/auth"
+    path: "/api/auth",
   });
 }
 
@@ -140,7 +153,7 @@ export function clearRefreshCookie(res: Response) {
     httpOnly: true,
     secure: isProd,
     sameSite,
-    path: "/api/auth"
+    path: "/api/auth",
   });
 }
 
@@ -165,8 +178,8 @@ export async function createRefreshSession(userId: string, req: Request, res: Re
       geoRegion: geo?.region || undefined,
       geoCountry: geo?.country || undefined,
       geoCountryCode: geo?.countryCode || undefined,
-      geoTimezone: geo?.timezone || undefined
-    }
+      geoTimezone: geo?.timezone || undefined,
+    },
   });
 
   setRefreshCookie(res, token, expiresAt);
@@ -191,8 +204,8 @@ export async function rotateRefreshSession(
       where: { id: session.id },
       data: {
         revokedAt: new Date(),
-        replacedByTokenHash: tokenHash
-      }
+        replacedByTokenHash: tokenHash,
+      },
     }),
     prisma.refreshSession.create({
       data: {
@@ -206,9 +219,9 @@ export async function rotateRefreshSession(
         geoRegion: geo?.region || undefined,
         geoCountry: geo?.country || undefined,
         geoCountryCode: geo?.countryCode || undefined,
-        geoTimezone: geo?.timezone || undefined
-      }
-    })
+        geoTimezone: geo?.timezone || undefined,
+      },
+    }),
   ]);
 
   setRefreshCookie(res, token, expiresAt);
@@ -218,13 +231,13 @@ export async function rotateRefreshSession(
 export async function revokeRefreshSession(tokenHash: string) {
   await prisma.refreshSession.updateMany({
     where: { tokenHash, revokedAt: null },
-    data: { revokedAt: new Date() }
+    data: { revokedAt: new Date() },
   });
 }
 
 export async function revokeAllSessionsForUser(userId: string) {
   await prisma.refreshSession.updateMany({
     where: { userId, revokedAt: null },
-    data: { revokedAt: new Date() }
+    data: { revokedAt: new Date() },
   });
 }

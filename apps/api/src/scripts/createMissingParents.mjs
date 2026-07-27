@@ -15,13 +15,16 @@ dotenv.config({ path: envFromApp });
 const DEFAULT_PASSWORD = process.env.PARENT_DEFAULT_PASSWORD || "Temporal123!";
 const prisma = new PrismaClient();
 
-const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizeEmail = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
 const normalizeText = (value) => String(value || "").trim();
 
 async function main() {
   const parentUsers = await prisma.user.findMany({
     where: { role: "PARENT" },
-    select: { email: true }
+    select: { email: true },
   });
   const existingEmails = new Set(parentUsers.map((p) => normalizeEmail(p.email)).filter(Boolean));
 
@@ -32,8 +35,8 @@ async function main() {
         studentId: true,
         contactEmail: true,
         guardianFullName: true,
-        guardianRelation: true
-      }
+        guardianRelation: true,
+      },
     }),
     prisma.admission.findMany({
       where: { status: { not: "REJECTED" }, contactEmail: { not: null } },
@@ -41,9 +44,9 @@ async function main() {
         id: true,
         contactEmail: true,
         guardianFullName: true,
-        guardianRelation: true
-      }
-    })
+        guardianRelation: true,
+      },
+    }),
   ]);
 
   const pending = new Map();
@@ -58,7 +61,7 @@ async function main() {
       email,
       fullName,
       relation,
-      studentIds: new Set()
+      studentIds: new Set(),
     };
     if (!current.fullName && fullName) current.fullName = fullName;
     if (!current.relation && relation) current.relation = relation;
@@ -85,17 +88,17 @@ async function main() {
           passwordHash,
           fullName: entry.fullName,
           role: "PARENT",
-          isActive: true
-        }
+          isActive: true,
+        },
       });
       const parent = await tx.parent.create({
-        data: { userId: user.id }
+        data: { userId: user.id },
       });
 
       const guardianRows = Array.from(entry.studentIds).map((studentId) => ({
         parentId: parent.id,
         studentId,
-        relation: entry.relation || "Acudiente"
+        relation: entry.relation || "Acudiente",
       }));
       if (guardianRows.length > 0) {
         const result = await tx.guardian.createMany({ data: guardianRows, skipDuplicates: true });
@@ -108,7 +111,9 @@ async function main() {
     console.log(`Creado usuario acudiente: ${created.email} (${created.fullName})`);
   }
 
-  console.log(`\nResumen: ${createdUsers} usuarios creados, ${createdGuardians} relaciones guardian creadas.`);
+  console.log(
+    `\nResumen: ${createdUsers} usuarios creados, ${createdGuardians} relaciones guardian creadas.`
+  );
   if (createdUsers > 0) {
     console.log(`Contrasena temporal usada: ${DEFAULT_PASSWORD}`);
   }

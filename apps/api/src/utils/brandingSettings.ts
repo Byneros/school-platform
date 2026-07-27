@@ -39,8 +39,8 @@ const DEFAULT_SETTINGS: BrandingSettings = {
   footerText: "Comprometidos con la excelencia academica y formacion integral.",
   promotionRules: {
     minAverage: 60,
-    maxFailedSubjects: 2
-  }
+    maxFailedSubjects: 2,
+  },
 };
 
 const BRANDING_DIR = path.resolve(process.cwd(), ".runtime");
@@ -59,12 +59,17 @@ export async function getBrandingSettings(): Promise<BrandingSettings> {
       ...parsed,
       schoolName: parsed.schoolName?.trim() || DEFAULT_SETTINGS.schoolName,
       promotionRules: {
-        minAverage: Number((parsed as any)?.promotionRules?.minAverage ?? DEFAULT_SETTINGS.promotionRules.minAverage),
-        maxFailedSubjects: Number((parsed as any)?.promotionRules?.maxFailedSubjects ?? DEFAULT_SETTINGS.promotionRules.maxFailedSubjects)
+        minAverage: Number(
+          (parsed as any)?.promotionRules?.minAverage ?? DEFAULT_SETTINGS.promotionRules.minAverage
+        ),
+        maxFailedSubjects: Number(
+          (parsed as any)?.promotionRules?.maxFailedSubjects ??
+            DEFAULT_SETTINGS.promotionRules.maxFailedSubjects
+        ),
       },
       promotionRulesHistory: Array.isArray((parsed as any)?.promotionRulesHistory)
         ? ((parsed as any).promotionRulesHistory as BrandingSettings["promotionRulesHistory"])
-        : []
+        : [],
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -80,12 +85,17 @@ export async function saveBrandingSettings(settings: Partial<BrandingSettings>) 
     schoolName: (settings.schoolName ?? current.schoolName).trim(),
     logoDataUrl: settings.logoDataUrl === undefined ? current.logoDataUrl : settings.logoDataUrl,
     promotionRules: {
-      minAverage: Number((settings as any)?.promotionRules?.minAverage ?? current.promotionRules.minAverage),
-      maxFailedSubjects: Number((settings as any)?.promotionRules?.maxFailedSubjects ?? current.promotionRules.maxFailedSubjects)
+      minAverage: Number(
+        (settings as any)?.promotionRules?.minAverage ?? current.promotionRules.minAverage
+      ),
+      maxFailedSubjects: Number(
+        (settings as any)?.promotionRules?.maxFailedSubjects ??
+          current.promotionRules.maxFailedSubjects
+      ),
     },
     promotionRulesHistory: Array.isArray((settings as any)?.promotionRulesHistory)
       ? ((settings as any).promotionRulesHistory as BrandingSettings["promotionRulesHistory"])
-      : current.promotionRulesHistory
+      : current.promotionRulesHistory,
   };
   await fs.writeFile(BRANDING_FILE, JSON.stringify(next, null, 2), "utf8");
   return next;

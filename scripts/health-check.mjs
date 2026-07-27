@@ -24,7 +24,8 @@ async function check(url) {
 
 async function main() {
   const port = process.env.PORT || "4003";
-  const apiHealth = process.env.API_HEALTH_URL || process.env.API_READY_URL || `http://localhost:${port}/ready`;
+  const apiHealth =
+    process.env.API_HEALTH_URL || process.env.API_READY_URL || `http://localhost:${port}/ready`;
   await check(apiHealth);
 }
 
@@ -32,4 +33,3 @@ main().catch((error) => {
   console.error(`[health] FAIL ${error?.message || error}`);
   process.exit(1);
 });
-

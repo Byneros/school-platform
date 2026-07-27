@@ -9,6 +9,6 @@ export function getQueueJobOptions(overrides: JobsOptions = {}): JobsOptions {
     backoff: { type: "exponential", delay: backoffMs },
     removeOnComplete: true,
     removeOnFail: 500,
-    ...overrides
+    ...overrides,
   };
 }

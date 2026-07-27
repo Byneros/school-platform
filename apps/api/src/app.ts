@@ -34,25 +34,16 @@ const rateLimitWindowMs = Math.max(
   Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000)
 );
 
-const rateLimitMax = Math.max(
-  10,
-  Number(process.env.RATE_LIMIT_MAX || 300)
-);
+const rateLimitMax = Math.max(10, Number(process.env.RATE_LIMIT_MAX || 300));
 
-const loginRateLimitMax = Math.max(
-  3,
-  Number(process.env.LOGIN_RATE_LIMIT_MAX || 10)
-);
+const loginRateLimitMax = Math.max(3, Number(process.env.LOGIN_RATE_LIMIT_MAX || 10));
 
 const writeRateLimitWindowMs = Math.max(
   1000,
   Number(process.env.WRITE_RATE_LIMIT_WINDOW_MS || 60 * 1000)
 );
 
-const writeRateLimitMax = Math.max(
-  10,
-  Number(process.env.WRITE_RATE_LIMIT_MAX || 120)
-);
+const writeRateLimitMax = Math.max(10, Number(process.env.WRITE_RATE_LIMIT_MAX || 120));
 
 const notificationsRateLimitWindowMs = Math.max(
   1000,
@@ -69,20 +60,14 @@ const reportsRateLimitWindowMs = Math.max(
   Number(process.env.REPORTS_RATE_LIMIT_WINDOW_MS || 60 * 1000)
 );
 
-const reportsRateLimitMax = Math.max(
-  5,
-  Number(process.env.REPORTS_RATE_LIMIT_MAX || 30)
-);
+const reportsRateLimitMax = Math.max(5, Number(process.env.REPORTS_RATE_LIMIT_MAX || 30));
 
 const twoFactorRateLimitWindowMs = Math.max(
   60_000,
   Number(process.env.TWO_FACTOR_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000)
 );
 
-const twoFactorRateLimitMax = Math.max(
-  3,
-  Number(process.env.TWO_FACTOR_RATE_LIMIT_MAX || 10)
-);
+const twoFactorRateLimitMax = Math.max(3, Number(process.env.TWO_FACTOR_RATE_LIMIT_MAX || 10));
 
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "15mb";
 const cacheTtlSeconds = Math.max(5, Number(process.env.REDIS_CACHE_TTL_SECONDS || 300));
@@ -102,10 +87,7 @@ const cacheWarmEnabled = String(process.env.CACHE_WARM_ENABLED || "").toLowerCas
 
 const trustProxyEnv = String(process.env.TRUST_PROXY || "").toLowerCase();
 
-const trustProxy =
-  trustProxyEnv === "true" ||
-  trustProxyEnv === "1" ||
-  trustProxyEnv === "yes";
+const trustProxy = trustProxyEnv === "true" || trustProxyEnv === "1" || trustProxyEnv === "yes";
 
 type TokenScope = { role: string; userId: string };
 
@@ -120,7 +102,7 @@ function getTokenScope(req: express.Request): TokenScope {
     const payload = jwt.verify(token, secret) as any;
     return {
       role: String(payload?.role || "ANON"),
-      userId: String(payload?.userId || "")
+      userId: String(payload?.userId || ""),
     };
   } catch {
     return { role: "ANON", userId: "" };
@@ -145,8 +127,12 @@ function cacheTagsForPath(req: express.Request) {
   const segments = path.split("/").filter(Boolean);
   const base = segments[0] || "";
   const idCandidate = segments[1] || "";
-  const statusRaw = String(req.query?.status || "").toUpperCase().trim();
-  const typeRaw = String(req.query?.type || "").toLowerCase().trim();
+  const statusRaw = String(req.query?.status || "")
+    .toUpperCase()
+    .trim();
+  const typeRaw = String(req.query?.type || "")
+    .toLowerCase()
+    .trim();
   const isIdCandidate =
     idCandidate &&
     idCandidate.length >= 8 &&
@@ -394,9 +380,7 @@ app.use((req, res, next) => {
   const requestIdHeader = req.headers["x-request-id"];
 
   const requestId =
-    typeof requestIdHeader === "string" && requestIdHeader.trim()
-      ? requestIdHeader
-      : randomUUID();
+    typeof requestIdHeader === "string" && requestIdHeader.trim() ? requestIdHeader : randomUUID();
 
   const start = Date.now();
 
@@ -425,7 +409,6 @@ app.use((req, res, next) => {
 app.get("/", (req, res) => {
   res.send("API funcionando correctamente 🚀");
 });
-
 
 app.get("/health", (req, res) => {
   res.json({ ok: true });
@@ -501,11 +484,11 @@ app.use(
       "/api/reports/export",
       "/api/notifications/export",
       "/api/certificates/export",
-      ...cacheExcludePaths
+      ...cacheExcludePaths,
     ],
     logEvery: cacheLogEvery,
     keyFn: cacheScopeForPath,
-    tagsFn: cacheTagsForPath
+    tagsFn: cacheTagsForPath,
   })
 );
 
@@ -519,7 +502,7 @@ app.use(
       if (urls.length > 0) {
         enqueueCacheWarm(urls).catch(() => undefined);
       }
-    }
+    },
   })
 );
 
@@ -554,23 +537,18 @@ const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
 
   const status = Number(errorAny?.status || (isPrismaUnavailable ? 503 : 500));
 
-  const isJsonParseError =
-    errorAny?.type === "entity.parse.failed";
-  const isEntityTooLarge =
-    status === 413 ||
-    errorAny?.type === "entity.too.large";
+  const isJsonParseError = errorAny?.type === "entity.parse.failed";
+  const isEntityTooLarge = status === 413 || errorAny?.type === "entity.too.large";
 
   const message = isEntityTooLarge
     ? "El archivo o la solicitud es demasiado grande para procesarse. Usa una plantilla mas pequena o aumenta JSON_BODY_LIMIT."
     : isJsonParseError
-    ? "JSON invalido en la solicitud"
-    : isPrismaUnavailable
-    ? "Base de datos no disponible o DATABASE_URL no configurado."
-    : isPrismaError
-    ? "Error de base de datos. Verifica migraciones y conexion."
-    : String(
-        errorAny?.message || "Error interno del servidor"
-      );
+      ? "JSON invalido en la solicitud"
+      : isPrismaUnavailable
+        ? "Base de datos no disponible o DATABASE_URL no configurado."
+        : isPrismaError
+          ? "Error de base de datos. Verifica migraciones y conexion."
+          : String(errorAny?.message || "Error interno del servidor");
 
   if (status >= 500) {
     logError("http_unhandled_error", {
@@ -589,5 +567,3 @@ const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
 app.use(errorHandler);
 
 export default app;
-
-

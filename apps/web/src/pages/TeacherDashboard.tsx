@@ -1,16 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import ActionFeedback from "../components/ActionFeedback";
+import DataTable from "../components/DataTable";
 import KpiCard from "../components/KpiCard";
 import Section from "../components/Section";
-import DataTable from "../components/DataTable";
 import { apiGet, apiPost, apiPut } from "../services/api";
 import { gradeLabel } from "../services/grades";
 import { feedbackTitles, inferFeedbackTone } from "../utils/feedback";
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
-  const [students, setStudents] = useState<Array<{ id: string; fullName: string; gradeLevel: string; studentGroup?: string | null; latestYear?: number | null }>>([]);
+  const [students, setStudents] = useState<
+    Array<{
+      id: string;
+      fullName: string;
+      gradeLevel: string;
+      studentGroup?: string | null;
+      latestYear?: number | null;
+    }>
+  >([]);
   const [studentId, setStudentId] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -21,7 +30,7 @@ export default function TeacherDashboard() {
   const [profileMsg, setProfileMsg] = useState("");
   const [profileForm, setProfileForm] = useState({
     professionalProfile: "",
-    subjectsText: ""
+    subjectsText: "",
   });
 
   useEffect(() => {
@@ -35,7 +44,7 @@ export default function TeacherDashboard() {
       .then((res) =>
         setProfileForm({
           professionalProfile: res.professionalProfile || "",
-          subjectsText: Array.isArray(res.subjects) ? res.subjects.join(", ") : ""
+          subjectsText: Array.isArray(res.subjects) ? res.subjects.join(", ") : "",
         })
       )
       .catch(() => undefined);
@@ -69,7 +78,7 @@ export default function TeacherDashboard() {
         .filter(Boolean);
       await apiPut("/teacher/profile", {
         professionalProfile: profileForm.professionalProfile,
-        subjects
+        subjects,
       });
       setProfileMsg("Perfil docente actualizado.");
     } catch (error: any) {
@@ -85,10 +94,14 @@ export default function TeacherDashboard() {
         <div className="section-head">
           <div>
             <div className="section-title">Panel Docente</div>
-            <div style={{ color: "#6b7280" }}>Registra asistencia, notas y comunica tareas en minutos.</div>
+            <div style={{ color: "#6b7280" }}>
+              Registra asistencia, notas y comunica tareas en minutos.
+            </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="button secondary" onClick={() => navigate("/teacher/asistencia")}>Asistencia por grado</button>
+            <button className="button secondary" onClick={() => navigate("/teacher/asistencia")}>
+              Asistencia por grado
+            </button>
             <button className="button" onClick={() => navigate("/teacher/tareas-calificaciones")}>
               Tareas y calificaciones
             </button>
@@ -112,7 +125,9 @@ export default function TeacherDashboard() {
                 className="input"
                 rows={4}
                 value={profileForm.professionalProfile}
-                onChange={(e) => setProfileForm({ ...profileForm, professionalProfile: e.target.value })}
+                onChange={(e) =>
+                  setProfileForm({ ...profileForm, professionalProfile: e.target.value })
+                }
                 placeholder="Licenciado en..., experiencia, especializaciones..."
               />
             </label>
@@ -141,7 +156,10 @@ export default function TeacherDashboard() {
         <Section
           title="Calificaciones recientes"
           action={
-            <button className="button secondary" onClick={() => navigate("/teacher/tareas-calificaciones")}>
+            <button
+              className="button secondary"
+              onClick={() => navigate("/teacher/tareas-calificaciones")}
+            >
               Tareas y calificaciones
             </button>
           }
@@ -153,12 +171,15 @@ export default function TeacherDashboard() {
             columns={[
               { key: "assessment", label: "Evaluacion" },
               { key: "grade", label: "Grado" },
-              { key: "score", label: "Promedio" }
+              { key: "score", label: "Promedio" },
             ]}
             rows={recentGrades.map((g: any) => ({
               assessment: g.name,
               grade: gradeLabel(g.grade || g.enrollment?.class?.gradeLevel || ""),
-              score: Number(g.maxScore || 0) > 0 ? (Number(g.score || 0) / Number(g.maxScore || 0) * 20).toFixed(1) : String(g.score || "")
+              score:
+                Number(g.maxScore || 0) > 0
+                  ? ((Number(g.score || 0) / Number(g.maxScore || 0)) * 20).toFixed(1)
+                  : String(g.score || ""),
             }))}
           />
         </Section>
@@ -170,11 +191,17 @@ export default function TeacherDashboard() {
           <form className="card" onSubmit={sendNotification}>
             <label>
               Estudiante (opcional)
-              <select className="input" value={studentId} onChange={(e) => setStudentId(e.target.value)}>
+              <select
+                className="input"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+              >
                 <option value="">Todos</option>
                 {students.map((s) => (
                   <option key={s.id} value={s.id}>
-                  {s.fullName} - {gradeLabel(s.gradeLevel)}{s.studentGroup ? `${s.studentGroup}` : ""}{s.latestYear ? ` (${s.latestYear})` : ""}
+                    {s.fullName} - {gradeLabel(s.gradeLevel)}
+                    {s.studentGroup ? `${s.studentGroup}` : ""}
+                    {s.latestYear ? ` (${s.latestYear})` : ""}
                   </option>
                 ))}
               </select>
@@ -185,7 +212,12 @@ export default function TeacherDashboard() {
             </label>
             <label>
               Mensaje
-              <textarea className="input" rows={4} value={body} onChange={(e) => setBody(e.target.value)} />
+              <textarea
+                className="input"
+                rows={4}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+              />
             </label>
             <ActionFeedback
               tone={inferFeedbackTone(message)}

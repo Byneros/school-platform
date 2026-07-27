@@ -1,51 +1,125 @@
 # Despliegue gratuito en Render (API + Web + Postgres)
 
-Este paso a paso usa el plan **Free** de Render. Ten en cuenta sus limitaciones
-(sleep automático y base de datos temporal) antes de usarlo en producción.
+Este proyecto puede desplegarse en Render Free con un Blueprint desde `render.yaml`.
+Ten presente que Render Free duerme servicios sin trafico y la base Postgres Free tiene limites de retencion.
 
-## 1) Requisitos previos
-- Tener el repositorio en GitHub/GitLab/Bitbucket.
-- Tener una cuenta en Render.
+## 1. Preflight local
 
-## 2) Crear los servicios con `render.yaml`
-1. Asegúrate de tener el archivo `render.yaml` en la raíz del repo.
-2. En Render Dashboard ve a **Blueprints** y crea una nueva instancia.
-3. Render creará:
-   - Un **Web Service** para el API.
-   - Un **Static Site** para el frontend.
-   - Una **Postgres Free** para la base de datos.
-4. El `render.yaml` incluye **autodeploy** y health check estricto (`/ready`).
-5. Si migras a un plan pago, puedes mover las migraciones al `preDeployCommand`.
+Desde la raiz del proyecto:
 
-## 3) Configurar variables obligatorias
-En el panel del **API**:
-- `CORS_ORIGINS`: pega la URL del frontend (ej. `https://school-web.onrender.com`)
-- `JWT_SECRET`: generado automáticamente por Render.
-- `DATABASE_URL`: inyectada desde la DB (Render lo hace por `fromDatabase`).
+```powershell
+npm run verify
+$env:TEST_API_URL="http://127.0.0.1:4003"
+npm --workspace apps/api run test
+npm --workspace apps/api run test:regression
+```
 
-En el panel del **Web**:
-- `VITE_API_URL`: URL pública del API + `/api` (ej. `https://school-api.onrender.com/api`)
+Si regression necesita datos QA:
 
-## 4) Configurar SMTP (para 2FA por correo)
-Render Free **no permite** enviar correo por los puertos SMTP 25/465/587.
-Usa un proveedor que soporte **puerto 2525** o API SMTP con ese puerto.
+```powershell
+npm --workspace apps/api run prisma:seed:qa
+```
 
-Variables a definir en el API:
-- `SMTP_HOST`
-- `SMTP_PORT` = `2525`
-- `SMTP_USER`
-- `SMTP_PASS`
-- `SMTP_FROM`
+## 2. Crear Blueprint
 
-Si no tienes SMTP, puedes desactivar 2FA temporalmente:
-- `ADMIN_2FA_ENABLED=false`
+1. Sube el repositorio a GitHub/GitLab/Bitbucket.
+2. En Render Dashboard abre **Blueprints**.
+3. Selecciona el repositorio con `render.yaml`.
+4. Render creara:
+   - `school-api` como Web Service Node.
+   - `school-web` como Static Site.
+   - `school-db` como PostgreSQL.
 
-## 5) Consideraciones del plan Free
-- Los Web Services se “duermen” si no reciben tráfico por ~15 min.
-- El Postgres Free expira a los 30 días y no incluye backups.
-- El sistema de archivos es efímero (no guardar archivos locales).
+## 3. Comandos configurados
 
-## 6) Verificación rápida
-1. Abre la URL del frontend.
-2. Inicia sesión y comprueba que el API responde.
-3. Si 2FA está activo, verifica que el correo llegue.
+API:
+
+- Build: `npm ci && npm run render:api:build`
+- Start: `npm run render:api:start`
+- Health check: `/ready`
+
+Web:
+
+- Build: `npm ci && npm run render:web:build`
+- Publish path: `apps/web/dist`
+
+En plan Free, Render no ofrece `preDeployCommand`; por eso `render:api:start` ejecuta `prisma:migrate:deploy` antes de iniciar la API.
+
+## 4. Variables obligatorias del API
+
+Render inyecta:
+
+- `DATABASE_URL` desde `school-db`.
+- `JWT_SECRET` con `generateValue`.
+
+Revisar y completar manualmente:
+
+- `CORS_ORIGINS`: URL publica del frontend.
+- `REFRESH_TOKEN_PEPPER`: secreto fuerte.
+- `REDIS_URL`: URL Redis si se usan colas/cache distribuidos.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`: necesarios si 2FA/email esta activo.
+- `CACHE_METRICS_TOKEN`, `RATE_LIMIT_METRICS_TOKEN`: secretos para endpoints operativos.
+
+Si no hay SMTP listo, usar temporalmente:
+
+```text
+ADMIN_2FA_ENABLED=false
+EMAIL_WORKER_ENABLED=false
+NOTIFICATION_WORKER_ENABLED=false
+```
+
+## 5. Variables del Web
+
+- `VITE_API_URL`: URL publica del API con `/api`.
+
+Ejemplo:
+
+```text
+https://school-api.onrender.com/api
+```
+
+## 6. Verificacion post-deploy
+
+API:
+
+```powershell
+$env:API_HEALTH_URL="https://<api-render-url>/ready"
+npm run ready
+```
+
+Web:
+
+1. Abrir la URL publica del static site.
+2. Iniciar sesion con usuario admin sembrado o creado.
+3. Probar:
+   - Login.
+   - Usuarios.
+   - Matriculas.
+   - Importar plantilla Excel.
+   - Reportes PDF/XLSX.
+   - Asistencia docente.
+
+## 7. Smoke/regression contra Render
+
+```powershell
+$env:TEST_API_URL="https://<api-render-url>"
+npm --workspace apps/api run test
+npm --workspace apps/api run test:regression
+```
+
+## 8. Auditoria de dependencias
+
+`xlsx` fue retirado y reemplazado por `read-excel-file` / `write-excel-file`.
+
+Pendiente conocido:
+
+- `npm audit --omit=dev` puede reportar `react-router` por GHSA-qwww-vcr4-c8h2.
+- La app actual usa SPA con `BrowserRouter`, no RSC/SSR actions.
+- El riesgo esta registrado en `docs/audit/RISK_REGISTER.md`.
+- Revalidar cuando exista una version instalable fuera del rango vulnerable.
+
+## 9. Rollback
+
+1. Revertir commit/tag en Render.
+2. Si hubo migraciones destructivas, restaurar backup de BD.
+3. Validar `/ready` y smoke tests.

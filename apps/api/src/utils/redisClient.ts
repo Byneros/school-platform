@@ -8,7 +8,7 @@ function buildRedisOptions(redisUrl: string) {
     maxRetriesPerRequest: null,
     lazyConnect: true,
     connectTimeout: 1500,
-    ...(useTls ? { tls: {} } : {})
+    ...(useTls ? { tls: {} } : {}),
   };
 }
 
@@ -56,6 +56,6 @@ export function getRedisConnectionOptions() {
 
   return {
     url: redisUrl,
-    ...buildRedisOptions(redisUrl)
+    ...buildRedisOptions(redisUrl),
   };
 }

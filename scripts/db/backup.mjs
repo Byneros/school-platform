@@ -25,22 +25,20 @@ function nowStamp() {
 }
 
 function detectContainerId(composeFile) {
-  const output = execFileSync(
-    "docker",
-    ["compose", "-f", composeFile, "ps", "-q", "db"],
-    { encoding: "utf8" }
-  ).trim();
+  const output = execFileSync("docker", ["compose", "-f", composeFile, "ps", "-q", "db"], {
+    encoding: "utf8",
+  }).trim();
   if (!output) {
-    throw new Error(
-      "No se pudo detectar el contenedor de DB. Ejecuta: npm run infra:up"
-    );
+    throw new Error("No se pudo detectar el contenedor de DB. Ejecuta: npm run infra:up");
   }
   return output;
 }
 
 async function dumpToFile({ containerId, dbUser, dbName, filePath, dryRun }) {
   if (dryRun) {
-    console.log(`[dry-run] docker exec ${containerId} pg_dump -U ${dbUser} -d ${dbName} ... > ${filePath}`);
+    console.log(
+      `[dry-run] docker exec ${containerId} pg_dump -U ${dbUser} -d ${dbName} ... > ${filePath}`
+    );
     return;
   }
 
@@ -59,7 +57,7 @@ async function dumpToFile({ containerId, dbUser, dbName, filePath, dryRun }) {
         "--clean",
         "--if-exists",
         "--no-owner",
-        "--no-privileges"
+        "--no-privileges",
       ],
       { stdio: ["ignore", "pipe", "pipe"] }
     );
@@ -85,11 +83,16 @@ async function dumpToFile({ containerId, dbUser, dbName, filePath, dryRun }) {
 function cleanupOldBackups({ outputDir, retentionDays, dryRun }) {
   const files = fs
     .readdirSync(outputDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.startsWith("school-platform-backup-") && entry.name.endsWith(".sql"))
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.startsWith("school-platform-backup-") &&
+        entry.name.endsWith(".sql")
+    )
     .map((entry) => ({
       name: entry.name,
       fullPath: path.join(outputDir, entry.name),
-      mtimeMs: fs.statSync(path.join(outputDir, entry.name)).mtimeMs
+      mtimeMs: fs.statSync(path.join(outputDir, entry.name)).mtimeMs,
     }));
 
   const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;

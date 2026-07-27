@@ -5,16 +5,16 @@ const prisma = new PrismaClient();
 
 async function main() {
   const teachers = await prisma.teacher.findMany({
-    select: { id: true, subjects: true, subjectHoursMode: true }
+    select: { id: true, subjects: true, subjectHoursMode: true },
   });
 
   for (const teacher of teachers) {
-    const subjects = Array.isArray(teacher.subjects)
-      ? teacher.subjects.map((s) => String(s))
-      : [];
-    const current = (teacher.subjectHoursMode && typeof teacher.subjectHoursMode === "object"
-      ? (teacher.subjectHoursMode as Record<string, boolean>)
-      : {}) as Record<string, boolean>;
+    const subjects = Array.isArray(teacher.subjects) ? teacher.subjects.map((s) => String(s)) : [];
+    const current = (
+      teacher.subjectHoursMode && typeof teacher.subjectHoursMode === "object"
+        ? (teacher.subjectHoursMode as Record<string, boolean>)
+        : {}
+    ) as Record<string, boolean>;
 
     const next: Record<string, boolean> = { ...current };
     let changed = false;
@@ -28,7 +28,7 @@ async function main() {
     if (changed) {
       await prisma.teacher.update({
         where: { id: teacher.id },
-        data: { subjectHoursMode: next }
+        data: { subjectHoursMode: next },
       });
     }
   }

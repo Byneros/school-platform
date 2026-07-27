@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+
 import Section from "../components/Section";
 
 export default function TeacherGrades() {

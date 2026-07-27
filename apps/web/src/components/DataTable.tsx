@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import Autocomplete from "./Autocomplete";
+
 import useSuggestions from "../hooks/useSuggestions";
+
+import Autocomplete from "./Autocomplete";
 
 type Column = { key: string; label: string; sticky?: boolean };
 
@@ -25,7 +27,7 @@ export default function DataTable({
   rowKey,
   rowStyle,
   suggestionsEndpoint,
-  suggestionsLimit
+  suggestionsLimit,
 }: Props) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -67,7 +69,7 @@ export default function DataTable({
     endpoint: suggestionsEndpoint || "",
     query,
     enabled: Boolean(enableSearch && suggestionsEndpoint),
-    limit: suggestionsLimit
+    limit: suggestionsLimit,
   });
 
   const suggestionOptions = suggestionsEndpoint ? remoteSuggestionOptions : localSuggestionOptions;
@@ -114,7 +116,7 @@ export default function DataTable({
                           left: 0,
                           zIndex: 2,
                           background: "#fff",
-                          boxShadow: "2px 0 0 rgba(226,232,240,0.9)"
+                          boxShadow: "2px 0 0 rgba(226,232,240,0.9)",
                         }
                       : undefined
                   }
@@ -127,11 +129,16 @@ export default function DataTable({
           <tbody>
             {paged.length === 0 && (
               <tr>
-                <td colSpan={columns.length} className="table-empty">{emptyText}</td>
+                <td colSpan={columns.length} className="table-empty">
+                  {emptyText}
+                </td>
               </tr>
             )}
             {paged.map((row, i) => (
-              <tr key={rowKey ? String(row[rowKey]) : i} style={rowStyle ? rowStyle(row) : undefined}>
+              <tr
+                key={rowKey ? String(row[rowKey]) : i}
+                style={rowStyle ? rowStyle(row) : undefined}
+              >
                 {columns.map((c) => {
                   const value = row[c.key];
                   if (c.key === "status" && typeof value === "string") {
@@ -146,7 +153,7 @@ export default function DataTable({
                                 left: 0,
                                 zIndex: 1,
                                 background: "#fff",
-                                boxShadow: "2px 0 0 rgba(226,232,240,0.9)"
+                                boxShadow: "2px 0 0 rgba(226,232,240,0.9)",
                               }
                             : undefined
                         }
@@ -166,7 +173,7 @@ export default function DataTable({
                                 left: 0,
                                 zIndex: 1,
                                 background: "#fff",
-                                boxShadow: "2px 0 0 rgba(226,232,240,0.9)"
+                                boxShadow: "2px 0 0 rgba(226,232,240,0.9)",
                               }
                             : undefined
                         }
@@ -185,7 +192,7 @@ export default function DataTable({
                               left: 0,
                               zIndex: 1,
                               background: "#fff",
-                              boxShadow: "2px 0 0 rgba(226,232,240,0.9)"
+                              boxShadow: "2px 0 0 rgba(226,232,240,0.9)",
                             }
                           : undefined
                       }
@@ -200,13 +207,21 @@ export default function DataTable({
         </table>
       </div>
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-        <button className="button secondary" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>
+        <button
+          className="button secondary"
+          disabled={safePage <= 1}
+          onClick={() => setPage(safePage - 1)}
+        >
           Anterior
         </button>
         <div style={{ alignSelf: "center", color: "#64748b" }}>
           Pagina {safePage} de {totalPages}
         </div>
-        <button className="button secondary" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)}>
+        <button
+          className="button secondary"
+          disabled={safePage >= totalPages}
+          onClick={() => setPage(safePage + 1)}
+        >
           Siguiente
         </button>
       </div>

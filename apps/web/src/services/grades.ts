@@ -28,7 +28,7 @@ export const gradeOptions: Array<{ value: GradeLevel; label: string }> = [
   { value: "OCTAVO", label: "Octavo" },
   { value: "NOVENO", label: "Noveno" },
   { value: "DECIMO", label: "Decimo" },
-  { value: "ONCE", label: "Once" }
+  { value: "ONCE", label: "Once" },
 ];
 
 export function gradeLabel(value?: string) {

@@ -4,3 +4,36 @@ dist
 .env
 .env.local
 coverage
+# Logs
+*.log
+
+# Local editor/project scratch
+.vscode/
+lint.txt
+lint2.txt
+s
+
+# Zip
+*.zip
+
+# Lint reports
+.eslintcache
+lint.log
+lint2.log
+
+# Coverage
+coverage/
+
+# Build
+dist/
+build/
+
+# Vite
+.vite/
+
+# Turbo
+.turbo/
+
+# OS
+.DS_Store
+Thumbs.db

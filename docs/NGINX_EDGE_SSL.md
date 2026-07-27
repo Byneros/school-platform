@@ -6,6 +6,7 @@ Este documento permite publicar varios colegios en un mismo servidor con HTTPS:
 - `colegio-b.tudominio.com` -> `localhost:8082`
 
 ## 1. Prerrequisitos
+
 1. DNS apuntando al servidor:
    - `A colegio-a.tudominio.com -> <IP_PUBLICA>`
    - `A colegio-b.tudominio.com -> <IP_PUBLICA>`
@@ -14,6 +15,7 @@ Este documento permite publicar varios colegios en un mismo servidor con HTTPS:
 4. Cada colegio desplegado con puerto distinto (`WEB_PORT`) usando `deploy-prod.ps1`.
 
 ## 2. Copiar configuracion base
+
 1. Copia `infra/nginx/edge/nginx.conf` a `/etc/nginx/nginx.conf` (si deseas reemplazar base).
 2. Define tu mapeo dominio/puerto en `infra/nginx/edge/schools-map.example.json`.
 3. Genera el archivo final:
@@ -25,6 +27,7 @@ npm run nginx:generate:multi
 4. Copia `infra/nginx/edge/school-multi.conf` a `/etc/nginx/conf.d/school-multi.conf`.
 
 ## 3. Obtener certificados SSL
+
 Automatizado desde el mapping:
 
 ```bash
@@ -39,6 +42,7 @@ node ./scripts/certbot-multi.mjs --mode issue --email admin@tudominio.com --exec
 ```
 
 Luego verifica rutas:
+
 - `/etc/letsencrypt/live/colegio-a.tudominio.com/fullchain.pem`
 - `/etc/letsencrypt/live/colegio-a.tudominio.com/privkey.pem`
 
@@ -50,6 +54,7 @@ sudo systemctl reload nginx
 ```
 
 ## 5. Renovacion automatica
+
 Prueba de renovacion:
 
 ```bash
@@ -81,11 +86,13 @@ sudo journalctl -u school-certbot-renew.service -n 100 --no-pager
 ```
 
 ## 6. Prueba final por colegio
+
 1. `https://colegio-a.tudominio.com/`
 2. `https://colegio-b.tudominio.com/`
 3. Revisar `https://colegio-a.tudominio.com/health` (debe responder health de API).
 
 ## 7. Recomendaciones de operacion
+
 1. Mantener una tabla de mapeo:
    - subdominio
    - `WEB_PORT`

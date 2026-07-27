@@ -19,31 +19,39 @@ export function startNotificationWorker() {
 
       const notification = await prisma.notification.findUnique({
         where: { id: notificationId },
-        include: { createdBy: { include: { teacher: true } } }
+        include: { createdBy: { include: { teacher: true } } },
       });
       if (!notification) return;
       const audience = extractNotificationAudience(notification.body);
       const plainBody = stripNotificationMeta(notification.body);
-      const sendToParents = notification.createdBy.role === "TEACHER" || audience === "PARENTS" || audience === "BOTH" || !audience;
+      const sendToParents =
+        notification.createdBy.role === "TEACHER" ||
+        audience === "PARENTS" ||
+        audience === "BOTH" ||
+        !audience;
       const sendToTeachers = audience === "TEACHERS" || audience === "BOTH";
 
       let parents: { id: string }[] = [];
       if (sendToParents && notification.studentId) {
         const guardians = await prisma.guardian.findMany({
           where: { studentId: notification.studentId },
-          select: { parentId: true }
+          select: { parentId: true },
         });
         parents = guardians.map((g) => ({ id: g.parentId }));
-      } else if (sendToParents && notification.createdBy.role === "TEACHER" && notification.createdBy.teacher) {
+      } else if (
+        sendToParents &&
+        notification.createdBy.role === "TEACHER" &&
+        notification.createdBy.teacher
+      ) {
         const enrollments = await prisma.enrollment.findMany({
           where: { class: { teacherId: notification.createdBy.teacher.id } },
-          select: { studentId: true }
+          select: { studentId: true },
         });
         const studentIds = Array.from(new Set(enrollments.map((e) => e.studentId)));
         if (studentIds.length > 0) {
           const guardians = await prisma.guardian.findMany({
             where: { studentId: { in: studentIds } },
-            select: { parentId: true }
+            select: { parentId: true },
           });
           parents = guardians.map((g) => ({ id: g.parentId }));
         }
@@ -54,12 +62,12 @@ export function startNotificationWorker() {
       if (parents.length > 0) {
         const recipients = parents.map((p) => ({
           notificationId,
-          parentId: p.id
+          parentId: p.id,
         }));
 
         await prisma.notificationRecipient.createMany({
           data: recipients,
-          skipDuplicates: true
+          skipDuplicates: true,
         });
       }
 
@@ -67,22 +75,22 @@ export function startNotificationWorker() {
         ? notification.targetUserId
           ? await prisma.user.findMany({
               where: { id: notification.targetUserId, role: "TEACHER", isActive: true },
-              select: { email: true }
+              select: { email: true },
             })
           : await prisma.user.findMany({
               where: { role: "TEACHER", isActive: true },
-              select: { email: true }
+              select: { email: true },
             })
         : [];
 
       await prisma.notification.update({
         where: { id: notificationId },
-        data: { status: "SENT", sentAt: new Date() }
+        data: { status: "SENT", sentAt: new Date() },
       });
 
       const parentUsers = await prisma.parent.findMany({
         where: { id: { in: parents.map((p) => p.id) } },
-        include: { user: true }
+        include: { user: true },
       });
       const toList = parentUsers.map((p) => p.user.email).filter(Boolean);
       const teacherToList = teacherEmails.map((t) => t.email).filter(Boolean);
@@ -93,7 +101,9 @@ export function startNotificationWorker() {
           allEmails.map((email) =>
             sendEmail({
               to: email,
-              subject: branding ? `${notification.title} - ${branding.schoolName}` : notification.title,
+              subject: branding
+                ? `${notification.title} - ${branding.schoolName}`
+                : notification.title,
               text: plainBody,
               html: `
                 <div style="font-family: Arial, sans-serif; color: #0f172a;">
@@ -107,7 +117,7 @@ export function startNotificationWorker() {
                     ${branding?.footerText || "Notificacion enviada por la institucion educativa."}
                   </div>
                 </div>
-              `
+              `,
             }).catch(() => undefined)
           )
         );

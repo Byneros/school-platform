@@ -12,13 +12,13 @@ export const createStudentObservationSchema = z.object({
     coexistenceOffense: z.string().min(2).optional(),
     followUpDate: z.string().optional(),
     autoDetail: z.boolean().optional(),
-    detail: z.string().min(5)
-  })
+    detail: z.string().min(5),
+  }),
 });
 
 export const updateStudentObservationSchema = z.object({
   params: z.object({
-    id: z.string().min(1)
+    id: z.string().min(1),
   }),
   body: z.object({
     date: z.string().optional(),
@@ -27,6 +27,6 @@ export const updateStudentObservationSchema = z.object({
     coexistenceOffense: z.string().min(2).optional(),
     followUpDate: z.string().optional(),
     followUpCompleted: z.boolean().optional(),
-    detail: z.string().min(5).optional()
-  })
+    detail: z.string().min(5).optional(),
+  }),
 });

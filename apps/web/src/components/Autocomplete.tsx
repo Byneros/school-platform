@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 type Option = { value: string; label: string; [key: string]: any };
 
 type Props = {
+  id?: string;
   value: string;
   options: Option[];
   placeholder?: string;
@@ -11,7 +12,15 @@ type Props = {
   onSelectOption?: (option: Option) => void;
 };
 
-export default function Autocomplete({ value, options, placeholder, className, onChange, onSelectOption }: Props) {
+export default function Autocomplete({
+  id,
+  value,
+  options,
+  placeholder,
+  className,
+  onChange,
+  onSelectOption,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
 
@@ -24,6 +33,7 @@ export default function Autocomplete({ value, options, placeholder, className, o
   return (
     <div style={{ position: "relative" }}>
       <input
+        id={id}
         className={className || "input"}
         value={value}
         placeholder={placeholder}
@@ -65,13 +75,21 @@ export default function Autocomplete({ value, options, placeholder, className, o
             borderRadius: 8,
             width: "100%",
             boxShadow: "var(--shadow)",
-            marginTop: 4
+            marginTop: 4,
           }}
         >
           {filtered.map((o, idx) => (
-            <div
+            <button
               key={o.value}
-              style={{ padding: "8px 10px", cursor: "pointer", background: idx === active ? "#eff6ff" : "white" }}
+              type="button"
+              style={{
+                padding: "8px 10px",
+                cursor: "pointer",
+                background: idx === active ? "#eff6ff" : "white",
+                width: "100%",
+                textAlign: "left",
+                border: "none",
+              }}
               onMouseEnter={() => setActive(idx)}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
@@ -81,7 +99,7 @@ export default function Autocomplete({ value, options, placeholder, className, o
               }}
             >
               <span style={{ fontWeight: idx === active ? 700 : 400 }}>{o.label}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}

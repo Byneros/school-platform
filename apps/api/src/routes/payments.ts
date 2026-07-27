@@ -17,13 +17,15 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
         invoice: {
           OR: [
             { id: { contains: search, mode: "insensitive" } },
-            { student: { fullName: { contains: search, mode: "insensitive" } } }
-          ]
-        }
+            { student: { fullName: { contains: search, mode: "insensitive" } } },
+          ],
+        },
       }
     : {};
 
-  const finalWhere = status ? { ...where, invoice: { ...(where as any).invoice, status: status as any } } : where;
+  const finalWhere = status
+    ? { ...where, invoice: { ...(where as any).invoice, status: status as any } }
+    : where;
 
   const [data, total] = await Promise.all([
     prisma.payment.findMany({
@@ -31,26 +33,32 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
       include: { invoice: { include: { student: true } } },
       orderBy: { paidAt: "desc" },
       skip: (page - 1) * pageSize,
-      take: pageSize
+      take: pageSize,
     }),
-    prisma.payment.count({ where: finalWhere })
+    prisma.payment.count({ where: finalWhere }),
   ]);
 
   res.json({ data, total, page, pageSize });
 });
 
-router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createPaymentSchema), async (req, res) => {
-  const { body } = (req as any).validated;
-  const payment = await prisma.payment.create({
-    data: {
-      invoiceId: body.invoiceId,
-      amount: body.amount,
-      paidAt: new Date(body.paidAt),
-      method: body.method,
-      reference: body.reference
-    }
-  });
-  res.json(payment);
-});
+router.post(
+  "/",
+  requireAuth,
+  requireRole(["ADMIN"]),
+  validate(createPaymentSchema),
+  async (req, res) => {
+    const { body } = (req as any).validated;
+    const payment = await prisma.payment.create({
+      data: {
+        invoiceId: body.invoiceId,
+        amount: body.amount,
+        paidAt: new Date(body.paidAt),
+        method: body.method,
+        reference: body.reference,
+      },
+    });
+    res.json(payment);
+  }
+);
 
 export default router;

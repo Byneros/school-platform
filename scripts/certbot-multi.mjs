@@ -42,7 +42,7 @@ function usage() {
       "  --email <email>    Email requerido para mode=issue",
       "  --staging          Usa Let's Encrypt staging (solo issue)",
       "  --execute          Ejecuta comandos. Sin esto, solo imprime plan",
-    ].join("\n"),
+    ].join("\n")
   );
 }
 

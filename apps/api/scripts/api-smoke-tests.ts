@@ -21,9 +21,7 @@ async function requestJson(url: string, init?: RequestInit) {
 }
 
 async function main() {
-  const baseUrl =
-    process.env.TEST_API_URL ||
-    `http://127.0.0.1:${process.env.PORT || "4000"}`;
+  const baseUrl = process.env.TEST_API_URL || `http://127.0.0.1:${process.env.PORT || "4000"}`;
 
   const health = await requestJson(`${baseUrl}/health`);
   if (!health.res.ok || health.json?.ok !== true) {
@@ -40,7 +38,7 @@ async function main() {
   const badJsonRes = await fetch(`${baseUrl}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: "{bad-json"
+    body: "{bad-json",
   });
   const badJsonBody = (await badJsonRes.json()) as JsonObject;
   if (badJsonRes.status !== 400 || badJsonBody?.message !== "JSON invalido en la solicitud") {
@@ -53,8 +51,8 @@ async function main() {
     body: JSON.stringify({
       enrollmentId: "x",
       date: new Date().toISOString(),
-      status: "PRESENT"
-    })
+      status: "PRESENT",
+    }),
   });
   if (attendanceNoToken.res.status !== 401 || attendanceNoToken.json?.error !== "Missing token") {
     fail("Fallo test attendance sin token: se esperaba 401 Missing token.");
@@ -66,26 +64,28 @@ async function main() {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${adminToken}`
+      Authorization: `Bearer ${adminToken}`,
     },
     body: JSON.stringify({
       enrollmentId: "x",
       date: new Date().toISOString(),
-      status: "PRESENT"
-    })
+      status: "PRESENT",
+    }),
   });
   if (attendanceAdmin.res.status !== 403 || attendanceAdmin.json?.error !== "Forbidden") {
     fail("Fallo test attendance rol ADMIN: se esperaba 403 Forbidden.");
   }
 
-  const teacherToken = jwt.sign({ role: "TEACHER", userId: "test-teacher" }, secret, { expiresIn: "1h" });
+  const teacherToken = jwt.sign({ role: "TEACHER", userId: "test-teacher" }, secret, {
+    expiresIn: "1h",
+  });
   const attendanceTeacherInvalid = await requestJson(`${baseUrl}/api/attendance`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${teacherToken}`
+      Authorization: `Bearer ${teacherToken}`,
     },
-    body: JSON.stringify({})
+    body: JSON.stringify({}),
   });
   if (
     attendanceTeacherInvalid.res.status !== 400 ||

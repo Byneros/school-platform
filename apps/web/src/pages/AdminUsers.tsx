@@ -1,14 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import Section from "../components/Section";
-import DataTable from "../components/DataTable";
-import Autocomplete from "../components/Autocomplete";
+
 import ActionFeedback from "../components/ActionFeedback";
-import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
-import useDebounce from "../hooks/useDebounce";
-import { feedbackTitles } from "../utils/feedback";
-import useSuggestions from "../hooks/useSuggestions";
+import Autocomplete from "../components/Autocomplete";
+import DataTable from "../components/DataTable";
+import Section from "../components/Section";
 import { useAuth } from "../context/AuthContext";
+import useDebounce from "../hooks/useDebounce";
+import useSuggestions from "../hooks/useSuggestions";
+import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
+import { feedbackTitles } from "../utils/feedback";
 
 function isStrongPassword(password: string) {
   return (
@@ -26,7 +27,7 @@ function passwordRules(password: string) {
     { label: "Al menos una mayuscula (A-Z)", ok: /[A-Z]/.test(password) },
     { label: "Al menos una minuscula (a-z)", ok: /[a-z]/.test(password) },
     { label: "Al menos un numero (0-9)", ok: /[0-9]/.test(password) },
-    { label: "Al menos un simbolo (!@#$...)", ok: /[^A-Za-z0-9]/.test(password) }
+    { label: "Al menos un simbolo (!@#$...)", ok: /[^A-Za-z0-9]/.test(password) },
   ];
 }
 
@@ -37,18 +38,52 @@ function PasswordChecklist({ password }: { password: string }) {
     passed <= 2
       ? { label: "Debil", color: "#dc2626", width: "33%" }
       : passed <= 4
-      ? { label: "Media", color: "#d97706", width: "66%" }
-      : { label: "Fuerte", color: "#15803d", width: "100%" };
+        ? { label: "Media", color: "#d97706", width: "66%" }
+        : { label: "Fuerte", color: "#15803d", width: "100%" };
   return (
     <div style={{ marginTop: 6 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "#64748b", marginBottom: 4 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontSize: 12,
+          color: "#64748b",
+          marginBottom: 4,
+        }}
+      >
         <span>Fortaleza de contrasena</span>
         <span style={{ color: strength.color, fontWeight: 600 }}>{strength.label}</span>
       </div>
-      <div style={{ width: "100%", height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", marginBottom: 6 }}>
-        <div style={{ width: strength.width, height: "100%", background: strength.color, transition: "width .2s ease" }} />
+      <div
+        style={{
+          width: "100%",
+          height: 8,
+          borderRadius: 999,
+          background: "#e5e7eb",
+          overflow: "hidden",
+          marginBottom: 6,
+        }}
+      >
+        <div
+          style={{
+            width: strength.width,
+            height: "100%",
+            background: strength.color,
+            transition: "width .2s ease",
+          }}
+        />
       </div>
-      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: "#64748b", display: "grid", gap: 2 }}>
+      <ul
+        style={{
+          margin: 0,
+          paddingLeft: 16,
+          fontSize: 12,
+          color: "#64748b",
+          display: "grid",
+          gap: 2,
+        }}
+      >
         {rules.map((rule) => (
           <li key={rule.label} style={{ color: rule.ok ? "#15803d" : "#64748b" }}>
             {rule.ok ? "✅" : "❌"} {rule.label}
@@ -112,8 +147,14 @@ export default function AdminUsers() {
     }>
   >([]);
   const [pendingParentLoading, setPendingParentLoading] = useState(false);
-  const [form, setForm] = useState({ fullName: "", email: "", role: "ADMIN", password: "", teacherSubjects: [] as string[] });
-  const [actionError, setActionError] = useState("");
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    role: "ADMIN",
+    password: "",
+    teacherSubjects: [] as string[],
+  });
+  const [, setActionError] = useState("");
   const [createError, setCreateError] = useState("");
   const [createMessage, setCreateMessage] = useState("");
   const [editingId, setEditingId] = useState("");
@@ -124,14 +165,21 @@ export default function AdminUsers() {
   const [toggleMessage, setToggleMessage] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleteMessage, setDeleteMessage] = useState("");
-  const [editForm, setEditForm] = useState({ fullName: "", email: "", role: "ADMIN", password: "" });
+  const [editForm, setEditForm] = useState({
+    fullName: "",
+    email: "",
+    role: "ADMIN",
+    password: "",
+  });
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
-  const [collapsedByRole, setCollapsedByRole] = useState<Record<"ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER", boolean>>({
+  const [collapsedByRole, setCollapsedByRole] = useState<
+    Record<"ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER", boolean>
+  >({
     ADMIN: false,
     TEACHER: false,
     PARENT: false,
-    DEVELOPER: false
+    DEVELOPER: false,
   });
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importBusy, setImportBusy] = useState(false);
@@ -159,19 +207,23 @@ export default function AdminUsers() {
     "Fisica",
     "Quimica",
     "Geometria",
-    "Comprension Lectora"
+    "Comprension Lectora",
   ];
 
   const initialPage = Number(searchParams.get("page") || "1");
   const initialRole = searchParams.get("role") || "";
   const initialSearch = searchParams.get("search") || "";
 
-  const [page, setPage] = useState(Number.isFinite(initialPage) && initialPage > 0 ? initialPage : 1);
+  const [page, setPage] = useState(
+    Number.isFinite(initialPage) && initialPage > 0 ? initialPage : 1
+  );
   const [total, setTotal] = useState(0);
   const [roleFilter, setRoleFilter] = useState(initialRole);
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search, 350);
-  const [savedFilters, setSavedFilters] = useState<Array<{ id: string; name: string; roleFilter: string; search: string }>>([]);
+  const [savedFilters, setSavedFilters] = useState<
+    Array<{ id: string; name: string; roleFilter: string; search: string }>
+  >([]);
   const [filterName, setFilterName] = useState("");
   const [selectedFilterId, setSelectedFilterId] = useState("");
   const [canDeleteUsers, setCanDeleteUsers] = useState(false);
@@ -182,7 +234,7 @@ export default function AdminUsers() {
   const editNameInputRef = useRef<HTMLInputElement | null>(null);
   const userSearchOptions = useSuggestions({
     endpoint: "/suggestions?type=users",
-    query: search
+    query: search,
   });
 
   useEffect(() => {
@@ -206,20 +258,21 @@ export default function AdminUsers() {
     }
   }, []);
 
-  const persistFilters = (next: Array<{ id: string; name: string; roleFilter: string; search: string }>) => {
+  const persistFilters = (
+    next: Array<{ id: string; name: string; roleFilter: string; search: string }>
+  ) => {
     setSavedFilters(next);
     localStorage.setItem("admin_users_filters", JSON.stringify(next));
   };
 
   const saveCurrentFilter = () => {
     const trimmed = filterName.trim();
-    const name = trimmed || `Filtro ${new Date().toLocaleDateString("es-CO")} ${new Date().toLocaleTimeString("es-CO")}`;
+    const name =
+      trimmed ||
+      `Filtro ${new Date().toLocaleDateString("es-CO")} ${new Date().toLocaleTimeString("es-CO")}`;
     const id = trimmed ? trimmed.toLowerCase().replace(/\s+/g, "-") : `f-${Date.now()}`;
     const next = savedFilters.filter((f) => f.id !== id);
-    const updated = [
-      { id, name, roleFilter, search },
-      ...next
-    ];
+    const updated = [{ id, name, roleFilter, search }, ...next];
     persistFilters(updated.slice(0, 10));
     setSelectedFilterId(id);
     setFilterName("");
@@ -241,35 +294,22 @@ export default function AdminUsers() {
     setSelectedFilterId("");
   };
 
-  const load = () =>
-    apiGet(`/users?page=${page}&pageSize=10${roleFilter ? `&role=${roleFilter}` : ""}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`)
-      .then((res) => {
-        setLoadError("");
-        const data = res.data || [];
-        setUsers(data);
-        setTotal(res.total || 0);
-        setCanDeleteUsers(Boolean(res.canDelete));
-      })
-      .catch((error: any) => {
-        setLoadError(error?.message || "No se pudieron cargar los usuarios.");
-      });
+  const loadPendingParentUsers = useCallback(async () => {
+    setPendingParentLoading(true);
 
-  const loadAllForSections = () =>
-    apiGet(`/users?page=1&pageSize=5000${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`)
-      .then((res) => {
-        setAllUsersForSections(res.data || []);
-      })
-      .catch(() => undefined);
+    try {
+      const res = await apiGet("/users/parents/pending-account");
+      setPendingParentUsers(res.data || []);
+    } catch {
+      setPendingParentUsers([]);
+    } finally {
+      setPendingParentLoading(false);
+    }
+  }, []);
 
-  const loadPendingParentUsers = () =>
-    (setPendingParentLoading(true),
-    apiGet("/users/parents/pending-account")
-      .then((res) => setPendingParentUsers(res.data || []))
-      .catch(() => setPendingParentUsers([]))
-      .finally(() => setPendingParentLoading(false)));
-
-  const loadImportHistory = async () => {
+  const loadImportHistory = useCallback(async () => {
     setImportHistoryLoading(true);
+
     try {
       const res = await apiGet("/reports/import-template/history");
       setImportHistory(res?.data || []);
@@ -278,14 +318,46 @@ export default function AdminUsers() {
     } finally {
       setImportHistoryLoading(false);
     }
+  }, []);
+
+  const refreshData = async () => {
+    await Promise.all([loadPendingParentUsers(), loadImportHistory()]);
   };
 
   useEffect(() => {
-    load();
-    loadAllForSections();
-    loadPendingParentUsers();
-    loadImportHistory();
-  }, [page, roleFilter, debouncedSearch]);
+    const fetchData = async () => {
+      try {
+        const usersResponse = await apiGet(
+          `/users?page=${page}&pageSize=10${roleFilter ? `&role=${roleFilter}` : ""}${
+            debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""
+          }`
+        );
+
+        setLoadError("");
+        setUsers(usersResponse.data || []);
+        setTotal(usersResponse.total || 0);
+        setCanDeleteUsers(Boolean(usersResponse.canDelete));
+      } catch (error: any) {
+        setLoadError(error?.message || "No se pudieron cargar los usuarios.");
+      }
+
+      try {
+        const allUsersResponse = await apiGet(
+          `/users?page=1&pageSize=5000${
+            debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""
+          }`
+        );
+
+        setAllUsersForSections(allUsersResponse.data || []);
+      } catch {
+        setAllUsersForSections([]);
+      }
+
+      await Promise.all([loadPendingParentUsers(), loadImportHistory()]);
+    };
+
+    void fetchData();
+  }, [page, roleFilter, debouncedSearch, loadPendingParentUsers, loadImportHistory]);
 
   useEffect(() => {
     if (!editingId) return;
@@ -308,7 +380,9 @@ export default function AdminUsers() {
       return;
     }
     if (!isStrongPassword(form.password.trim())) {
-      setCreateError("Contrasena invalida. Usa minimo 8 caracteres, mayuscula, minuscula, numero y simbolo.");
+      setCreateError(
+        "Contrasena invalida. Usa minimo 8 caracteres, mayuscula, minuscula, numero y simbolo."
+      );
       return;
     }
     try {
@@ -316,19 +390,18 @@ export default function AdminUsers() {
         ...form,
         fullName: form.fullName.trim(),
         email: form.email.trim().toLowerCase(),
-        password: form.password.trim()
+        password: form.password.trim(),
       };
       await apiPost("/users", payload);
       setForm({ fullName: "", email: "", role: "ADMIN", password: "", teacherSubjects: [] });
       setCreateMessage("Usuario creado satisfactoriamente.");
-      load();
-      loadPendingParentUsers();
+      await refreshData();
     } catch (error: any) {
       setCreateError(error?.message || "No se pudo crear el usuario.");
     }
   };
 
-  const usePendingGuardianForCreate = (guardian: {
+  const loadPendingGuardianForCreate = (guardian: {
     guardianFullName: string;
     contactEmail: string;
   }) => {
@@ -338,7 +411,7 @@ export default function AdminUsers() {
       fullName: guardian.guardianFullName || "",
       email: guardian.contactEmail || "",
       role: "PARENT",
-      teacherSubjects: []
+      teacherSubjects: [],
     }));
     requestAnimationFrame(() => {
       createPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -353,7 +426,11 @@ export default function AdminUsers() {
       const updated = await apiPatch(`/users/${id}`, { isActive: !isActive });
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
       setAllUsersForSections((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
-      setToggleMessage(isActive ? "Usuario desactivado satisfactoriamente." : "Usuario activado satisfactoriamente.");
+      setToggleMessage(
+        isActive
+          ? "Usuario desactivado satisfactoriamente."
+          : "Usuario activado satisfactoriamente."
+      );
     } catch (error: any) {
       setToggleError(error?.message || "No se pudo actualizar el usuario");
     }
@@ -368,7 +445,7 @@ export default function AdminUsers() {
       fullName: user.fullName,
       email: user.email,
       role: user.role,
-      password: ""
+      password: "",
     });
   };
 
@@ -382,11 +459,13 @@ export default function AdminUsers() {
       const body: Record<string, unknown> = {
         fullName: editForm.fullName,
         email: editForm.email,
-        role: editForm.role
+        role: editForm.role,
       };
       if (editForm.password.trim()) {
         if (!isStrongPassword(editForm.password.trim())) {
-          setEditError("La nueva contrasena debe tener minimo 8 caracteres, mayuscula, minuscula, numero y simbolo.");
+          setEditError(
+            "La nueva contrasena debe tener minimo 8 caracteres, mayuscula, minuscula, numero y simbolo."
+          );
           setEditBusy(false);
           return;
         }
@@ -394,7 +473,9 @@ export default function AdminUsers() {
       }
       const updated = await apiPatch(`/users/${editingId}`, body);
       setUsers((prev) => prev.map((u) => (u.id === editingId ? { ...u, ...updated } : u)));
-      setAllUsersForSections((prev) => prev.map((u) => (u.id === editingId ? { ...u, ...updated } : u)));
+      setAllUsersForSections((prev) =>
+        prev.map((u) => (u.id === editingId ? { ...u, ...updated } : u))
+      );
       setEditMessage("Usuario actualizado satisfactoriamente.");
       setEditForm({ fullName: "", email: "", role: "ADMIN", password: "" });
       loadPendingParentUsers();
@@ -410,7 +491,9 @@ export default function AdminUsers() {
       setDeleteError("Solo el administrador principal puede eliminar usuarios.");
       return;
     }
-    const confirmed = window.confirm(`Eliminar usuario ${fullName}? Esta accion no se puede deshacer.`);
+    const confirmed = window.confirm(
+      `Eliminar usuario ${fullName}? Esta accion no se puede deshacer.`
+    );
     if (!confirmed) return;
     setDeleteError("");
     setDeleteMessage("");
@@ -418,7 +501,9 @@ export default function AdminUsers() {
       const res = await apiDelete(`/users/${id}`);
       if (res?.deactivated && res?.user) {
         setUsers((prev) => prev.map((u) => (u.id === res.user.id ? { ...u, ...res.user } : u)));
-        setAllUsersForSections((prev) => prev.map((u) => (u.id === res.user.id ? { ...u, ...res.user } : u)));
+        setAllUsersForSections((prev) =>
+          prev.map((u) => (u.id === res.user.id ? { ...u, ...res.user } : u))
+        );
         setDeleteMessage(res?.message || "Usuario desactivado.");
       } else {
         setUsers((prev) => prev.filter((u) => u.id !== id));
@@ -456,7 +541,9 @@ export default function AdminUsers() {
     }
     const maxFileSizeBytes = 8 * 1024 * 1024;
     if (importFile.size > maxFileSizeBytes) {
-      setImportError("El archivo .xlsx es demasiado grande. Usa un archivo menor a 8 MB o dividelo en varias importaciones.");
+      setImportError(
+        "El archivo .xlsx es demasiado grande. Usa un archivo menor a 8 MB o dividelo en varias importaciones."
+      );
       return;
     }
     setImportBusy(true);
@@ -466,13 +553,11 @@ export default function AdminUsers() {
       const fileBase64 = await fileToBase64(importFile);
       const result = await apiPost("/reports/import-template/import", {
         fileBase64,
-        mode: importMode
+        mode: importMode,
       });
       setImportResult(result);
       if (importMode === "import") {
-        load();
-        loadAllForSections();
-        loadPendingParentUsers();
+        await refreshData();
       }
       await loadImportHistory();
     } catch (error: any) {
@@ -482,18 +567,17 @@ export default function AdminUsers() {
     }
   };
 
-  const roleSections: Array<{ key: "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER"; label: string }> = [
-    { key: "ADMIN", label: "Administradores" },
-    ...(canManageDeveloperUsers ? [{ key: "DEVELOPER" as const, label: "Desarrolladores" }] : []),
-    { key: "TEACHER", label: "Docentes" },
-    { key: "PARENT", label: "Padres de familia" }
-  ];
+  const roleSections: Array<{ key: "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER"; label: string }> =
+    [
+      { key: "ADMIN", label: "Administradores" },
+      ...(canManageDeveloperUsers ? [{ key: "DEVELOPER" as const, label: "Desarrolladores" }] : []),
+      { key: "TEACHER", label: "Docentes" },
+      { key: "PARENT", label: "Padres de familia" },
+    ];
 
   return (
     <Section title="Usuarios">
-      <div className="help-card">
-        Gestiona usuarios, roles y accesos desde el panel principal.
-      </div>
+      <div className="help-card">Gestiona usuarios, roles y accesos desde el panel principal.</div>
       <ActionFeedback
         tone="success"
         title={feedbackTitles.users.createSuccess}
@@ -555,7 +639,17 @@ export default function AdminUsers() {
         </label>
         <label>
           Rol
-          <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value, teacherSubjects: e.target.value === "TEACHER" ? form.teacherSubjects : [] })}>
+          <select
+            className="input"
+            value={form.role}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                role: e.target.value,
+                teacherSubjects: e.target.value === "TEACHER" ? form.teacherSubjects : [],
+              })
+            }
+          >
             <option value="ADMIN">Administrador</option>
             {canManageDeveloperUsers && <option value="DEVELOPER">Desarrollador</option>}
             <option value="TEACHER">Docente</option>
@@ -563,14 +657,23 @@ export default function AdminUsers() {
           </select>
         </label>
         {form.role === "TEACHER" && (
-          <label>
-            Asignaturas del docente
+          <div>
+            <div style={{ marginBottom: 6, fontWeight: 500 }}>Asignaturas del docente</div>
             <div className="card" style={{ boxShadow: "none", padding: 10, marginTop: 6 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                  gap: 6,
+                }}
+              >
                 {teacherSubjectOptions.map((subject) => {
                   const checked = form.teacherSubjects.includes(subject);
                   return (
-                    <label key={subject} style={{ display: "flex", gap: 8, alignItems: "center", color: "#334155" }}>
+                    <label
+                      key={subject}
+                      style={{ display: "flex", gap: 8, alignItems: "center", color: "#334155" }}
+                    >
                       <input
                         type="checkbox"
                         checked={checked}
@@ -579,7 +682,7 @@ export default function AdminUsers() {
                             ...prev,
                             teacherSubjects: e.target.checked
                               ? [...prev.teacherSubjects, subject]
-                              : prev.teacherSubjects.filter((s) => s !== subject)
+                              : prev.teacherSubjects.filter((s) => s !== subject),
                           }))
                         }
                       />
@@ -589,34 +692,55 @@ export default function AdminUsers() {
                 })}
               </div>
             </div>
-          </label>
+          </div>
         )}
         <label>
           Contrasena temporal
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                className="input"
-                name="newPassword"
-                autoComplete="new-password"
-                type={showCreatePassword ? "text" : "password"}
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+            <input
+              className="input"
+              name="newPassword"
+              autoComplete="new-password"
+              type={showCreatePassword ? "text" : "password"}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
             />
-            <button type="button" className="button secondary" onClick={() => setShowCreatePassword((v) => !v)}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setShowCreatePassword((v) => !v)}
+            >
               {showCreatePassword ? "Ocultar" : "Ver"}
             </button>
           </div>
           <PasswordChecklist password={form.password} />
         </label>
-        <button className="button" style={{ marginTop: 10 }}>Crear</button>
+        <button className="button" style={{ marginTop: 10 }}>
+          Crear
+        </button>
       </form>
       <div className="card" style={{ marginBottom: 10 }}>
         <div className="section-title" style={{ marginBottom: 8 }}>
           Acudientes con estudiantes matriculados sin usuario ({pendingParentUsers.length})
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          {pendingParentLoading && <span style={{ color: "#64748b", fontSize: 12 }}>Actualizando...</span>}
-          <button className="button secondary" type="button" onClick={loadPendingParentUsers} disabled={pendingParentLoading}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 8,
+          }}
+        >
+          {pendingParentLoading && (
+            <span style={{ color: "#64748b", fontSize: 12 }}>Actualizando...</span>
+          )}
+          <button
+            className="button secondary"
+            type="button"
+            onClick={loadPendingParentUsers}
+            disabled={pendingParentLoading}
+          >
             {pendingParentLoading ? "Actualizando..." : "Actualizar lista"}
           </button>
         </div>
@@ -639,14 +763,16 @@ export default function AdminUsers() {
                   <tr
                     key={`${row.guardianDocNumber || row.contactEmail || row.guardianFullName}-${idx}`}
                     style={{ cursor: "pointer" }}
-                    onClick={() => usePendingGuardianForCreate(row)}
+                    onClick={() => loadPendingGuardianForCreate(row)}
                     title="Clic para cargar en Crear usuario"
                   >
                     <td>{row.guardianFullName || "-"}</td>
                     <td>{row.contactEmail || "Sin correo"}</td>
                     <td>{row.guardianDocNumber || "-"}</td>
                     <td>
-                      {row.students.map((s) => `${s.studentName} (${s.grade || "-"}-${s.group || "-"})`).join(", ")}
+                      {row.students
+                        .map((s) => `${s.studentName} (${s.grade || "-"}-${s.group || "-"})`)
+                        .join(", ")}
                     </td>
                     <td>
                       <button
@@ -654,7 +780,7 @@ export default function AdminUsers() {
                         className="button secondary"
                         onClick={(e) => {
                           e.stopPropagation();
-                          usePendingGuardianForCreate(row);
+                          loadPendingGuardianForCreate(row);
                         }}
                         style={{ padding: "4px 8px", fontSize: 12 }}
                       >
@@ -679,20 +805,38 @@ export default function AdminUsers() {
             setPage(1);
           }}
         />
-        <select className="input" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+        <select
+          className="input"
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+        >
           <option value="">Todos los roles</option>
           <option value="ADMIN">Administrador</option>
           {canManageDeveloperUsers && <option value="DEVELOPER">Desarrollador</option>}
           <option value="TEACHER">Docente</option>
           <option value="PARENT">Padre</option>
         </select>
-        <button className="button secondary" type="button" onClick={() => downloadFile("/users/export/excel", "users-report.xlsx")}>
+        <button
+          className="button secondary"
+          type="button"
+          onClick={() => downloadFile("/users/export/excel", "users-report.xlsx")}
+        >
           Exportar Excel
         </button>
-        <button className="button secondary" type="button" onClick={() => downloadFile("/users/export/pdf", "users.pdf")}>
+        <button
+          className="button secondary"
+          type="button"
+          onClick={() => downloadFile("/users/export/pdf", "users.pdf")}
+        >
           Exportar PDF
         </button>
-        <button className="button secondary" type="button" onClick={() => downloadFile("/reports/import-template/excel", "plantilla-importacion.xlsx")}>
+        <button
+          className="button secondary"
+          type="button"
+          onClick={() =>
+            downloadFile("/reports/import-template/excel", "plantilla-importacion.xlsx")
+          }
+        >
           Plantilla importacion
         </button>
       </div>
@@ -707,7 +851,11 @@ export default function AdminUsers() {
             accept=".xlsx"
             onChange={(e) => setImportFile(e.target.files?.[0] || null)}
           />
-          <select className="input" value={importMode} onChange={(e) => setImportMode(e.target.value as "validate" | "import")}>
+          <select
+            className="input"
+            value={importMode}
+            onChange={(e) => setImportMode(e.target.value as "validate" | "import")}
+          >
             <option value="validate">Solo validar</option>
             <option value="import">Importar</option>
           </select>
@@ -726,14 +874,23 @@ export default function AdminUsers() {
           <div style={{ marginTop: 8, color: "#334155" }}>
             <div>Modo: {importResult.mode}</div>
             <div>
-              Creados: usuarios {importResult.created?.users || 0}, docentes {importResult.created?.teachers || 0}, padres {importResult.created?.parents || 0}, estudiantes {importResult.created?.students || 0}, clases {importResult.created?.classes || 0}, matriculas {importResult.created?.enrollments || 0}
+              Creados: usuarios {importResult.created?.users || 0}, docentes{" "}
+              {importResult.created?.teachers || 0}, padres {importResult.created?.parents || 0},
+              estudiantes {importResult.created?.students || 0}, clases{" "}
+              {importResult.created?.classes || 0}, matriculas{" "}
+              {importResult.created?.enrollments || 0}
             </div>
             <div>
-              Actualizados: usuarios {importResult.updated?.users || 0}, docentes {importResult.updated?.teachers || 0}, estudiantes {importResult.updated?.students || 0}, clases {importResult.updated?.classes || 0}, matriculas {importResult.updated?.enrollments || 0}
+              Actualizados: usuarios {importResult.updated?.users || 0}, docentes{" "}
+              {importResult.updated?.teachers || 0}, estudiantes{" "}
+              {importResult.updated?.students || 0}, clases {importResult.updated?.classes || 0},
+              matriculas {importResult.updated?.enrollments || 0}
             </div>
             <div>Omitidos: {importResult.skipped || 0}</div>
             {importResult.defaultPasswordUsed && (
-              <div style={{ color: "#9a3412" }}>Se uso contrasena temporal para algunos usuarios.</div>
+              <div style={{ color: "#9a3412" }}>
+                Se uso contrasena temporal para algunos usuarios.
+              </div>
             )}
             {Array.isArray(importResult.errors) && importResult.errors.length > 0 && (
               <div style={{ marginTop: 6 }}>
@@ -746,23 +903,37 @@ export default function AdminUsers() {
                   ))}
                 </ul>
                 {importResult.errors.length > 10 && (
-                  <div style={{ color: "#b91c1c" }}>...{importResult.errors.length - 10} errores mas.</div>
+                  <div style={{ color: "#b91c1c" }}>
+                    ...{importResult.errors.length - 10} errores mas.
+                  </div>
                 )}
               </div>
             )}
           </div>
         )}
         <div style={{ marginTop: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <div className="section-title" style={{ fontSize: 16 }}>Historial de importaciones</div>
-            <button className="button secondary" type="button" onClick={loadImportHistory} disabled={importHistoryLoading}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+            }}
+          >
+            <div className="section-title" style={{ fontSize: 16 }}>
+              Historial de importaciones
+            </div>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={loadImportHistory}
+              disabled={importHistoryLoading}
+            >
               {importHistoryLoading ? "Actualizando..." : "Actualizar historial"}
             </button>
           </div>
           {importHistory.length === 0 ? (
-            <div style={{ color: "#64748b", marginTop: 6 }}>
-              No hay importaciones registradas.
-            </div>
+            <div style={{ color: "#64748b", marginTop: 6 }}>No hay importaciones registradas.</div>
           ) : (
             <div className="table-wrap" style={{ marginTop: 6 }}>
               <table className="table">
@@ -780,11 +951,29 @@ export default function AdminUsers() {
                 <tbody>
                   {importHistory.slice(0, 10).map((row) => (
                     <tr key={row.id}>
-                      <td>{String(row.createdAt || "").slice(0, 19).replace("T", " ")}</td>
+                      <td>
+                        {String(row.createdAt || "")
+                          .slice(0, 19)
+                          .replace("T", " ")}
+                      </td>
                       <td>{row.mode}</td>
                       <td>{row.createdByName || "-"}</td>
-                      <td>{row.summary?.created ? (Object.values(row.summary.created) as number[]).reduce((s, v) => s + Number(v || 0), 0) : 0}</td>
-                      <td>{row.summary?.updated ? (Object.values(row.summary.updated) as number[]).reduce((s, v) => s + Number(v || 0), 0) : 0}</td>
+                      <td>
+                        {row.summary?.created
+                          ? (Object.values(row.summary.created) as number[]).reduce(
+                              (s, v) => s + Number(v || 0),
+                              0
+                            )
+                          : 0}
+                      </td>
+                      <td>
+                        {row.summary?.updated
+                          ? (Object.values(row.summary.updated) as number[]).reduce(
+                              (s, v) => s + Number(v || 0),
+                              0
+                            )
+                          : 0}
+                      </td>
                       <td>{row.summary?.skipped || 0}</td>
                       <td>{row.summary?.errorsCount || 0}</td>
                     </tr>
@@ -805,13 +994,24 @@ export default function AdminUsers() {
         <button className="button secondary" type="button" onClick={saveCurrentFilter}>
           Guardar filtro
         </button>
-        <select className="input" value={selectedFilterId} onChange={(e) => applySavedFilter(e.target.value)}>
+        <select
+          className="input"
+          value={selectedFilterId}
+          onChange={(e) => applySavedFilter(e.target.value)}
+        >
           <option value="">Filtros guardados</option>
           {savedFilters.map((f) => (
-            <option key={f.id} value={f.id}>{f.name}</option>
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
           ))}
         </select>
-        <button className="button secondary" type="button" disabled={!selectedFilterId} onClick={deleteSavedFilter}>
+        <button
+          className="button secondary"
+          type="button"
+          disabled={!selectedFilterId}
+          onClick={deleteSavedFilter}
+        >
           Eliminar filtro
         </button>
       </div>
@@ -859,13 +1059,17 @@ export default function AdminUsers() {
             />
           </label>
           <label>
-          Rol
-          <select className="input" value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}>
-            <option value="ADMIN">Administrador</option>
-            {canManageDeveloperUsers && <option value="DEVELOPER">Desarrollador</option>}
-            <option value="TEACHER">Docente</option>
-            <option value="PARENT">Padre</option>
-          </select>
+            Rol
+            <select
+              className="input"
+              value={editForm.role}
+              onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+            >
+              <option value="ADMIN">Administrador</option>
+              {canManageDeveloperUsers && <option value="DEVELOPER">Desarrollador</option>}
+              <option value="TEACHER">Docente</option>
+              <option value="PARENT">Padre</option>
+            </select>
           </label>
           <label>
             Nueva contrasena (opcional)
@@ -879,7 +1083,11 @@ export default function AdminUsers() {
                 onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
                 placeholder="Dejar en blanco para no cambiar"
               />
-              <button type="button" className="button secondary" onClick={() => setShowEditPassword((v) => !v)}>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => setShowEditPassword((v) => !v)}
+              >
                 {showEditPassword ? "Ocultar" : "Ver"}
               </button>
             </div>
@@ -908,24 +1116,33 @@ export default function AdminUsers() {
           { key: "name", label: "Nombre" },
           { key: "email", label: "Correo" },
           { key: "role", label: "Rol" },
-          { key: "status", label: "Estado" }
+          { key: "status", label: "Estado" },
         ]}
         rows={users.map((u) => ({
           name: u.fullName,
           email: u.email,
           role: u.role,
-          status: u.isActive ? "ACTIVE" : "INACTIVE"
+          status: u.isActive ? "ACTIVE" : "INACTIVE",
         }))}
       />
       <div style={{ marginTop: 8 }}>
-        <div className="section-title" style={{ fontSize: 16, marginBottom: 8 }}>Editar y desactivar usuarios</div>
+        <div className="section-title" style={{ fontSize: 16, marginBottom: 8 }}>
+          Editar y desactivar usuarios
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {roleSections.map((section) => {
             const sectionUsers = allUsersForSections.filter((u) => u.role === section.key);
             const collapsed = collapsedByRole[section.key];
             return (
               <div key={section.key} className="card" style={{ padding: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
                   <div style={{ fontWeight: 700 }}>
                     {section.label} ({sectionUsers.length})
                   </div>
@@ -935,7 +1152,7 @@ export default function AdminUsers() {
                     onClick={() =>
                       setCollapsedByRole((prev) => ({
                         ...prev,
-                        [section.key]: !prev[section.key]
+                        [section.key]: !prev[section.key],
                       }))
                     }
                   >
@@ -943,11 +1160,39 @@ export default function AdminUsers() {
                   </button>
                 </div>
                 {!collapsed && (
-                  <ul style={{ listStyle: "none", margin: "10px 0 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <ul
+                    style={{
+                      listStyle: "none",
+                      margin: "10px 0 0 0",
+                      padding: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                    }}
+                  >
                     {sectionUsers.map((u) => (
-                      <li key={u.id} className="card" style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", padding: 10 }}>
-                        <div style={{ color: "#6b7280", display: "flex", flexDirection: "column", gap: 4 }}>
-                          <span>{u.fullName} ({u.email})</span>
+                      <li
+                        key={u.id}
+                        className="card"
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: 10,
+                        }}
+                      >
+                        <div
+                          style={{
+                            color: "#6b7280",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                          }}
+                        >
+                          <span>
+                            {u.fullName} ({u.email})
+                          </span>
                           {u.role === "PARENT" && (
                             <div style={{ fontSize: 12, color: "#334155", marginTop: 2 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -964,7 +1209,7 @@ export default function AdminUsers() {
                                     onClick={() =>
                                       setExpandedParentById((prev) => ({
                                         ...prev,
-                                        [u.id]: !prev[u.id]
+                                        [u.id]: !prev[u.id],
                                       }))
                                     }
                                   >
@@ -1003,11 +1248,15 @@ export default function AdminUsers() {
                             </div>
                           )}
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "stretch" }}>
-                          <button
-                            className="button secondary"
-                            onClick={() => startEdit(u)}
-                          >
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                            alignItems: "stretch",
+                          }}
+                        >
+                          <button className="button secondary" onClick={() => startEdit(u)}>
                             Editar
                           </button>
                           {!u.isPrincipal && (
@@ -1026,8 +1275,8 @@ export default function AdminUsers() {
                               u.isPrincipal
                                 ? "El administrador principal no se puede eliminar"
                                 : !canDeleteUsers
-                                ? "Solo el administrador principal puede eliminar usuarios"
-                                : ""
+                                  ? "Solo el administrador principal puede eliminar usuarios"
+                                  : ""
                             }
                           >
                             Eliminar
@@ -1036,7 +1285,9 @@ export default function AdminUsers() {
                       </li>
                     ))}
                     {sectionUsers.length === 0 && (
-                      <li style={{ color: "#6b7280", padding: "4px 2px" }}>Sin usuarios en esta seccion.</li>
+                      <li style={{ color: "#6b7280", padding: "4px 2px" }}>
+                        Sin usuarios en esta seccion.
+                      </li>
                     )}
                   </ul>
                 )}
@@ -1052,7 +1303,11 @@ export default function AdminUsers() {
         <div style={{ alignSelf: "center", color: "#6b7280" }}>
           Pagina {page} de {Math.max(1, Math.ceil(total / 10))}
         </div>
-        <button className="button secondary" disabled={page >= Math.ceil(total / 10)} onClick={() => setPage(page + 1)}>
+        <button
+          className="button secondary"
+          disabled={page >= Math.ceil(total / 10)}
+          onClick={() => setPage(page + 1)}
+        >
           Siguiente
         </button>
       </div>

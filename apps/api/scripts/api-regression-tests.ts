@@ -24,12 +24,10 @@ async function login(baseUrl: string, email: string, password: string) {
   const { res, json } = await request(baseUrl, "/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password }),
   });
   if (!res.ok || !json?.token) {
-    fail(
-      `No se pudo iniciar sesion con ${email}. Verifica credenciales o ejecuta seed.`
-    );
+    fail(`No se pudo iniciar sesion con ${email}. Verifica credenciales o ejecuta seed.`);
   }
   return String(json.token);
 }
@@ -49,7 +47,7 @@ async function tryLogin(baseUrl: string, email: string, password: string) {
 
 function authHeaders(token: string) {
   return {
-    Authorization: `Bearer ${token}`
+    Authorization: `Bearer ${token}`,
   };
 }
 
@@ -89,14 +87,14 @@ async function main() {
   // Auth/session and refresh
   {
     const session = await request(baseUrl, "/api/auth/session", {
-      headers: authHeaders(adminToken)
+      headers: authHeaders(adminToken),
     });
     expectOk(session.res, "auth/session admin");
     if (session.json?.role !== "ADMIN") fail("session admin devolvio rol inesperado");
 
     const refresh = await request(baseUrl, "/api/auth/refresh", {
       method: "POST",
-      headers: authHeaders(adminToken)
+      headers: authHeaders(adminToken),
     });
     expectOk(refresh.res, "auth/refresh admin");
     if (!refresh.json?.token) fail("auth/refresh no devolvio token");
@@ -105,19 +103,19 @@ async function main() {
   // Admin critical modules
   {
     const users = await request(baseUrl, "/api/users?page=1&pageSize=5", {
-      headers: authHeaders(adminToken)
+      headers: authHeaders(adminToken),
     });
     expectOk(users.res, "users list");
     if (!Array.isArray(users.json?.data)) fail("users list no devolvio data[]");
 
     const admissions = await request(baseUrl, "/api/admissions?page=1&pageSize=5", {
-      headers: authHeaders(adminToken)
+      headers: authHeaders(adminToken),
     });
     expectOk(admissions.res, "admissions list");
     if (!Array.isArray(admissions.json?.data)) fail("admissions list no devolvio data[]");
 
     const enrollments = await request(baseUrl, "/api/enrollments?page=1&pageSize=5", {
-      headers: authHeaders(adminToken)
+      headers: authHeaders(adminToken),
     });
     expectOk(enrollments.res, "enrollments list");
     if (!Array.isArray(enrollments.json?.data)) fail("enrollments list no devolvio data[]");
@@ -126,7 +124,7 @@ async function main() {
   // Reports
   {
     const attendanceSummary = await request(baseUrl, "/api/reports/attendance-summary", {
-      headers: authHeaders(adminToken)
+      headers: authHeaders(adminToken),
     });
     expectOk(attendanceSummary.res, "reports/attendance-summary");
     if (typeof attendanceSummary.json?.total !== "number") {
@@ -134,7 +132,7 @@ async function main() {
     }
 
     const financeSummary = await request(baseUrl, "/api/reports/finance-summary", {
-      headers: authHeaders(adminToken)
+      headers: authHeaders(adminToken),
     });
     expectOk(financeSummary.res, "reports/finance-summary");
     if (typeof financeSummary.json?.total !== "number") {
@@ -142,7 +140,7 @@ async function main() {
     }
 
     const studentsPdf = await request(baseUrl, "/api/reports/students-pdf", {
-      headers: authHeaders(adminToken)
+      headers: authHeaders(adminToken),
     });
     expectOk(studentsPdf.res, "reports/students-pdf");
     const pdfType = studentsPdf.res.headers.get("content-type") || "";
@@ -154,19 +152,24 @@ async function main() {
   // Teacher critical modules + access boundaries
   if (teacherToken) {
     const enrollmentsRes = await request(baseUrl, "/api/teacher/enrollments", {
-      headers: authHeaders(teacherToken)
+      headers: authHeaders(teacherToken),
     });
     expectOk(enrollmentsRes.res, "teacher/enrollments");
     if (!Array.isArray(enrollmentsRes.json)) fail("teacher/enrollments no devolvio array");
 
     const ownAttendance = await request(baseUrl, "/api/teacher/attendance?page=1&pageSize=5", {
-      headers: authHeaders(teacherToken)
+      headers: authHeaders(teacherToken),
     });
     expectOk(ownAttendance.res, "teacher/attendance");
     if (!Array.isArray(ownAttendance.json?.data)) fail("teacher/attendance no devolvio data[]");
 
     const sampleAttendance = ownAttendance.json.data[0];
-    if (sampleAttendance?.grade && sampleAttendance?.group && sampleAttendance?.date && sampleAttendance?.status) {
+    if (
+      sampleAttendance?.grade &&
+      sampleAttendance?.group &&
+      sampleAttendance?.date &&
+      sampleAttendance?.status
+    ) {
       const gradeLevel = encodeURIComponent(String(sampleAttendance.grade));
       const group = encodeURIComponent(String(sampleAttendance.group));
       const date = encodeURIComponent(String(sampleAttendance.date).slice(0, 10));
@@ -195,11 +198,13 @@ async function main() {
         }
       }
     } else {
-      console.warn("Regression API WARN: se omite validacion de filtros combinados de asistencia por falta de datos.");
+      console.warn(
+        "Regression API WARN: se omite validacion de filtros combinados de asistencia por falta de datos."
+      );
     }
 
     const ownWindows = await request(baseUrl, "/api/teacher/attendance/windows", {
-      headers: authHeaders(teacherToken)
+      headers: authHeaders(teacherToken),
     });
     expectOk(ownWindows.res, "teacher/attendance/windows");
     if (typeof ownWindows.json?.dayOfWeek !== "string") {
@@ -216,14 +221,17 @@ async function main() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...authHeaders(teacherToken)
+            ...authHeaders(teacherToken),
           },
           body: JSON.stringify({
-            items: [{ enrollmentId: String(candidate.id), date: todayIso, status: "PRESENT" }]
-          })
+            items: [{ enrollmentId: String(candidate.id), date: todayIso, status: "PRESENT" }],
+          }),
         });
         expectStatus(bulkOk.res, 200, "attendance/bulk success");
-        if (Number(bulkOk.json?.summary?.ok || 0) < 1 || Number(bulkOk.json?.summary?.failed || 0) !== 0) {
+        if (
+          Number(bulkOk.json?.summary?.ok || 0) < 1 ||
+          Number(bulkOk.json?.summary?.failed || 0) !== 0
+        ) {
           fail("attendance/bulk success devolvio resumen inesperado");
         }
 
@@ -232,26 +240,28 @@ async function main() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...authHeaders(teacherToken)
+            ...authHeaders(teacherToken),
           },
           body: JSON.stringify({
             items: [
               { enrollmentId: String(candidate.id), date: todayIso, status: "PRESENT" },
-              { enrollmentId: invalidEnrollmentId, date: todayIso, status: "ABSENT" }
-            ]
-          })
+              { enrollmentId: invalidEnrollmentId, date: todayIso, status: "ABSENT" },
+            ],
+          }),
         });
         expectStatus(bulkPartial.res, 207, "attendance/bulk partial success");
         if (Number(bulkPartial.json?.summary?.failed || 0) < 1) {
           fail("attendance/bulk partial no reporto fallos");
         }
       } else {
-        console.warn("Regression API WARN: se omite attendance/bulk por falta de matriculas del docente.");
+        console.warn(
+          "Regression API WARN: se omite attendance/bulk por falta de matriculas del docente."
+        );
       }
     }
 
     const usersForbidden = await request(baseUrl, "/api/users?page=1&pageSize=1", {
-      headers: authHeaders(teacherToken)
+      headers: authHeaders(teacherToken),
     });
     expectStatus(usersForbidden.res, 403, "teacher no debe acceder a /api/users");
   }
@@ -259,19 +269,19 @@ async function main() {
   // Parent critical modules + access boundaries
   if (parentToken) {
     const children = await request(baseUrl, "/api/parent/children", {
-      headers: authHeaders(parentToken)
+      headers: authHeaders(parentToken),
     });
     expectOk(children.res, "parent/children");
     if (!Array.isArray(children.json)) fail("parent/children no devolvio array");
 
     const invoices = await request(baseUrl, "/api/parent/invoices?page=1&pageSize=5", {
-      headers: authHeaders(parentToken)
+      headers: authHeaders(parentToken),
     });
     expectOk(invoices.res, "parent/invoices");
     if (!Array.isArray(invoices.json?.data)) fail("parent/invoices no devolvio data[]");
 
     const teacherForbidden = await request(baseUrl, "/api/teacher/attendance?page=1&pageSize=1", {
-      headers: authHeaders(parentToken)
+      headers: authHeaders(parentToken),
     });
     expectStatus(teacherForbidden.res, 403, "parent no debe acceder a /api/teacher/attendance");
   }

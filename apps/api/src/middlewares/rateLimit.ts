@@ -34,7 +34,7 @@ const metrics = {
   blocked: 0,
   redisErrors: 0,
   byRole: new Map<string, MetricBucket>(),
-  byPrefix: new Map<string, MetricBucket>()
+  byPrefix: new Map<string, MetricBucket>(),
 };
 
 function bumpMetric(map: Map<string, MetricBucket>, key: string, blocked: boolean) {
@@ -69,7 +69,7 @@ export function getRateLimitMetrics() {
     blocked: metrics.blocked,
     redisErrors: metrics.redisErrors,
     byRole: mapToObj(metrics.byRole),
-    byPrefix: mapToObj(metrics.byPrefix)
+    byPrefix: mapToObj(metrics.byPrefix),
   };
 }
 
@@ -121,14 +121,17 @@ export function createRateLimit(options: RateLimitOptions) {
           res.setHeader("Retry-After", String(retryAfterSec));
           return res.status(429).json({
             error: "Too many requests",
-            message: `Demasiadas solicitudes. Intenta de nuevo en ${retryAfterSec} segundos.`
+            message: `Demasiadas solicitudes. Intenta de nuevo en ${retryAfterSec} segundos.`,
           });
         }
 
         return next();
       } catch (error) {
         metrics.redisErrors += 1;
-        console.warn("Rate limit redis failed, falling back to memory:", (error as any)?.message || error);
+        console.warn(
+          "Rate limit redis failed, falling back to memory:",
+          (error as any)?.message || error
+        );
       }
     }
 
@@ -138,7 +141,7 @@ export function createRateLimit(options: RateLimitOptions) {
     if (!bucket || bucket.resetAt <= now) {
       bucket = {
         count: 0,
-        resetAt: now + options.windowMs
+        resetAt: now + options.windowMs,
       };
       buckets.set(key, bucket);
     }
@@ -161,7 +164,7 @@ export function createRateLimit(options: RateLimitOptions) {
       res.setHeader("Retry-After", String(retryAfterSec));
       return res.status(429).json({
         error: "Too many requests",
-        message: `Demasiadas solicitudes. Intenta de nuevo en ${retryAfterSec} segundos.`
+        message: `Demasiadas solicitudes. Intenta de nuevo en ${retryAfterSec} segundos.`,
       });
     }
 

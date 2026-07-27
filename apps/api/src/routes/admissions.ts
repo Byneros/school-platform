@@ -1,9 +1,13 @@
 import { Router } from "express";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { validate } from "../utils/validate.js";
-import { createAdmissionSchema, updateAdmissionSchema, updateAdmissionStatusSchema } from "../schemas/admissions.js";
+import {
+  createAdmissionSchema,
+  updateAdmissionSchema,
+  updateAdmissionStatusSchema,
+} from "../schemas/admissions.js";
 import { buildCsvReport, buildXlsxReportBuffer, sendTabularPdf } from "../utils/reportExport.js";
 import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { validateGuardianRelationAndAdultDoc } from "../utils/guardianValidation.js";
@@ -24,7 +28,9 @@ function addBusinessDays(start: Date, days: number) {
 }
 
 function normalizeEmail(value?: string | null) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function isEmailLike(value: string) {
@@ -33,13 +39,18 @@ function isEmailLike(value: string) {
 
 async function linkParentToStudent(
   tx: Prisma.TransactionClient,
-  params: { studentId: string; guardianRelation?: string | null; contactEmail?: string | null; guardianFullName?: string | null }
+  params: {
+    studentId: string;
+    guardianRelation?: string | null;
+    contactEmail?: string | null;
+    guardianFullName?: string | null;
+  }
 ) {
   const email = normalizeEmail(params.contactEmail || "");
   if (!isEmailLike(email)) return;
   const user = await tx.user.findUnique({
     where: { email },
-    select: { id: true, role: true }
+    select: { id: true, role: true },
   });
   if (!user || user.role !== "PARENT") return;
 
@@ -47,7 +58,7 @@ async function linkParentToStudent(
     where: { userId: user.id },
     update: {},
     create: { userId: user.id },
-    select: { id: true }
+    select: { id: true },
   });
 
   const relation = String(params.guardianRelation || "").trim() || "Acudiente";
@@ -55,15 +66,15 @@ async function linkParentToStudent(
     where: {
       parentId_studentId: {
         parentId: parent.id,
-        studentId: params.studentId
-      }
+        studentId: params.studentId,
+      },
     },
     update: { relation },
     create: {
       parentId: parent.id,
       studentId: params.studentId,
-      relation
-    }
+      relation,
+    },
   });
 }
 
@@ -80,24 +91,24 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
     ...(status
       ? { status: status as any }
       : {
-          status: { not: "APPROVED" }
+          status: { not: "APPROVED" },
         }),
     ...(status === "APPROVED"
       ? {
-          OR: [{ enrollmentDueAt: null }, { enrollmentDueAt: { gte: now } }]
+          OR: [{ enrollmentDueAt: null }, { enrollmentDueAt: { gte: now } }],
         }
       : {}),
     ...(gradeLevel ? { gradeLevel: gradeLevel as any } : {}),
-    ...(search ? { studentName: { contains: search, mode: "insensitive" } } : {})
+    ...(search ? { studentName: { contains: search, mode: "insensitive" } } : {}),
   };
   const [data, total] = await Promise.all([
     prisma.admission.findMany({
       where,
       orderBy: { createdAt: "asc" },
       skip: (page - 1) * pageSize,
-      take: pageSize
+      take: pageSize,
     }),
-    prisma.admission.count({ where })
+    prisma.admission.count({ where }),
   ]);
 
   res.json({ data, total, page, pageSize });
@@ -109,19 +120,22 @@ router.get("/approved", requireAuth, requireRole(["ADMIN"]), async (_req, res) =
     where: {
       status: "APPROVED",
       enrollment: null,
-      OR: [
-        { enrollmentDueAt: null },
-        { enrollmentDueAt: { gte: now } }
-      ]
+      OR: [{ enrollmentDueAt: null }, { enrollmentDueAt: { gte: now } }],
     },
-    orderBy: { createdAt: "asc" }
+    orderBy: { createdAt: "asc" },
   });
   res.json(data);
 });
 
 router.get("/export/csv", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const data = await prisma.admission.findMany({
-    select: { studentName: true, gradeLevel: true, status: true, createdAt: true, enrollmentDueAt: true }
+    select: {
+      studentName: true,
+      gradeLevel: true,
+      status: true,
+      createdAt: true,
+      enrollmentDueAt: true,
+    },
   });
   const branding = await getBrandingSettings();
   const csv = buildCsvReport({
@@ -132,25 +146,31 @@ router.get("/export/csv", requireAuth, requireRole(["ADMIN"]), async (_req, res)
       { key: "gradeLevel", label: "Nivel" },
       { key: "status", label: "Estado" },
       { key: "createdAt", label: "Fecha solicitud" },
-      { key: "enrollmentDueAt", label: "Fecha limite matricula" }
+      { key: "enrollmentDueAt", label: "Fecha limite matricula" },
     ],
     rows: data.map((a) => ({
       ...a,
       createdAt: a.createdAt.toISOString().slice(0, 10),
-      enrollmentDueAt: a.enrollmentDueAt ? a.enrollmentDueAt.toISOString().slice(0, 10) : "-"
-    }))
+      enrollmentDueAt: a.enrollmentDueAt ? a.enrollmentDueAt.toISOString().slice(0, 10) : "-",
+    })),
   });
   res.setHeader("Content-Type", "text/csv");
-  res.setHeader("Content-Disposition", "attachment; filename=\"admissions.csv\"");
+  res.setHeader("Content-Disposition", 'attachment; filename="admissions.csv"');
   res.send(csv);
 });
 
 router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const data = await prisma.admission.findMany({
-    select: { studentName: true, gradeLevel: true, status: true, createdAt: true, enrollmentDueAt: true }
+    select: {
+      studentName: true,
+      gradeLevel: true,
+      status: true,
+      createdAt: true,
+      enrollmentDueAt: true,
+    },
   });
   const branding = await getBrandingSettings();
-  const xlsx = buildXlsxReportBuffer({
+  const xlsx = await buildXlsxReportBuffer({
     title: "Reporte de Admisiones",
     institutionName: branding.schoolName,
     columns: [
@@ -158,22 +178,31 @@ router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (_req, re
       { key: "gradeLevel", label: "Nivel" },
       { key: "status", label: "Estado" },
       { key: "createdAt", label: "Fecha solicitud" },
-      { key: "enrollmentDueAt", label: "Fecha limite matricula" }
+      { key: "enrollmentDueAt", label: "Fecha limite matricula" },
     ],
     rows: data.map((a) => ({
       ...a,
       createdAt: a.createdAt.toISOString().slice(0, 10),
-      enrollmentDueAt: a.enrollmentDueAt ? a.enrollmentDueAt.toISOString().slice(0, 10) : "-"
-    }))
+      enrollmentDueAt: a.enrollmentDueAt ? a.enrollmentDueAt.toISOString().slice(0, 10) : "-",
+    })),
   });
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", "attachment; filename=\"admissions-report.xlsx\"");
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader("Content-Disposition", 'attachment; filename="admissions-report.xlsx"');
   res.send(xlsx);
 });
 
 router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const data = await prisma.admission.findMany({
-    select: { studentName: true, gradeLevel: true, status: true, createdAt: true, enrollmentDueAt: true }
+    select: {
+      studentName: true,
+      gradeLevel: true,
+      status: true,
+      createdAt: true,
+      enrollmentDueAt: true,
+    },
   });
   const branding = await getBrandingSettings();
   sendTabularPdf(res, {
@@ -185,190 +214,210 @@ router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (_req, res)
       { key: "gradeLevel", label: "Nivel", width: 90, align: "center" },
       { key: "status", label: "Estado", width: 90, align: "center" },
       { key: "createdAt", label: "Solicitud", width: 90, align: "center" },
-      { key: "enrollmentDueAt", label: "Vence", width: 90, align: "center" }
+      { key: "enrollmentDueAt", label: "Vence", width: 90, align: "center" },
     ],
     rows: data.map((a) => ({
       ...a,
       createdAt: a.createdAt.toISOString().slice(0, 10),
-      enrollmentDueAt: a.enrollmentDueAt ? a.enrollmentDueAt.toISOString().slice(0, 10) : "-"
-    }))
+      enrollmentDueAt: a.enrollmentDueAt ? a.enrollmentDueAt.toISOString().slice(0, 10) : "-",
+    })),
   });
 });
 
-router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createAdmissionSchema), async (req, res) => {
-  const { body } = (req as any).validated;
-  if (body.guardianRelation !== undefined || body.guardianDocType !== undefined) {
-    const guardianValidationError = validateGuardianRelationAndAdultDoc({
-      guardianRelation: body.guardianRelation,
-      guardianDocType: body.guardianDocType
+router.post(
+  "/",
+  requireAuth,
+  requireRole(["ADMIN"]),
+  validate(createAdmissionSchema),
+  async (req, res) => {
+    const { body } = (req as any).validated;
+    if (body.guardianRelation !== undefined || body.guardianDocType !== undefined) {
+      const guardianValidationError = validateGuardianRelationAndAdultDoc({
+        guardianRelation: body.guardianRelation,
+        guardianDocType: body.guardianDocType,
+      });
+      if (guardianValidationError) {
+        return res.status(400).json({ message: guardianValidationError });
+      }
+    }
+
+    const admission = await prisma.admission.create({
+      data: {
+        studentName: body.studentName,
+        gradeLevel: body.gradeLevel,
+        notes: body.notes,
+        documents: body.documents,
+        studentFullName: body.studentFullName,
+        studentBirthDate: body.studentBirthDate ? new Date(body.studentBirthDate) : undefined,
+        studentBirthPlaceDept: body.studentBirthPlaceDept,
+        studentBirthPlaceCity: body.studentBirthPlaceCity,
+        studentGender: body.studentGender,
+        studentDocType: body.studentDocType,
+        studentDocNumber: body.studentDocNumber,
+        studentAddress: body.studentAddress,
+        guardianFullName: body.guardianFullName,
+        guardianDocType: body.guardianDocType,
+        guardianDocNumber: body.guardianDocNumber,
+        guardianRelation: body.guardianRelation,
+        contactPhone: body.contactPhone,
+        contactEmail: body.contactEmail,
+      },
     });
-    if (guardianValidationError) {
-      return res.status(400).json({ message: guardianValidationError });
-    }
+    res.json(admission);
   }
+);
 
-  const admission = await prisma.admission.create({
-    data: {
-      studentName: body.studentName,
-      gradeLevel: body.gradeLevel,
-      notes: body.notes,
-      documents: body.documents,
-      studentFullName: body.studentFullName,
-      studentBirthDate: body.studentBirthDate ? new Date(body.studentBirthDate) : undefined,
-      studentBirthPlaceDept: body.studentBirthPlaceDept,
-      studentBirthPlaceCity: body.studentBirthPlaceCity,
-      studentGender: body.studentGender,
-      studentDocType: body.studentDocType,
-      studentDocNumber: body.studentDocNumber,
-      studentAddress: body.studentAddress,
-      guardianFullName: body.guardianFullName,
-      guardianDocType: body.guardianDocType,
-      guardianDocNumber: body.guardianDocNumber,
-      guardianRelation: body.guardianRelation,
-      contactPhone: body.contactPhone,
-      contactEmail: body.contactEmail
+router.patch(
+  "/:id",
+  requireAuth,
+  requireRole(["ADMIN"]),
+  validate(updateAdmissionSchema),
+  async (req, res) => {
+    const { params, body } = (req as any).validated;
+    if (body.guardianRelation !== undefined || body.guardianDocType !== undefined) {
+      const guardianValidationError = validateGuardianRelationAndAdultDoc({
+        guardianRelation: body.guardianRelation,
+        guardianDocType: body.guardianDocType,
+      });
+      if (guardianValidationError) {
+        return res.status(400).json({ message: guardianValidationError });
+      }
     }
-  });
-  res.json(admission);
-});
 
-router.patch("/:id", requireAuth, requireRole(["ADMIN"]), validate(updateAdmissionSchema), async (req, res) => {
-  const { params, body } = (req as any).validated;
-  if (body.guardianRelation !== undefined || body.guardianDocType !== undefined) {
-    const guardianValidationError = validateGuardianRelationAndAdultDoc({
-      guardianRelation: body.guardianRelation,
-      guardianDocType: body.guardianDocType
+    const admission = await prisma.admission.update({
+      where: { id: params.id },
+      data: body,
     });
-    if (guardianValidationError) {
-      return res.status(400).json({ message: guardianValidationError });
-    }
+    res.json(admission);
   }
+);
 
-  const admission = await prisma.admission.update({
-    where: { id: params.id },
-    data: body
-  });
-  res.json(admission);
-});
+router.patch(
+  "/:id/status",
+  requireAuth,
+  requireRole(["ADMIN"]),
+  validate(updateAdmissionStatusSchema),
+  async (req, res) => {
+    const { params, body } = (req as any).validated;
 
-router.patch("/:id/status", requireAuth, requireRole(["ADMIN"]), validate(updateAdmissionStatusSchema), async (req, res) => {
-  const { params, body } = (req as any).validated;
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        const now = new Date();
+        const isApproved = body.status === "APPROVED";
 
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      const now = new Date();
-      const isApproved = body.status === "APPROVED";
-
-      const currentAdmission = await tx.admission.findUnique({
-        where: { id: params.id },
-        include: { enrollment: true }
-      });
-
-      if (!currentAdmission) {
-        throw new Error("Admision no encontrada");
-      }
-
-      const admission = await tx.admission.update({
-        where: { id: params.id },
-        data: {
-          status: body.status,
-          approvedAt: isApproved ? now : null,
-          enrollmentDueAt: isApproved ? addBusinessDays(now, 5) : null
-        },
-        include: { enrollment: true }
-      });
-
-      if (!isApproved || admission.enrollment) {
-        return admission;
-      }
-
-      const fullName = (admission.studentFullName || admission.studentName).trim();
-
-      const existingStudent = await tx.student.findFirst({
-        where: { fullName: { equals: fullName, mode: "insensitive" } },
-        select: { id: true }
-      });
-
-      const studentId = existingStudent
-        ? existingStudent.id
-        : (
-            await tx.student.create({
-              data: {
-                fullName,
-                birthDate: admission.studentBirthDate ?? undefined,
-                gradeLevel: admission.gradeLevel
-              },
-              select: { id: true }
-            })
-          ).id;
-
-      const classForGrade = await tx.class.findFirst({
-        where: { gradeLevel: admission.gradeLevel },
-        orderBy: { id: "asc" },
-        select: { id: true }
-      });
-
-      if (!classForGrade) {
-        throw new Error(`No hay clases configuradas para el grado ${admission.gradeLevel}`);
-      }
-
-      const year = new Date().getFullYear();
-      const duplicated = await tx.enrollment.findFirst({
-        where: { studentId, classId: classForGrade.id, year },
-        select: { id: true }
-      });
-
-      if (!duplicated) {
-        const guardianValidationError = validateGuardianRelationAndAdultDoc({
-          guardianRelation: admission.guardianRelation,
-          guardianDocType: admission.guardianDocType
+        const currentAdmission = await tx.admission.findUnique({
+          where: { id: params.id },
+          include: { enrollment: true },
         });
-        if (!guardianValidationError) {
-          await tx.enrollment.create({
-            data: {
-              studentId,
-              classId: classForGrade.id,
-              year,
-              status: "ACTIVE",
-              admissionId: admission.id,
-              studentFullName: fullName,
-              studentBirthDate: admission.studentBirthDate ?? undefined,
-              studentBirthPlaceDept: admission.studentBirthPlaceDept,
-              studentBirthPlaceCity: admission.studentBirthPlaceCity,
-              studentGender: admission.studentGender,
-              studentDocType: admission.studentDocType,
-              studentDocNumber: admission.studentDocNumber,
-              studentGradeLevel: admission.gradeLevel,
-              studentAddress: admission.studentAddress,
-              guardianFullName: admission.guardianFullName || "Sin registrar",
-              guardianDocType: admission.guardianDocType,
-              guardianDocNumber: admission.guardianDocNumber || "N/A",
-              guardianRelation: admission.guardianRelation || "ACUDIENTE_LEGAL",
-              contactPhone: admission.contactPhone || "N/A",
-              contactEmail: admission.contactEmail
-            }
-          });
 
-          await linkParentToStudent(tx, {
-            studentId,
-            guardianRelation: admission.guardianRelation,
-            contactEmail: admission.contactEmail,
-            guardianFullName: admission.guardianFullName
-          });
+        if (!currentAdmission) {
+          throw new Error("Admision no encontrada");
         }
-      }
 
-      return tx.admission.findUnique({
-        where: { id: admission.id },
-        include: { enrollment: true }
+        const admission = await tx.admission.update({
+          where: { id: params.id },
+          data: {
+            status: body.status,
+            approvedAt: isApproved ? now : null,
+            enrollmentDueAt: isApproved ? addBusinessDays(now, 5) : null,
+          },
+          include: { enrollment: true },
+        });
+
+        if (!isApproved || admission.enrollment) {
+          return admission;
+        }
+
+        const fullName = (admission.studentFullName || admission.studentName).trim();
+
+        const existingStudent = await tx.student.findFirst({
+          where: { fullName: { equals: fullName, mode: "insensitive" } },
+          select: { id: true },
+        });
+
+        const studentId = existingStudent
+          ? existingStudent.id
+          : (
+              await tx.student.create({
+                data: {
+                  fullName,
+                  birthDate: admission.studentBirthDate ?? undefined,
+                  gradeLevel: admission.gradeLevel,
+                },
+                select: { id: true },
+              })
+            ).id;
+
+        const classForGrade = await tx.class.findFirst({
+          where: { gradeLevel: admission.gradeLevel },
+          orderBy: { id: "asc" },
+          select: { id: true },
+        });
+
+        if (!classForGrade) {
+          throw new Error(`No hay clases configuradas para el grado ${admission.gradeLevel}`);
+        }
+
+        const year = new Date().getFullYear();
+        const duplicated = await tx.enrollment.findFirst({
+          where: { studentId, classId: classForGrade.id, year },
+          select: { id: true },
+        });
+
+        if (!duplicated) {
+          const guardianValidationError = validateGuardianRelationAndAdultDoc({
+            guardianRelation: admission.guardianRelation,
+            guardianDocType: admission.guardianDocType,
+          });
+          if (!guardianValidationError) {
+            await tx.enrollment.create({
+              data: {
+                studentId,
+                classId: classForGrade.id,
+                year,
+                status: "ACTIVE",
+                admissionId: admission.id,
+                studentFullName: fullName,
+                studentBirthDate: admission.studentBirthDate ?? undefined,
+                studentBirthPlaceDept: admission.studentBirthPlaceDept,
+                studentBirthPlaceCity: admission.studentBirthPlaceCity,
+                studentGender: admission.studentGender,
+                studentDocType: admission.studentDocType,
+                studentDocNumber: admission.studentDocNumber,
+                studentGradeLevel: admission.gradeLevel,
+                studentAddress: admission.studentAddress,
+                guardianFullName: admission.guardianFullName || "Sin registrar",
+                guardianDocType: admission.guardianDocType,
+                guardianDocNumber: admission.guardianDocNumber || "N/A",
+                guardianRelation: admission.guardianRelation || "ACUDIENTE_LEGAL",
+                contactPhone: admission.contactPhone || "N/A",
+                contactEmail: admission.contactEmail,
+              },
+            });
+
+            await linkParentToStudent(tx, {
+              studentId,
+              guardianRelation: admission.guardianRelation,
+              contactEmail: admission.contactEmail,
+              guardianFullName: admission.guardianFullName,
+            });
+          }
+        }
+
+        return tx.admission.findUnique({
+          where: { id: admission.id },
+          include: { enrollment: true },
+        });
       });
-    });
 
-    res.json(result);
-  } catch (error: any) {
-    res.status(400).json({ message: error?.message || "No fue posible actualizar el estado de admision" });
+      res.json(result);
+    } catch (error: any) {
+      res
+        .status(400)
+        .json({ message: error?.message || "No fue posible actualizar el estado de admision" });
+    }
   }
-});
+);
 
 router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const id = String(req.params.id || "").trim();
@@ -376,7 +425,7 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
 
   const admission = await prisma.admission.findUnique({
     where: { id },
-    include: { enrollment: true }
+    include: { enrollment: true },
   });
   if (!admission) return res.status(404).json({ message: "Admision no encontrada" });
   if (admission.enrollment) {

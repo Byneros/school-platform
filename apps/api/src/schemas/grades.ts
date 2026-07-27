@@ -7,6 +7,6 @@ export const createGradeSchema = z.object({
     name: z.string().min(1),
     aspect: z.enum(["COGNITIVE", "PERSONAL", "SOCIAL"]).default("COGNITIVE"),
     score: z.number(),
-    maxScore: z.number()
-  })
+    maxScore: z.number(),
+  }),
 });

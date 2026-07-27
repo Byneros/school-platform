@@ -13,7 +13,7 @@ const transporter = canSend
       host,
       port,
       secure: false,
-      auth: user && pass ? { user, pass } : undefined
+      auth: user && pass ? { user, pass } : undefined,
     })
   : null;
 
@@ -21,14 +21,19 @@ export function canSendEmail() {
   return Boolean(transporter);
 }
 
-export async function sendEmail(opts: { to: string; subject: string; text: string; html?: string }) {
+export async function sendEmail(opts: {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+}) {
   if (!transporter) return false;
   await transporter.sendMail({
     from,
     to: opts.to,
     subject: opts.subject,
     text: opts.text,
-    html: opts.html
+    html: opts.html,
   });
   return true;
 }

@@ -1,7 +1,10 @@
 import { Router } from "express";
 import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
-import { composeNotificationBodyWithMeta, stripNotificationMeta } from "../utils/notificationMeta.js";
+import {
+  composeNotificationBodyWithMeta,
+  stripNotificationMeta,
+} from "../utils/notificationMeta.js";
 
 const router = Router();
 
@@ -13,22 +16,22 @@ router.get("/children", requireAuth, requireRole(["PARENT"]), async (req, res) =
   const auth = (req as any).auth;
   const parent = await prisma.parent.findUnique({
     where: { userId: auth.userId },
-    include: { user: { select: { email: true } } }
+    include: { user: { select: { email: true } } },
   });
   if (!parent) return res.json([]);
 
   let guardians = await prisma.guardian.findMany({
     where: { parentId: parent.id },
-    include: { student: true }
+    include: { student: true },
   });
 
   const parentEmail = String(parent.user?.email || "").trim();
   if (parentEmail) {
     const enrollments = await prisma.enrollment.findMany({
       where: {
-        contactEmail: { equals: parentEmail, mode: "insensitive" as const }
+        contactEmail: { equals: parentEmail, mode: "insensitive" as const },
       },
-      select: { studentId: true, guardianRelation: true }
+      select: { studentId: true, guardianRelation: true },
     });
     if (enrollments.length > 0) {
       await prisma.$transaction(
@@ -37,21 +40,21 @@ router.get("/children", requireAuth, requireRole(["PARENT"]), async (req, res) =
             where: {
               parentId_studentId: {
                 parentId: parent.id,
-                studentId: enr.studentId
-              }
+                studentId: enr.studentId,
+              },
             },
             update: { relation: enr.guardianRelation || "Acudiente" },
             create: {
               parentId: parent.id,
               studentId: enr.studentId,
-              relation: enr.guardianRelation || "Acudiente"
-            }
+              relation: enr.guardianRelation || "Acudiente",
+            },
           })
         )
       );
       guardians = await prisma.guardian.findMany({
         where: { parentId: parent.id },
-        include: { student: true }
+        include: { student: true },
       });
     }
   }
@@ -66,7 +69,7 @@ router.get("/boletines", requireAuth, requireRole(["PARENT"]), async (req, res) 
 
   const guardians = await prisma.guardian.findMany({
     where: { parentId: parent.id },
-    select: { studentId: true }
+    select: { studentId: true },
   });
   const studentIds = guardians.map((g) => g.studentId);
 
@@ -75,23 +78,29 @@ router.get("/boletines", requireAuth, requireRole(["PARENT"]), async (req, res) 
   const period = String(req.query.period || "").trim();
   const studentId = String(req.query.studentId || "").trim();
   const grades = await prisma.grade.findMany({
-    where: { enrollment: { studentId: { in: studentIds }, ...(studentId ? { studentId } : {}) }, ...(period ? { period } : {}) },
+    where: {
+      enrollment: { studentId: { in: studentIds }, ...(studentId ? { studentId } : {}) },
+      ...(period ? { period } : {}),
+    },
     include: { enrollment: { include: { student: true, class: true } } },
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
   });
 
-  const grouped = new Map<string, {
-    enrollmentId: string;
-    studentId: string;
-    student: string;
-    grade: string;
-    group: string;
-    period: string;
-    subject: string;
-    maxScore: number;
-    sum: number;
-    count: number;
-  }>();
+  const grouped = new Map<
+    string,
+    {
+      enrollmentId: string;
+      studentId: string;
+      student: string;
+      grade: string;
+      group: string;
+      period: string;
+      subject: string;
+      maxScore: number;
+      sum: number;
+      count: number;
+    }
+  >();
 
   grades.forEach((item) => {
     const enrollment = item.enrollment;
@@ -112,7 +121,7 @@ router.get("/boletines", requireAuth, requireRole(["PARENT"]), async (req, res) 
         subject,
         maxScore: Number(item.maxScore || 0),
         sum: 0,
-        count: 0
+        count: 0,
       });
     }
     const entry = grouped.get(key)!;
@@ -124,34 +133,36 @@ router.get("/boletines", requireAuth, requireRole(["PARENT"]), async (req, res) 
     entry.count += 1;
   });
 
-  const rows = Array.from(grouped.values()).map((entry) => {
-    const finalScore = entry.count ? entry.sum / entry.count : 0;
-    return {
-      enrollmentId: entry.enrollmentId,
-      studentId: entry.studentId,
-      student: entry.student,
-      grade: entry.grade,
-      group: entry.group,
-      period: entry.period,
-      subject: entry.subject,
-      finalScore: Number(finalScore.toFixed(2)),
-      maxScore: entry.maxScore
-    };
-  }).sort((a, b) => {
-    const studentA = String(a.student || "");
-    const studentB = String(b.student || "");
-    if (studentA !== studentB) return studentA.localeCompare(studentB, "es");
-    const gradeA = String(a.grade || "");
-    const gradeB = String(b.grade || "");
-    if (gradeA !== gradeB) return gradeA.localeCompare(gradeB, "es");
-    const groupA = String(a.group || "");
-    const groupB = String(b.group || "");
-    if (groupA !== groupB) return groupA.localeCompare(groupB, "es");
-    const periodA = String(a.period || "");
-    const periodB = String(b.period || "");
-    if (periodA !== periodB) return periodA.localeCompare(periodB, "es");
-    return String(a.subject || "").localeCompare(String(b.subject || ""), "es");
-  });
+  const rows = Array.from(grouped.values())
+    .map((entry) => {
+      const finalScore = entry.count ? entry.sum / entry.count : 0;
+      return {
+        enrollmentId: entry.enrollmentId,
+        studentId: entry.studentId,
+        student: entry.student,
+        grade: entry.grade,
+        group: entry.group,
+        period: entry.period,
+        subject: entry.subject,
+        finalScore: Number(finalScore.toFixed(2)),
+        maxScore: entry.maxScore,
+      };
+    })
+    .sort((a, b) => {
+      const studentA = String(a.student || "");
+      const studentB = String(b.student || "");
+      if (studentA !== studentB) return studentA.localeCompare(studentB, "es");
+      const gradeA = String(a.grade || "");
+      const gradeB = String(b.grade || "");
+      if (gradeA !== gradeB) return gradeA.localeCompare(gradeB, "es");
+      const groupA = String(a.group || "");
+      const groupB = String(b.group || "");
+      if (groupA !== groupB) return groupA.localeCompare(groupB, "es");
+      const periodA = String(a.period || "");
+      const periodB = String(b.period || "");
+      if (periodA !== periodB) return periodA.localeCompare(periodB, "es");
+      return String(a.subject || "").localeCompare(String(b.subject || ""), "es");
+    });
 
   const total = rows.length;
   const start = (page - 1) * pageSize;
@@ -167,7 +178,7 @@ router.get("/invoices", requireAuth, requireRole(["PARENT"]), async (req, res) =
 
   const guardians = await prisma.guardian.findMany({
     where: { parentId: parent.id },
-    select: { studentId: true }
+    select: { studentId: true },
   });
   const studentIds = guardians.map((g) => g.studentId);
 
@@ -177,13 +188,19 @@ router.get("/invoices", requireAuth, requireRole(["PARENT"]), async (req, res) =
   const studentId = String(req.query.studentId || "").trim();
   const [data, total] = await Promise.all([
     prisma.invoice.findMany({
-      where: { studentId: { in: studentIds }, ...(studentId ? { studentId } : {}), ...(status ? { status: status as any } : {}) },
+      where: {
+        studentId: { in: studentIds },
+        ...(studentId ? { studentId } : {}),
+        ...(status ? { status: status as any } : {}),
+      },
       include: { student: true, payments: true },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
-      take: pageSize
+      take: pageSize,
     }),
-    prisma.invoice.count({ where: { studentId: { in: studentIds }, ...(status ? { status: status as any } : {}) } })
+    prisma.invoice.count({
+      where: { studentId: { in: studentIds }, ...(status ? { status: status as any } : {}) },
+    }),
   ]);
 
   res.json({ data, total, page, pageSize });
@@ -199,13 +216,21 @@ router.get("/notifications", requireAuth, requireRole(["PARENT"]), async (req, r
   const status = String(req.query.status || "").trim();
   const [data, total] = await Promise.all([
     prisma.notificationRecipient.findMany({
-      where: { parentId: parent.id, ...(status ? { notification: { status: status as any } } : {}) },
+      where: {
+        parentId: parent.id,
+        ...(status ? { notification: { status: status as any } } : {}),
+      },
       include: { notification: true },
       orderBy: { notification: { createdAt: "desc" } },
       skip: (page - 1) * pageSize,
-      take: pageSize
+      take: pageSize,
     }),
-    prisma.notificationRecipient.count({ where: { parentId: parent.id, ...(status ? { notification: { status: status as any } } : {}) } })
+    prisma.notificationRecipient.count({
+      where: {
+        parentId: parent.id,
+        ...(status ? { notification: { status: status as any } } : {}),
+      },
+    }),
   ]);
 
   res.json({
@@ -214,13 +239,13 @@ router.get("/notifications", requireAuth, requireRole(["PARENT"]), async (req, r
       notification: item.notification
         ? {
             ...item.notification,
-            body: stripNotificationMeta(item.notification.body)
+            body: stripNotificationMeta(item.notification.body),
           }
-        : item.notification
+        : item.notification,
     })),
     total,
     page,
-    pageSize
+    pageSize,
   });
 });
 
@@ -228,7 +253,7 @@ router.post("/association-request", requireAuth, requireRole(["PARENT"]), async 
   const auth = (req as any).auth;
   const parent = await prisma.parent.findUnique({
     where: { userId: auth.userId },
-    include: { user: { select: { email: true, fullName: true } } }
+    include: { user: { select: { email: true, fullName: true } } },
   });
   if (!parent) return res.status(404).json({ message: "Acudiente no encontrado" });
 
@@ -240,22 +265,27 @@ router.post("/association-request", requireAuth, requireRole(["PARENT"]), async 
       title: "Solicitud de asociacion de acudiente",
       status: "PENDING",
       createdAt: { gte: recentWindow },
-      body: { contains: "[[audience:ADMINS]]" }
-    }
+      body: { contains: "[[audience:ADMINS]]" },
+    },
   });
   if (existing > 0) {
-    return res.json({ ok: true, alreadyPending: true, message: "Ya existe una solicitud pendiente en los ultimos dias." });
+    return res.json({
+      ok: true,
+      alreadyPending: true,
+      message: "Ya existe una solicitud pendiente en los ultimos dias.",
+    });
   }
 
   const guardians = await prisma.guardian.findMany({
     where: { parentId: parent.id },
-    include: { student: { select: { fullName: true, gradeLevel: true, studentGroup: true } } }
+    include: { student: { select: { fullName: true, gradeLevel: true, studentGroup: true } } },
   });
 
   const studentLines =
     guardians.length > 0
-      ? guardians.map((g) =>
-          `${g.student?.fullName || "-"}${g.student?.gradeLevel ? ` (${g.student.gradeLevel}${g.student?.studentGroup ? `-${g.student.studentGroup}` : ""})` : ""}`
+      ? guardians.map(
+          (g) =>
+            `${g.student?.fullName || "-"}${g.student?.gradeLevel ? ` (${g.student.gradeLevel}${g.student?.studentGroup ? `-${g.student.studentGroup}` : ""})` : ""}`
         )
       : ["(Sin estudiantes vinculados)"];
 
@@ -266,7 +296,7 @@ router.post("/association-request", requireAuth, requireRole(["PARENT"]), async 
     `Correo: ${parent.user?.email || "-"}`,
     "Estudiantes vinculados:",
     ...studentLines,
-    ...(note ? ["", `Mensaje: ${note}`] : [])
+    ...(note ? ["", `Mensaje: ${note}`] : []),
   ];
 
   const notification = await prisma.notification.create({
@@ -274,8 +304,8 @@ router.post("/association-request", requireAuth, requireRole(["PARENT"]), async 
       title: "Solicitud de asociacion de acudiente",
       body: composeNotificationBodyWithMeta(bodyLines.join("\n"), "ADMINS", null),
       status: "PENDING",
-      createdById: auth.userId
-    }
+      createdById: auth.userId,
+    },
   });
 
   res.json({ ok: true, notificationId: notification.id });

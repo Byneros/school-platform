@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { validate } from "../utils/validate.js";
@@ -9,7 +9,9 @@ const router = Router();
 const preschoolGrades = new Set(["PRE_JARDIN", "JARDIN", "TRANSICION"]);
 
 function normalizeGroup(value?: string | null) {
-  const normalized = String(value || "").trim().toUpperCase();
+  const normalized = String(value || "")
+    .trim()
+    .toUpperCase();
   return normalized || null;
 }
 
@@ -50,7 +52,7 @@ router.get("/", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_req, res
     "8": "OCTAVO",
     "9": "NOVENO",
     "10": "DECIMO",
-    "11": "ONCE"
+    "11": "ONCE",
   };
 
   const rawGradeMatch = search ? normalizeGrade(search) : "";
@@ -69,30 +71,30 @@ router.get("/", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_req, res
     "OCTAVO",
     "NOVENO",
     "DECIMO",
-    "ONCE"
+    "ONCE",
   ].includes(gradeMatch);
 
   const whereFromSearch: Prisma.StudentWhereInput = search
     ? {
         OR: [
           { fullName: { contains: search, mode: "insensitive" } },
-          ...(isGrade ? [{ gradeLevel: gradeMatch as any }] : [])
-        ]
+          ...(isGrade ? [{ gradeLevel: gradeMatch as any }] : []),
+        ],
       }
     : {};
 
   const finalWhere: Prisma.StudentWhereInput = {
     ...whereFromSearch,
-    ...(gradeLevel ? { gradeLevel: gradeLevel as any } : {})
+    ...(gradeLevel ? { gradeLevel: gradeLevel as any } : {}),
   };
 
   const [data, total] = await Promise.all([
     prisma.student.findMany({
       where: finalWhere,
       skip: (page - 1) * pageSize,
-      take: pageSize
+      take: pageSize,
     }),
-    prisma.student.count({ where: finalWhere })
+    prisma.student.count({ where: finalWhere }),
   ]);
 
   res.json({ data, total, page, pageSize });
@@ -108,10 +110,10 @@ router.get("/simple", requireAuth, requireRole(["TEACHER", "ADMIN"]), async (_re
       enrollments: {
         select: { year: true },
         orderBy: [{ year: "desc" }, { id: "desc" }],
-        take: 1
-      }
+        take: 1,
+      },
     },
-    orderBy: { fullName: "asc" }
+    orderBy: { fullName: "asc" },
   });
   res.json(
     students.map((s) => ({
@@ -119,7 +121,7 @@ router.get("/simple", requireAuth, requireRole(["TEACHER", "ADMIN"]), async (_re
       fullName: s.fullName,
       gradeLevel: s.gradeLevel,
       studentGroup: s.studentGroup,
-      latestYear: s.enrollments?.[0]?.year || null
+      latestYear: s.enrollments?.[0]?.year || null,
     }))
   );
 });
@@ -134,9 +136,9 @@ router.get("/:id/profile", requireAuth, requireRole(["ADMIN", "TEACHER"]), async
       enrollments: {
         include: { class: true },
         orderBy: [{ year: "desc" }, { id: "desc" }],
-        take: 1
-      }
-    }
+        take: 1,
+      },
+    },
   });
 
   if (!student) return res.status(404).json({ message: "Estudiante no encontrado" });
@@ -165,59 +167,74 @@ router.get("/:id/profile", requireAuth, requireRole(["ADMIN", "TEACHER"]), async
           guardianDocNumber: latestEnrollment.guardianDocNumber,
           guardianRelation: latestEnrollment.guardianRelation,
           contactPhone: latestEnrollment.contactPhone,
-          contactEmail: latestEnrollment.contactEmail
+          contactEmail: latestEnrollment.contactEmail,
         }
-      : null
+      : null,
   });
 });
 
-router.post("/", requireAuth, requireRole(["ADMIN"]), validate(createStudentSchema), async (req, res) => {
-  const { body } = (req as any).validated;
-  const normalizedGroup = normalizeGroup(body.studentGroup);
-  if (!isValidGroupForGrade(body.gradeLevel, normalizedGroup)) {
-    return res.status(400).json({
-      message: preschoolGrades.has(body.gradeLevel)
-        ? "Para preescolar el grupo debe ser A, B o C"
-        : "Para primaria/secundaria el grupo debe ser 1, 2 o 3"
-    });
-  }
-  const student = await prisma.student.create({
-    data: {
-      ...body,
-      studentGroup: normalizedGroup
+router.post(
+  "/",
+  requireAuth,
+  requireRole(["ADMIN"]),
+  validate(createStudentSchema),
+  async (req, res) => {
+    const { body } = (req as any).validated;
+    const normalizedGroup = normalizeGroup(body.studentGroup);
+    if (!isValidGroupForGrade(body.gradeLevel, normalizedGroup)) {
+      return res.status(400).json({
+        message: preschoolGrades.has(body.gradeLevel)
+          ? "Para preescolar el grupo debe ser A, B o C"
+          : "Para primaria/secundaria el grupo debe ser 1, 2 o 3",
+      });
     }
-  });
-  res.json(student);
-});
-
-router.patch("/:id", requireAuth, requireRole(["ADMIN"]), validate(updateStudentSchema), async (req, res) => {
-  const { params, body } = (req as any).validated;
-  const current = await prisma.student.findUnique({
-    where: { id: params.id },
-    select: { gradeLevel: true, studentGroup: true }
-  });
-  if (!current) return res.status(404).json({ message: "Estudiante no encontrado" });
-
-  const nextGradeLevel = body.gradeLevel || current.gradeLevel;
-  const nextGroup = body.studentGroup !== undefined ? normalizeGroup(body.studentGroup) : current.studentGroup;
-  if (!isValidGroupForGrade(nextGradeLevel, nextGroup)) {
-    return res.status(400).json({
-      message: preschoolGrades.has(nextGradeLevel)
-        ? "Para preescolar el grupo debe ser A, B o C"
-        : "Para primaria/secundaria el grupo debe ser 1, 2 o 3"
+    const student = await prisma.student.create({
+      data: {
+        ...body,
+        studentGroup: normalizedGroup,
+      },
     });
+    res.json(student);
   }
+);
 
-  const student = await prisma.student.update({
-    where: { id: params.id },
-    data: {
-      ...body,
-      ...(body.studentGroup !== undefined ? { studentGroup: normalizeGroup(body.studentGroup) } : {}),
-      ...(body.birthDate ? { birthDate: new Date(body.birthDate) } : {})
+router.patch(
+  "/:id",
+  requireAuth,
+  requireRole(["ADMIN"]),
+  validate(updateStudentSchema),
+  async (req, res) => {
+    const { params, body } = (req as any).validated;
+    const current = await prisma.student.findUnique({
+      where: { id: params.id },
+      select: { gradeLevel: true, studentGroup: true },
+    });
+    if (!current) return res.status(404).json({ message: "Estudiante no encontrado" });
+
+    const nextGradeLevel = body.gradeLevel || current.gradeLevel;
+    const nextGroup =
+      body.studentGroup !== undefined ? normalizeGroup(body.studentGroup) : current.studentGroup;
+    if (!isValidGroupForGrade(nextGradeLevel, nextGroup)) {
+      return res.status(400).json({
+        message: preschoolGrades.has(nextGradeLevel)
+          ? "Para preescolar el grupo debe ser A, B o C"
+          : "Para primaria/secundaria el grupo debe ser 1, 2 o 3",
+      });
     }
-  });
-  res.json(student);
-});
+
+    const student = await prisma.student.update({
+      where: { id: params.id },
+      data: {
+        ...body,
+        ...(body.studentGroup !== undefined
+          ? { studentGroup: normalizeGroup(body.studentGroup) }
+          : {}),
+        ...(body.birthDate ? { birthDate: new Date(body.birthDate) } : {}),
+      },
+    });
+    res.json(student);
+  }
+);
 
 router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const studentId = String(req.params.id || "");
@@ -236,13 +253,15 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
 
       const enrollments = await tx.enrollment.findMany({
         where: { studentId },
-        select: { id: true, admissionId: true }
+        select: { id: true, admissionId: true },
       });
       const enrollmentIds = enrollments.map((e) => e.id);
       const admissionIds = enrollments.map((e) => e.admissionId).filter(Boolean) as string[];
 
       if (enrollmentIds.length) {
-        await tx.academicClosureResult.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
+        await tx.academicClosureResult.deleteMany({
+          where: { enrollmentId: { in: enrollmentIds } },
+        });
         await tx.taskScore.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
         await tx.attendance.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
         await tx.grade.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
@@ -252,7 +271,7 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
       if (admissionIds.length) {
         await tx.admission.updateMany({
           where: { id: { in: admissionIds } },
-          data: { status: "APPROVED" }
+          data: { status: "APPROVED" },
         });
       }
 
@@ -269,7 +288,7 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
     return res.json({ ok: true });
   } catch (error: any) {
     return res.status(400).json({
-      message: error?.message || "No fue posible eliminar el estudiante"
+      message: error?.message || "No fue posible eliminar el estudiante",
     });
   }
 });

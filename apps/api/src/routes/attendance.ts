@@ -15,24 +15,31 @@ function normalizeDayOfWeek(value: unknown) {
 }
 
 function normalizeGradeGroup(gradeLevelRaw: unknown, groupRaw: unknown) {
-  const gradeRaw = String(gradeLevelRaw || "").trim().toUpperCase();
+  const gradeRaw = String(gradeLevelRaw || "")
+    .trim()
+    .toUpperCase();
   const groupValue = String(groupRaw || "").trim();
   if (gradeRaw.includes("-") && !groupValue) {
-    const [grade, ...rest] = gradeRaw.split("-").map((p) => p.trim()).filter(Boolean);
+    const [grade, ...rest] = gradeRaw
+      .split("-")
+      .map((p) => p.trim())
+      .filter(Boolean);
     return {
       gradeLevel: grade || "",
-      group: rest.join("-") || ""
+      group: rest.join("-") || "",
     };
   }
   return {
     gradeLevel: gradeRaw,
-    group: groupValue
+    group: groupValue,
   };
 }
 
 function normalizeTeacherSlots(rawSchedules: unknown) {
   const schedulesMap =
-    rawSchedules && typeof rawSchedules === "object" ? (rawSchedules as Record<string, unknown>) : {};
+    rawSchedules && typeof rawSchedules === "object"
+      ? (rawSchedules as Record<string, unknown>)
+      : {};
   const slots: Array<{ dayOfWeek: string; gradeLevel: string; group: string }> = [];
 
   Object.values(schedulesMap).forEach((entry) => {
@@ -42,7 +49,9 @@ function normalizeTeacherSlots(rawSchedules: unknown) {
         slots.push({
           dayOfWeek: normalizeDayOfWeek(slot?.dayOfWeek),
           gradeLevel: normalized.gradeLevel,
-          group: String(normalized.group || "").trim().toUpperCase()
+          group: String(normalized.group || "")
+            .trim()
+            .toUpperCase(),
         });
       });
       return;
@@ -52,7 +61,9 @@ function normalizeTeacherSlots(rawSchedules: unknown) {
       slots.push({
         dayOfWeek: normalizeDayOfWeek((entry as any)?.dayOfWeek),
         gradeLevel: normalized.gradeLevel,
-        group: String(normalized.group || "").trim().toUpperCase()
+        group: String(normalized.group || "")
+          .trim()
+          .toUpperCase(),
       });
     }
   });
@@ -70,7 +81,7 @@ function dayOfWeekInSpanishUpper(date: Date, timeZone = "America/Bogota") {
     MIERCOLES: "MIERCOLES",
     JUEVES: "JUEVES",
     VIERNES: "VIERNES",
-    SABADO: "SABADO"
+    SABADO: "SABADO",
   };
   return map[normalized] || normalized;
 }
@@ -120,7 +131,7 @@ function parseAttendanceDateParts(input: string) {
 async function resolveTeacherByUser(userId: string) {
   const teacher = await prisma.teacher.findUnique({
     where: { userId },
-    select: { id: true, subjectSchedules: true }
+    select: { id: true, subjectSchedules: true },
   });
   if (!teacher) throw new Error("Docente no encontrado");
   return teacher;
@@ -128,7 +139,12 @@ async function resolveTeacherByUser(userId: string) {
 
 async function upsertAttendanceForTeacher(
   teacher: { id: string; subjectSchedules: unknown },
-  payload: { enrollmentId: string; date: string; status: "PRESENT" | "ABSENT" | "LATE" | "EXCUSED"; notes?: string }
+  payload: {
+    enrollmentId: string;
+    date: string;
+    status: "PRESENT" | "ABSENT" | "LATE" | "EXCUSED";
+    notes?: string;
+  }
 ) {
   const slots = normalizeTeacherSlots(teacher.subjectSchedules);
   const { referenceDate, attendanceDate } = parseAttendanceDateParts(payload.date);
@@ -140,13 +156,17 @@ async function upsertAttendanceForTeacher(
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: payload.enrollmentId },
-    include: { class: true, student: { select: { studentGroup: true } } }
+    include: { class: true, student: { select: { studentGroup: true } } },
   });
   if (!enrollment) throw new Error("Matricula no encontrada");
 
   if (slots.length > 0) {
-    const grade = String((enrollment.class as any).gradeLevel || "").trim().toUpperCase();
-    const enrollmentGroup = String((enrollment as any)?.student?.studentGroup || "").trim().toUpperCase();
+    const grade = String((enrollment.class as any).gradeLevel || "")
+      .trim()
+      .toUpperCase();
+    const enrollmentGroup = String((enrollment as any)?.student?.studentGroup || "")
+      .trim()
+      .toUpperCase();
     const allowed = slots.some((s) => {
       if (s.dayOfWeek !== requestedDay) return false;
       if (s.gradeLevel !== grade) return false;
@@ -154,7 +174,9 @@ async function upsertAttendanceForTeacher(
       return s.group === enrollmentGroup;
     });
     if (!allowed) {
-      throw new Error(`No tienes franja horaria registrada para ${grade}${enrollmentGroup ? `-${enrollmentGroup}` : ""} el dia ${requestedDay}`);
+      throw new Error(
+        `No tienes franja horaria registrada para ${grade}${enrollmentGroup ? `-${enrollmentGroup}` : ""} el dia ${requestedDay}`
+      );
     }
   }
 
@@ -164,16 +186,16 @@ async function upsertAttendanceForTeacher(
   await prisma.attendance.deleteMany({
     where: {
       enrollmentId: payload.enrollmentId,
-      date: { gte: attendanceDate, lt: nextDay, not: attendanceDate }
-    }
+      date: { gte: attendanceDate, lt: nextDay, not: attendanceDate },
+    },
   });
 
   const existing = await prisma.attendance.findFirst({
     where: {
       enrollmentId: payload.enrollmentId,
-      date: attendanceDate
+      date: attendanceDate,
     },
-    select: { id: true, notes: true }
+    select: { id: true, notes: true },
   });
 
   const attendance = existing
@@ -181,75 +203,96 @@ async function upsertAttendanceForTeacher(
         where: { id: existing.id },
         data: {
           status: payload.status,
-          notes: composeAttendanceNotes(teacher.id, payload.notes ?? existing.notes)
-        }
+          notes: composeAttendanceNotes(teacher.id, payload.notes ?? existing.notes),
+        },
       })
     : await prisma.attendance.create({
         data: {
           enrollmentId: payload.enrollmentId,
           date: attendanceDate,
           status: payload.status,
-          notes: composeAttendanceNotes(teacher.id, payload.notes)
-        }
+          notes: composeAttendanceNotes(teacher.id, payload.notes),
+        },
       });
   return attendance;
 }
 
-router.post("/", requireAuth, requireRole(["TEACHER"]), validate(createAttendanceSchema), async (req, res) => {
-  const { body } = (req as any).validated;
-  const auth = (req as any).auth;
+router.post(
+  "/",
+  requireAuth,
+  requireRole(["TEACHER"]),
+  validate(createAttendanceSchema),
+  async (req, res) => {
+    const { body } = (req as any).validated;
+    const auth = (req as any).auth;
 
-  try {
-    const teacher = await resolveTeacherByUser(auth.userId);
-    const attendance = await upsertAttendanceForTeacher(teacher, body);
-    res.json(attendance);
-  } catch (error: any) {
-    const message = String(error?.message || "");
-    if (message === "Docente no encontrado") return res.status(404).json({ message });
-    if (message === "Matricula no encontrada") return res.status(404).json({ message });
-    if (message.includes("No tienes franja horaria")) return res.status(403).json({ message });
-    if (message.includes("No se permite registrar asistencia en domingo")) return res.status(403).json({ message });
-    return res.status(400).json({ message: message || "No fue posible registrar la asistencia" });
-  }
-});
-
-router.post("/bulk", requireAuth, requireRole(["TEACHER"]), validate(createAttendanceBulkSchema), async (req, res) => {
-  const { body } = (req as any).validated as {
-    body: {
-      items: Array<{ enrollmentId: string; date: string; status: "PRESENT" | "ABSENT" | "LATE" | "EXCUSED"; notes?: string }>;
-    };
-  };
-  const auth = (req as any).auth;
-
-  try {
-    const teacher = await resolveTeacherByUser(auth.userId);
-    const results: Array<{ enrollmentId: string; ok: boolean; error?: string }> = [];
-
-    for (const item of body.items) {
-      try {
-        await upsertAttendanceForTeacher(teacher, item);
-        results.push({ enrollmentId: item.enrollmentId, ok: true });
-      } catch (error: any) {
-        results.push({
-          enrollmentId: item.enrollmentId,
-          ok: false,
-          error: String(error?.message || "No fue posible registrar la asistencia")
-        });
-      }
+    try {
+      const teacher = await resolveTeacherByUser(auth.userId);
+      const attendance = await upsertAttendanceForTeacher(teacher, body);
+      res.json(attendance);
+    } catch (error: any) {
+      const message = String(error?.message || "");
+      if (message === "Docente no encontrado") return res.status(404).json({ message });
+      if (message === "Matricula no encontrada") return res.status(404).json({ message });
+      if (message.includes("No tienes franja horaria")) return res.status(403).json({ message });
+      if (message.includes("No se permite registrar asistencia en domingo"))
+        return res.status(403).json({ message });
+      return res.status(400).json({ message: message || "No fue posible registrar la asistencia" });
     }
-
-    const okCount = results.filter((r) => r.ok).length;
-    const failedCount = results.length - okCount;
-    return res.status(failedCount > 0 ? 207 : 200).json({
-      summary: { total: results.length, ok: okCount, failed: failedCount },
-      results
-    });
-  } catch (error: any) {
-    const message = String(error?.message || "");
-    if (message === "Docente no encontrado") return res.status(404).json({ message });
-    if (message.includes("No se permite registrar asistencia en domingo")) return res.status(403).json({ message });
-    return res.status(400).json({ message: message || "No fue posible registrar la asistencia masiva" });
   }
-});
+);
+
+router.post(
+  "/bulk",
+  requireAuth,
+  requireRole(["TEACHER"]),
+  validate(createAttendanceBulkSchema),
+  async (req, res) => {
+    const { body } = (req as any).validated as {
+      body: {
+        items: Array<{
+          enrollmentId: string;
+          date: string;
+          status: "PRESENT" | "ABSENT" | "LATE" | "EXCUSED";
+          notes?: string;
+        }>;
+      };
+    };
+    const auth = (req as any).auth;
+
+    try {
+      const teacher = await resolveTeacherByUser(auth.userId);
+      const results: Array<{ enrollmentId: string; ok: boolean; error?: string }> = [];
+
+      for (const item of body.items) {
+        try {
+          await upsertAttendanceForTeacher(teacher, item);
+          results.push({ enrollmentId: item.enrollmentId, ok: true });
+        } catch (error: any) {
+          results.push({
+            enrollmentId: item.enrollmentId,
+            ok: false,
+            error: String(error?.message || "No fue posible registrar la asistencia"),
+          });
+        }
+      }
+
+      const okCount = results.filter((r) => r.ok).length;
+      const failedCount = results.length - okCount;
+      return res.status(failedCount > 0 ? 207 : 200).json({
+        summary: { total: results.length, ok: okCount, failed: failedCount },
+        results,
+      });
+    } catch (error: any) {
+      const message = String(error?.message || "");
+      if (message === "Docente no encontrado") return res.status(404).json({ message });
+      if (message.includes("No se permite registrar asistencia en domingo"))
+        return res.status(403).json({ message });
+      return res
+        .status(400)
+        .json({ message: message || "No fue posible registrar la asistencia masiva" });
+    }
+  }
+);
 
 export default router;

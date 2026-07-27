@@ -8,7 +8,12 @@ export class ApiError extends Error {
   requestId: string | null;
   path: string | null;
 
-  constructor(message: string, status: number, requestId: string | null = null, path: string | null = null) {
+  constructor(
+    message: string,
+    status: number,
+    requestId: string | null = null,
+    path: string | null = null
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
@@ -16,6 +21,12 @@ export class ApiError extends Error {
     this.path = path;
   }
 }
+
+export type JsonPrimitive = string | number | boolean | null;
+
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+
+export type JsonObject = Record<string, JsonValue>;
 
 async function toApiError(res: Response, fallback = "Request failed", path: string | null = null) {
   const requestIdHeader = res.headers.get("x-request-id");
@@ -84,7 +95,7 @@ function buildHeaders(withJson: boolean, normalizedPath: string) {
   return {
     ...(withJson ? { "Content-Type": "application/json" } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(developerAccessToken ? { "X-Developer-Access-Token": developerAccessToken } : {})
+    ...(developerAccessToken ? { "X-Developer-Access-Token": developerAccessToken } : {}),
   };
 }
 
@@ -103,7 +114,7 @@ async function request(path: string, method: RequestMethod, body?: unknown) {
       headers: buildHeaders(withJson, normalizedPath),
       signal: controller.signal,
       credentials: "include",
-      ...(withJson ? { body: JSON.stringify(body) } : {})
+      ...(withJson ? { body: JSON.stringify(body) } : {}),
     });
   } catch {
     throw new ApiError(
@@ -124,22 +135,22 @@ async function request(path: string, method: RequestMethod, body?: unknown) {
 export async function apiGet<T = any>(path: string): Promise<T | null> {
   const res = await request(path, "GET");
   if (res.status === 204) return null;
-  return res.json();
+  return (await res.json()) as T;
 }
 
-export async function apiPost<T = any>(path: string, body: any): Promise<T> {
+export async function apiPost<T = any>(path: string, body: unknown): Promise<T> {
   const res = await request(path, "POST", body);
-  return res.json();
+  return (await res.json()) as T;
 }
 
-export async function apiPatch<T = any>(path: string, body: any): Promise<T> {
+export async function apiPatch<T = any>(path: string, body: unknown): Promise<T> {
   const res = await request(path, "PATCH", body);
-  return res.json();
+  return (await res.json()) as T;
 }
 
-export async function apiPut<T = any>(path: string, body: any): Promise<T> {
+export async function apiPut<T = any>(path: string, body: unknown): Promise<T> {
   const res = await request(path, "PUT", body);
-  return res.json();
+  return (await res.json()) as T;
 }
 
 export async function apiDownload(path: string) {

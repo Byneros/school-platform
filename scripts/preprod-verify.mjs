@@ -44,7 +44,7 @@ function runNpm(args, extraEnv = {}, options = {}) {
     cwd: rootDir,
     shell: true,
     stdio: "inherit",
-    env: { ...process.env, ...extraEnv }
+    env: { ...process.env, ...extraEnv },
   });
   if (result.error) {
     throw result.error;
@@ -70,7 +70,7 @@ function releaseApiPort(port) {
   spawnSync("powershell", ["-NoProfile", "-Command", psScript], {
     cwd: rootDir,
     shell: true,
-    stdio: "ignore"
+    stdio: "ignore",
   });
 }
 
@@ -90,7 +90,7 @@ function stopProjectNodeProcesses() {
   spawnSync("powershell", ["-NoProfile", "-Command", psScript], {
     cwd: rootDir,
     shell: true,
-    stdio: "ignore"
+    stdio: "ignore",
   });
 }
 
@@ -141,7 +141,11 @@ async function main() {
   runNpm(["run", "prisma:migrate:deploy"]);
   releaseApiPort(port);
   stopProjectNodeProcesses();
-  const generate = runNpm(["run", "prisma:generate"], {}, { allowFailure: process.platform === "win32" });
+  const generate = runNpm(
+    ["run", "prisma:generate"],
+    {},
+    { allowFailure: process.platform === "win32" }
+  );
   if (!generate.ok) {
     console.warn(
       "[preprod] ADVERTENCIA: prisma:generate fallo en Windows (bloqueo de query_engine). " +
@@ -167,7 +171,7 @@ async function main() {
       cwd: rootDir,
       shell: true,
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env
+      env: process.env,
     });
     apiStartedByScript.stdout.on("data", (chunk) => {
       process.stdout.write(`[api] ${String(chunk)}`);
@@ -186,7 +190,7 @@ async function main() {
 
   try {
     runNpm(["--workspace", "apps/api", "run", "test:regression"], {
-      TEST_API_URL: baseUrl
+      TEST_API_URL: baseUrl,
     });
   } finally {
     if (apiStartedByScript) {

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import ActionFeedback from "../components/ActionFeedback";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../services/api";
@@ -125,8 +126,8 @@ export default function LoginPage() {
         <div>
           <h1 className="hero-title">Gestion escolar clara y rapida</h1>
           <p className="hero-subtitle">
-            Centraliza admisiones, notas, comunicaciones y finanzas en un solo lugar.
-            Pensado para usuarios no tecnicos.
+            Centraliza admisiones, notas, comunicaciones y finanzas en un solo lugar. Pensado para
+            usuarios no tecnicos.
           </p>
           <div className="stat-row">
             <div className="stat">
@@ -145,48 +146,48 @@ export default function LoginPage() {
         </div>
         {step === "credentials" ? (
           <form onSubmit={onSubmit}>
-          <div className="card" style={{ boxShadow: "none" }}>
-            <h2 className="section-title">Ingreso al sistema</h2>
-            <label>
-              Correo
-              <input
-                className="input"
-                name="email"
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="correo@colegio.edu"
+            <div className="card" style={{ boxShadow: "none" }}>
+              <h2 className="section-title">Ingreso al sistema</h2>
+              <label>
+                Correo
+                <input
+                  className="input"
+                  name="email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="correo@colegio.edu"
+                />
+              </label>
+              <label>
+                Contrasena
+                <input
+                  className="input"
+                  name="password"
+                  autoComplete="current-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="********"
+                />
+              </label>
+              <ActionFeedback
+                tone="error"
+                title={feedbackTitles.login.accessError}
+                message={error}
+                onDismiss={() => setError("")}
+                style={{ marginTop: 8 }}
               />
-            </label>
-            <label>
-              Contrasena
-              <input
-                className="input"
-                name="password"
-                autoComplete="current-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="********"
-              />
-            </label>
-            <ActionFeedback
-              tone="error"
-              title={feedbackTitles.login.accessError}
-              message={error}
-              onDismiss={() => setError("")}
-              style={{ marginTop: 8 }}
-            />
-            <button className="button" style={{ marginTop: 12 }} disabled={loading}>
-              {loading ? "Ingresando..." : "Iniciar sesion"}
-            </button>
-          </div>
-        </form>
+              <button className="button" style={{ marginTop: 12 }} disabled={loading}>
+                {loading ? "Ingresando..." : "Iniciar sesion"}
+              </button>
+            </div>
+          </form>
         ) : (
           <form onSubmit={verifyCode}>
             <div className="card" style={{ boxShadow: "none" }}>
@@ -227,10 +228,20 @@ export default function LoginPage() {
                 <button className="button" type="submit" disabled={loading}>
                   {loading ? "Validando..." : "Validar codigo"}
                 </button>
-                <button className="button secondary" type="button" onClick={resendCode} disabled={loading}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={resendCode}
+                  disabled={loading}
+                >
                   Reenviar codigo
                 </button>
-                <button className="button secondary" type="button" onClick={resetTwoFactor} disabled={loading}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={resetTwoFactor}
+                  disabled={loading}
+                >
                   Cambiar correo
                 </button>
               </div>

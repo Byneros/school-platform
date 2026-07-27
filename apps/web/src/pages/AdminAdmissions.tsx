@@ -1,13 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+
 import ActionFeedback from "../components/ActionFeedback";
-import Section from "../components/Section";
-import DataTable from "../components/DataTable";
 import Autocomplete from "../components/Autocomplete";
-import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
-import { gradeLabel, gradeOptions } from "../services/grades";
+import DataTable from "../components/DataTable";
+import Section from "../components/Section";
 import useDebounce from "../hooks/useDebounce";
 import useSuggestions from "../hooks/useSuggestions";
+import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
+import { gradeLabel, gradeOptions } from "../services/grades";
 import { feedbackTitles } from "../utils/feedback";
 
 function getClassGradeLevel(classData: any) {
@@ -17,7 +18,7 @@ function getClassGradeLevel(classData: any) {
 const guardianDocTypeOptions = [
   { value: "CEDULA", label: "Cedula" },
   { value: "CEDULA_EXTRANJERIA", label: "Cedula de extranjeria" },
-  { value: "PASAPORTE", label: "Pasaporte" }
+  { value: "PASAPORTE", label: "Pasaporte" },
 ];
 
 const guardianRelationOptions = [
@@ -29,7 +30,7 @@ const guardianRelationOptions = [
   { value: "TIA", label: "Tia" },
   { value: "HERMANO", label: "Hermano" },
   { value: "HERMANA", label: "Hermana" },
-  { value: "ACUDIENTE_LEGAL", label: "Acudiente legal" }
+  { value: "ACUDIENTE_LEGAL", label: "Acudiente legal" },
 ];
 
 function normalizeGuardianRelation(value: string) {
@@ -77,7 +78,9 @@ export default function AdminAdmissions() {
   const [enrollmentsTotal, setEnrollmentsTotal] = useState(0);
   const [enrollmentsSearch, setEnrollmentsSearch] = useState("");
   const debouncedEnrollmentsSearch = useDebounce(enrollmentsSearch, 350);
-  const [savedFilters, setSavedFilters] = useState<Array<{ id: string; name: string; statusFilter: string; gradeFilter: string; search: string }>>([]);
+  const [savedFilters, setSavedFilters] = useState<
+    Array<{ id: string; name: string; statusFilter: string; gradeFilter: string; search: string }>
+  >([]);
   const [filterName, setFilterName] = useState("");
   const [selectedFilterId, setSelectedFilterId] = useState("");
   const initialPage = Number(searchParams.get("page") || "1");
@@ -85,7 +88,9 @@ export default function AdminAdmissions() {
   const initialGrade = searchParams.get("grade") || "";
   const initialSearch = searchParams.get("search") || "";
 
-  const [page, setPage] = useState(Number.isFinite(initialPage) && initialPage > 0 ? initialPage : 1);
+  const [page, setPage] = useState(
+    Number.isFinite(initialPage) && initialPage > 0 ? initialPage : 1
+  );
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [gradeFilter, setGradeFilter] = useState(initialGrade);
@@ -103,8 +108,8 @@ export default function AdminAdmissions() {
       recentReportCards: false,
       previousSchoolCertificates: false,
       addressProof: false,
-      vaccinationCard: false
-    }
+      vaccinationCard: false,
+    },
   });
   const [enrollmentBusy, setEnrollmentBusy] = useState(false);
   const [enrollmentMessage, setEnrollmentMessage] = useState("");
@@ -123,8 +128,8 @@ export default function AdminAdmissions() {
       recentReportCards: false,
       previousSchoolCertificates: false,
       addressProof: false,
-      vaccinationCard: false
-    }
+      vaccinationCard: false,
+    },
   });
   const [enrollmentForm, setEnrollmentForm] = useState({
     admissionId: "",
@@ -152,9 +157,9 @@ export default function AdminAdmissions() {
       residenceProof: false,
       healthCertificate: false,
       vaccinationCard: false,
-      previousReport: false
+      previousReport: false,
     },
-    documentsNotes: ""
+    documentsNotes: "",
   });
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [loadError, setLoadError] = useState("");
@@ -193,9 +198,9 @@ export default function AdminAdmissions() {
       residenceProof: false,
       healthCertificate: false,
       vaccinationCard: false,
-      previousReport: false
+      previousReport: false,
     },
-    documentsNotes: ""
+    documentsNotes: "",
   });
   const editPanelRef = useRef<HTMLFormElement | null>(null);
   const editNameInputRef = useRef<HTMLInputElement | null>(null);
@@ -203,19 +208,19 @@ export default function AdminAdmissions() {
   const editEnrollmentNameInputRef = useRef<HTMLInputElement | null>(null);
   const admissionsSearchOptions = useSuggestions({
     endpoint: "/suggestions?type=admissions",
-    query: search
+    query: search,
   });
 
   const enrollmentsSearchOptions = useSuggestions({
     endpoint: "/suggestions?type=enrollments",
-    query: enrollmentsSearch
+    query: enrollmentsSearch,
   });
   const enrollmentFeedback = (() => {
     if (enrollmentMessage) {
       return {
         title: "Matricula satisfactoria",
         text: enrollmentMessage,
-        tone: "success" as const
+        tone: "success" as const,
       };
     }
     if (!enrollmentError) return null;
@@ -224,7 +229,7 @@ export default function AdminAdmissions() {
       return {
         title: "Estudiante ya registrado",
         text: enrollmentError,
-        tone: "warning" as const
+        tone: "warning" as const,
       };
     }
     if (
@@ -236,13 +241,13 @@ export default function AdminAdmissions() {
       return {
         title: "Error de validacion de matricula",
         text: enrollmentError,
-        tone: "info" as const
+        tone: "info" as const,
       };
     }
     return {
       title: "Error de matricula",
       text: enrollmentError,
-      tone: "error" as const
+      tone: "error" as const,
     };
   })();
   const missingImportantEnrollmentFields = (() => {
@@ -257,11 +262,9 @@ export default function AdminAdmissions() {
       { key: "guardianDocType", label: "Tipo de documento del acudiente" },
       { key: "guardianDocNumber", label: "Documento del acudiente" },
       { key: "guardianRelation", label: "Parentesco del acudiente" },
-      { key: "contactPhone", label: "Telefono de contacto" }
+      { key: "contactPhone", label: "Telefono de contacto" },
     ];
-    return required
-      .filter((f) => !String(enrollmentForm[f.key] ?? "").trim())
-      .map((f) => f.label);
+    return required.filter((f) => !String(enrollmentForm[f.key] ?? "").trim()).map((f) => f.label);
   })();
 
   useEffect(() => {
@@ -286,20 +289,27 @@ export default function AdminAdmissions() {
     }
   }, []);
 
-  const persistFilters = (next: Array<{ id: string; name: string; statusFilter: string; gradeFilter: string; search: string }>) => {
+  const persistFilters = (
+    next: Array<{
+      id: string;
+      name: string;
+      statusFilter: string;
+      gradeFilter: string;
+      search: string;
+    }>
+  ) => {
     setSavedFilters(next);
     localStorage.setItem("admin_admissions_filters", JSON.stringify(next));
   };
 
   const saveCurrentFilter = () => {
     const trimmed = filterName.trim();
-    const name = trimmed || `Filtro ${new Date().toLocaleDateString("es-CO")} ${new Date().toLocaleTimeString("es-CO")}`;
-    const id = trimmed ? trimmed.toLowerCase().replace(/\s+/g, "-") : `f-${Date.now()}`;
+    const name =
+      trimmed ||
+      `Filtro ${new Date().toLocaleDateString("es-CO")} ${new Date().toLocaleTimeString("es-CO")}`;
+    const id = trimmed ? trimmed.toLowerCase().replace(/\s+/g, "-") : crypto.randomUUID();
     const next = savedFilters.filter((f) => f.id !== id);
-    const updated = [
-      { id, name, statusFilter, gradeFilter, search },
-      ...next
-    ];
+    const updated = [{ id, name, statusFilter, gradeFilter, search }, ...next];
     persistFilters(updated.slice(0, 10));
     setSelectedFilterId(id);
     setFilterName("");
@@ -322,49 +332,82 @@ export default function AdminAdmissions() {
     setSelectedFilterId("");
   };
 
-  const load = () =>
-    apiGet(
-      `/admissions?page=${page}&pageSize=10${statusFilter ? `&status=${statusFilter}` : ""}${gradeFilter ? `&gradeLevel=${gradeFilter}` : ""}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`
-    )
-      .then((res) => {
-        setLoadError("");
-        setAdmissions(res.data || []);
-        setTotal(res.total || 0);
-      })
-      .catch((error: any) => {
-        setLoadError(error?.message || "No se pudieron cargar las admisiones.");
-      });
+  const load = useCallback(async () => {
+    try {
+      const res = await apiGet(
+        `/admissions?page=${page}&pageSize=10${statusFilter ? `&status=${statusFilter}` : ""}${
+          gradeFilter ? `&gradeLevel=${gradeFilter}` : ""
+        }${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`
+      );
+
+      setLoadError("");
+      setAdmissions(res.data || []);
+      setTotal(res.total || 0);
+    } catch (error: any) {
+      setLoadError(error?.message || "No se pudieron cargar las admisiones.");
+    }
+  }, [page, statusFilter, gradeFilter, debouncedSearch]);
 
   const loadApprovedAdmissions = () =>
     apiGet("/admissions/approved")
       .then((res) => setApprovedAdmissions(res))
       .catch(() => undefined);
 
-  const loadEnrollments = () =>
-    apiGet(`/enrollments?page=${enrollmentsPage}&pageSize=10${debouncedEnrollmentsSearch ? `&search=${encodeURIComponent(debouncedEnrollmentsSearch)}` : ""}`)
-      .then((res) => {
-        const list = Array.isArray(res) ? res : res?.data || [];
-        setEnrollmentsError("");
-        setEnrollments(list);
-        setSelectedEnrollment((current) => (current ? list.find((item: any) => item.id === current.id) || current : null));
-        setEnrollmentsTotal(Array.isArray(res) ? list.length : Number(res?.total || 0));
-      })
-      .catch((error: any) => {
-        setEnrollmentsError(error?.message || "No se pudieron cargar las matriculas.");
-      });
+  const loadEnrollments = useCallback(async () => {
+    try {
+      const res = await apiGet(
+        `/enrollments?page=${enrollmentsPage}&pageSize=10${
+          debouncedEnrollmentsSearch
+            ? `&search=${encodeURIComponent(debouncedEnrollmentsSearch)}`
+            : ""
+        }`
+      );
+
+      const list = Array.isArray(res) ? res : res?.data || [];
+
+      setEnrollmentsError("");
+      setEnrollments(list);
+
+      setSelectedEnrollment((current) =>
+        current ? list.find((item: any) => item.id === current.id) || current : null
+      );
+
+      setEnrollmentsTotal(Array.isArray(res) ? list.length : Number(res?.total || 0));
+    } catch (error: any) {
+      setEnrollmentsError(error?.message || "No se pudieron cargar las matrículas.");
+    }
+  }, [enrollmentsPage, debouncedEnrollmentsSearch]);
 
   useEffect(() => {
-    load();
+    const fetchAdmissions = async () => {
+      try {
+        const res = await apiGet(
+          `/admissions?page=${page}&pageSize=10${statusFilter ? `&status=${statusFilter}` : ""}${
+            gradeFilter ? `&gradeLevel=${gradeFilter}` : ""
+          }${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`
+        );
+
+        setLoadError("");
+        setAdmissions(res.data || []);
+        setTotal(res.total || 0);
+      } catch (error: any) {
+        setLoadError(error?.message || "No se pudieron cargar las admisiones.");
+      }
+    };
+
+    void fetchAdmissions();
   }, [page, statusFilter, gradeFilter, debouncedSearch]);
 
   useEffect(() => {
-    apiGet("/classes/simple").then((res) => setClasses(res)).catch(() => undefined);
+    apiGet("/classes/simple")
+      .then((res) => setClasses(res))
+      .catch(() => undefined);
     loadApprovedAdmissions();
   }, []);
 
   useEffect(() => {
-    loadEnrollments();
-  }, [enrollmentsPage, debouncedEnrollmentsSearch]);
+    void loadEnrollments();
+  }, [loadEnrollments]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowMs(Date.now()), 60_000);
@@ -420,7 +463,7 @@ export default function AdminAdmissions() {
         studentName: form.studentName,
         gradeLevel: form.gradeLevel,
         notes: form.notes?.trim() || "",
-        documents: form.documents
+        documents: form.documents,
       });
       setAdmissions([admission, ...admissions]);
       setForm({
@@ -433,8 +476,8 @@ export default function AdminAdmissions() {
           recentReportCards: false,
           previousSchoolCertificates: false,
           addressProof: false,
-          vaccinationCard: false
-        }
+          vaccinationCard: false,
+        },
       });
       setAdmissionMessage("Nueva admision creada satisfactoriamente.");
     } catch (error: any) {
@@ -447,14 +490,14 @@ export default function AdminAdmissions() {
       return {
         title: "Admision creada",
         text: admissionMessage,
-        tone: "success" as const
+        tone: "success" as const,
       };
     }
     if (!admissionError) return null;
     return {
       title: "Error al crear admision",
       text: admissionError,
-      tone: "error" as const
+      tone: "error" as const,
     };
   })();
 
@@ -519,8 +562,8 @@ export default function AdminAdmissions() {
         recentReportCards: Boolean(admission.documents?.recentReportCards),
         previousSchoolCertificates: Boolean(admission.documents?.previousSchoolCertificates),
         addressProof: Boolean(admission.documents?.addressProof),
-        vaccinationCard: Boolean(admission.documents?.vaccinationCard)
-      }
+        vaccinationCard: Boolean(admission.documents?.vaccinationCard),
+      },
     });
   };
 
@@ -535,7 +578,7 @@ export default function AdminAdmissions() {
         studentName: editingForm.studentName,
         gradeLevel: editingForm.gradeLevel,
         notes: editingForm.notes,
-        documents: editingForm.documents
+        documents: editingForm.documents,
       });
       setAdmissions((prev) => prev.map((a) => (a.id === editingId ? updated : a)));
       setEditingMessage("Admision actualizada satisfactoriamente.");
@@ -549,7 +592,9 @@ export default function AdminAdmissions() {
   const createEnrollment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (missingImportantEnrollmentFields.length > 0) {
-      setEnrollmentError(`Completa los datos obligatorios para matricular: ${missingImportantEnrollmentFields.join(", ")}`);
+      setEnrollmentError(
+        `Completa los datos obligatorios para matricular: ${missingImportantEnrollmentFields.join(", ")}`
+      );
       setEnrollmentMessage("");
       return;
     }
@@ -587,7 +632,7 @@ export default function AdminAdmissions() {
         contactPhone: enrollmentForm.contactPhone,
         contactEmail: enrollmentForm.contactEmail || undefined,
         documents: enrollmentForm.documents,
-        documentsNotes: enrollmentForm.documentsNotes
+        documentsNotes: enrollmentForm.documentsNotes,
       });
       setEnrollmentMessage("Matricula registrada correctamente");
       if (enrollmentForm.admissionId) {
@@ -619,9 +664,9 @@ export default function AdminAdmissions() {
           residenceProof: false,
           healthCertificate: false,
           vaccinationCard: false,
-          previousReport: false
+          previousReport: false,
         },
-        documentsNotes: ""
+        documentsNotes: "",
       });
       load();
       loadApprovedAdmissions();
@@ -659,8 +704,10 @@ export default function AdminAdmissions() {
         residenceProof: Boolean(adm.documents?.addressProof),
         healthCertificate: false,
         vaccinationCard: Boolean(adm.documents?.vaccinationCard),
-        previousReport: Boolean(adm.documents?.recentReportCards || adm.documents?.previousSchoolCertificates)
-      }
+        previousReport: Boolean(
+          adm.documents?.recentReportCards || adm.documents?.previousSchoolCertificates
+        ),
+      },
     }));
   };
 
@@ -671,7 +718,9 @@ export default function AdminAdmissions() {
     setEditingEnrollmentId(enrollment.id);
     setEditingEnrollmentForm({
       studentFullName: enrollment.studentFullName || "",
-      studentBirthDate: enrollment.studentBirthDate ? String(enrollment.studentBirthDate).slice(0, 10) : "",
+      studentBirthDate: enrollment.studentBirthDate
+        ? String(enrollment.studentBirthDate).slice(0, 10)
+        : "",
       studentBirthPlaceDept: enrollment.studentBirthPlaceDept || "",
       studentBirthPlaceCity: enrollment.studentBirthPlaceCity || "",
       studentGender: enrollment.studentGender || "",
@@ -694,9 +743,9 @@ export default function AdminAdmissions() {
         residenceProof: Boolean(enrollment.documents?.residenceProof),
         healthCertificate: Boolean(enrollment.documents?.healthCertificate),
         vaccinationCard: Boolean(enrollment.documents?.vaccinationCard),
-        previousReport: Boolean(enrollment.documents?.previousReport)
+        previousReport: Boolean(enrollment.documents?.previousReport),
       },
-      documentsNotes: enrollment.documentsNotes || ""
+      documentsNotes: enrollment.documentsNotes || "",
     });
   };
 
@@ -727,7 +776,7 @@ export default function AdminAdmissions() {
         contactPhone: editingEnrollmentForm.contactPhone,
         contactEmail: editingEnrollmentForm.contactEmail || undefined,
         documents: editingEnrollmentForm.documents,
-        documentsNotes: editingEnrollmentForm.documentsNotes
+        documentsNotes: editingEnrollmentForm.documentsNotes,
       });
       setEnrollments((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       setSelectedEnrollment(updated);
@@ -826,15 +875,25 @@ export default function AdminAdmissions() {
         </label>
         <label>
           Nivel
-          <select className="input" value={form.gradeLevel} onChange={(e) => setForm({ ...form, gradeLevel: e.target.value })}>
+          <select
+            className="input"
+            value={form.gradeLevel}
+            onChange={(e) => setForm({ ...form, gradeLevel: e.target.value })}
+          >
             {gradeOptions.map((g) => (
-              <option key={g.value} value={g.value}>{g.label}</option>
+              <option key={g.value} value={g.value}>
+                {g.label}
+              </option>
             ))}
           </select>
         </label>
         <label>
           Notas
-          <input className="input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          <input
+            className="input"
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          />
         </label>
         <div style={{ fontWeight: 600, margin: "10px 0 6px" }}>Documentos de admision</div>
         <div style={{ display: "grid", gap: 6 }}>
@@ -845,7 +904,7 @@ export default function AdminAdmissions() {
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
-                  documents: { ...prev.documents, studentIdentity: e.target.checked }
+                  documents: { ...prev.documents, studentIdentity: e.target.checked },
                 }))
               }
             />
@@ -858,7 +917,7 @@ export default function AdminAdmissions() {
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
-                  documents: { ...prev.documents, parentsIds: e.target.checked }
+                  documents: { ...prev.documents, parentsIds: e.target.checked },
                 }))
               }
             />
@@ -871,7 +930,7 @@ export default function AdminAdmissions() {
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
-                  documents: { ...prev.documents, recentReportCards: e.target.checked }
+                  documents: { ...prev.documents, recentReportCards: e.target.checked },
                 }))
               }
             />
@@ -884,7 +943,7 @@ export default function AdminAdmissions() {
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
-                  documents: { ...prev.documents, previousSchoolCertificates: e.target.checked }
+                  documents: { ...prev.documents, previousSchoolCertificates: e.target.checked },
                 }))
               }
             />
@@ -897,7 +956,7 @@ export default function AdminAdmissions() {
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
-                  documents: { ...prev.documents, addressProof: e.target.checked }
+                  documents: { ...prev.documents, addressProof: e.target.checked },
                 }))
               }
             />
@@ -910,14 +969,16 @@ export default function AdminAdmissions() {
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
-                  documents: { ...prev.documents, vaccinationCard: e.target.checked }
+                  documents: { ...prev.documents, vaccinationCard: e.target.checked },
                 }))
               }
             />
             Carne de vacunacion
           </label>
         </div>
-        <button className="button" style={{ marginTop: 10 }}>Crear</button>
+        <button className="button" style={{ marginTop: 10 }}>
+          Crear
+        </button>
       </form>
       <form className="card" onSubmit={createEnrollment}>
         <div className="section-title">Matricular estudiante</div>
@@ -964,24 +1025,51 @@ export default function AdminAdmissions() {
             className="input"
             autoComplete="name"
             value={enrollmentForm.studentFullName}
-            onChange={(e) => setEnrollmentForm({ ...enrollmentForm, studentFullName: e.target.value })}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, studentFullName: e.target.value })
+            }
           />
         </label>
         <label>
           Fecha de nacimiento
-          <input className="input" type="date" value={enrollmentForm.studentBirthDate} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, studentBirthDate: e.target.value })} />
+          <input
+            className="input"
+            type="date"
+            value={enrollmentForm.studentBirthDate}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, studentBirthDate: e.target.value })
+            }
+          />
         </label>
         <label>
           Departamento de nacimiento
-          <input className="input" value={enrollmentForm.studentBirthPlaceDept} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, studentBirthPlaceDept: e.target.value })} />
+          <input
+            className="input"
+            value={enrollmentForm.studentBirthPlaceDept}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, studentBirthPlaceDept: e.target.value })
+            }
+          />
         </label>
         <label>
           Municipio de nacimiento
-          <input className="input" value={enrollmentForm.studentBirthPlaceCity} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, studentBirthPlaceCity: e.target.value })} />
+          <input
+            className="input"
+            value={enrollmentForm.studentBirthPlaceCity}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, studentBirthPlaceCity: e.target.value })
+            }
+          />
         </label>
         <label>
           Genero/sexo
-          <select className="input" value={enrollmentForm.studentGender} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, studentGender: e.target.value })}>
+          <select
+            className="input"
+            value={enrollmentForm.studentGender}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, studentGender: e.target.value })
+            }
+          >
             <option value="">Selecciona</option>
             <option value="MASCULINO">Masculino</option>
             <option value="FEMENINO">Femenino</option>
@@ -990,7 +1078,13 @@ export default function AdminAdmissions() {
         </label>
         <label>
           Tipo de documento
-          <select className="input" value={enrollmentForm.studentDocType} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, studentDocType: e.target.value })}>
+          <select
+            className="input"
+            value={enrollmentForm.studentDocType}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, studentDocType: e.target.value })
+            }
+          >
             <option value="">Selecciona</option>
             <option value="REGISTRO_CIVIL">Registro civil</option>
             <option value="TARJETA_IDENTIDAD">Tarjeta de identidad</option>
@@ -1000,13 +1094,27 @@ export default function AdminAdmissions() {
         </label>
         <label>
           Numero de documento
-          <input className="input" value={enrollmentForm.studentDocNumber} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, studentDocNumber: e.target.value })} />
+          <input
+            className="input"
+            value={enrollmentForm.studentDocNumber}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, studentDocNumber: e.target.value })
+            }
+          />
         </label>
         <label>
           Nivel/Grado
-          <select className="input" value={enrollmentForm.studentGradeLevel} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, studentGradeLevel: e.target.value })}>
+          <select
+            className="input"
+            value={enrollmentForm.studentGradeLevel}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, studentGradeLevel: e.target.value })
+            }
+          >
             {gradeOptions.map((g) => (
-              <option key={g.value} value={g.value}>{g.label}</option>
+              <option key={g.value} value={g.value}>
+                {g.label}
+              </option>
             ))}
           </select>
         </label>
@@ -1016,16 +1124,26 @@ export default function AdminAdmissions() {
             className="input"
             autoComplete="street-address"
             value={enrollmentForm.studentAddress}
-            onChange={(e) => setEnrollmentForm({ ...enrollmentForm, studentAddress: e.target.value })}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, studentAddress: e.target.value })
+            }
           />
         </label>
         <label>
           Ano
-          <input className="input" value={enrollmentForm.year} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, year: e.target.value })} />
+          <input
+            className="input"
+            value={enrollmentForm.year}
+            onChange={(e) => setEnrollmentForm({ ...enrollmentForm, year: e.target.value })}
+          />
         </label>
         <label>
           Estado
-          <input className="input" value={enrollmentForm.status} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, status: e.target.value })} />
+          <input
+            className="input"
+            value={enrollmentForm.status}
+            onChange={(e) => setEnrollmentForm({ ...enrollmentForm, status: e.target.value })}
+          />
         </label>
         <div style={{ fontWeight: 600, margin: "10px 0 6px" }}>Datos del acudiente</div>
         <label>
@@ -1034,12 +1152,20 @@ export default function AdminAdmissions() {
             className="input"
             autoComplete="name"
             value={enrollmentForm.guardianFullName}
-            onChange={(e) => setEnrollmentForm({ ...enrollmentForm, guardianFullName: e.target.value })}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, guardianFullName: e.target.value })
+            }
           />
         </label>
         <label>
           Tipo de documento
-          <select className="input" value={enrollmentForm.guardianDocType} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, guardianDocType: e.target.value })}>
+          <select
+            className="input"
+            value={enrollmentForm.guardianDocType}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, guardianDocType: e.target.value })
+            }
+          >
             <option value="">Selecciona</option>
             {guardianDocTypeOptions.map((item) => (
               <option key={item.value} value={item.value}>
@@ -1054,12 +1180,20 @@ export default function AdminAdmissions() {
             className="input"
             autoComplete="off"
             value={enrollmentForm.guardianDocNumber}
-            onChange={(e) => setEnrollmentForm({ ...enrollmentForm, guardianDocNumber: e.target.value })}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, guardianDocNumber: e.target.value })
+            }
           />
         </label>
         <label>
           Parentesco o rol
-          <select className="input" value={enrollmentForm.guardianRelation} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, guardianRelation: e.target.value })}>
+          <select
+            className="input"
+            value={enrollmentForm.guardianRelation}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, guardianRelation: e.target.value })
+            }
+          >
             <option value="">Selecciona</option>
             {guardianRelationOptions.map((item) => (
               <option key={item.value} value={item.value}>
@@ -1094,10 +1228,12 @@ export default function AdminAdmissions() {
             <input
               type="checkbox"
               checked={enrollmentForm.documents.civilRegistry}
-              onChange={(e) => setEnrollmentForm({
-                ...enrollmentForm,
-                documents: { ...enrollmentForm.documents, civilRegistry: e.target.checked }
-              })}
+              onChange={(e) =>
+                setEnrollmentForm({
+                  ...enrollmentForm,
+                  documents: { ...enrollmentForm.documents, civilRegistry: e.target.checked },
+                })
+              }
             />
             Registro civil o tarjeta de identidad
           </label>
@@ -1105,10 +1241,12 @@ export default function AdminAdmissions() {
             <input
               type="checkbox"
               checked={enrollmentForm.documents.guardianId}
-              onChange={(e) => setEnrollmentForm({
-                ...enrollmentForm,
-                documents: { ...enrollmentForm.documents, guardianId: e.target.checked }
-              })}
+              onChange={(e) =>
+                setEnrollmentForm({
+                  ...enrollmentForm,
+                  documents: { ...enrollmentForm.documents, guardianId: e.target.checked },
+                })
+              }
             />
             Documento del acudiente
           </label>
@@ -1116,10 +1254,12 @@ export default function AdminAdmissions() {
             <input
               type="checkbox"
               checked={enrollmentForm.documents.residenceProof}
-              onChange={(e) => setEnrollmentForm({
-                ...enrollmentForm,
-                documents: { ...enrollmentForm.documents, residenceProof: e.target.checked }
-              })}
+              onChange={(e) =>
+                setEnrollmentForm({
+                  ...enrollmentForm,
+                  documents: { ...enrollmentForm.documents, residenceProof: e.target.checked },
+                })
+              }
             />
             Soporte de residencia
           </label>
@@ -1127,10 +1267,12 @@ export default function AdminAdmissions() {
             <input
               type="checkbox"
               checked={enrollmentForm.documents.healthCertificate}
-              onChange={(e) => setEnrollmentForm({
-                ...enrollmentForm,
-                documents: { ...enrollmentForm.documents, healthCertificate: e.target.checked }
-              })}
+              onChange={(e) =>
+                setEnrollmentForm({
+                  ...enrollmentForm,
+                  documents: { ...enrollmentForm.documents, healthCertificate: e.target.checked },
+                })
+              }
             />
             Certificado de afiliacion a salud (EPS)
           </label>
@@ -1138,10 +1280,12 @@ export default function AdminAdmissions() {
             <input
               type="checkbox"
               checked={enrollmentForm.documents.vaccinationCard}
-              onChange={(e) => setEnrollmentForm({
-                ...enrollmentForm,
-                documents: { ...enrollmentForm.documents, vaccinationCard: e.target.checked }
-              })}
+              onChange={(e) =>
+                setEnrollmentForm({
+                  ...enrollmentForm,
+                  documents: { ...enrollmentForm.documents, vaccinationCard: e.target.checked },
+                })
+              }
             />
             Carne de vacunacion
           </label>
@@ -1149,19 +1293,31 @@ export default function AdminAdmissions() {
             <input
               type="checkbox"
               checked={enrollmentForm.documents.previousReport}
-              onChange={(e) => setEnrollmentForm({
-                ...enrollmentForm,
-                documents: { ...enrollmentForm.documents, previousReport: e.target.checked }
-              })}
+              onChange={(e) =>
+                setEnrollmentForm({
+                  ...enrollmentForm,
+                  documents: { ...enrollmentForm.documents, previousReport: e.target.checked },
+                })
+              }
             />
             Boletin o constancia anterior
           </label>
         </div>
         <label>
           Observaciones sobre documentos
-          <input className="input" value={enrollmentForm.documentsNotes} onChange={(e) => setEnrollmentForm({ ...enrollmentForm, documentsNotes: e.target.value })} />
+          <input
+            className="input"
+            value={enrollmentForm.documentsNotes}
+            onChange={(e) =>
+              setEnrollmentForm({ ...enrollmentForm, documentsNotes: e.target.value })
+            }
+          />
         </label>
-        <button className="button" style={{ marginTop: 10 }} disabled={enrollmentBusy || missingImportantEnrollmentFields.length > 0}>
+        <button
+          className="button"
+          style={{ marginTop: 10 }}
+          disabled={enrollmentBusy || missingImportantEnrollmentFields.length > 0}
+        >
           {enrollmentBusy ? "Matriculando..." : "Matricular"}
         </button>
         {missingImportantEnrollmentFields.length > 0 && (
@@ -1173,7 +1329,9 @@ export default function AdminAdmissions() {
       <div className="card" style={{ marginTop: 10 }}>
         <div className="section-title">Estudiantes aprobados para matricula</div>
         {approvedAdmissions.length === 0 ? (
-          <div style={{ color: "#64748b" }}>No hay estudiantes con admision aprobada pendientes por matricular.</div>
+          <div style={{ color: "#64748b" }}>
+            No hay estudiantes con admision aprobada pendientes por matricular.
+          </div>
         ) : (
           <div className="table-wrap">
             <table className="table">
@@ -1194,7 +1352,11 @@ export default function AdminAdmissions() {
                     <td>{adm.createdAt ? String(adm.createdAt).slice(0, 10) : "-"}</td>
                     <td>{adm.enrollmentDueAt ? String(adm.enrollmentDueAt).slice(0, 10) : "-"}</td>
                     <td>
-                      <button type="button" className="button secondary" onClick={() => applyApprovedAdmission(adm)}>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => applyApprovedAdmission(adm)}
+                      >
                         Usar en matricula
                       </button>
                     </td>
@@ -1241,21 +1403,51 @@ export default function AdminAdmissions() {
             <tbody>
               {enrollments.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="table-empty">No hay matriculas registradas</td>
+                  <td colSpan={6} className="table-empty">
+                    No hay matriculas registradas
+                  </td>
                 </tr>
               )}
               {enrollments.map((item) => (
                 <tr key={item.id}>
                   <td>{item.studentFullName}</td>
-                  <td><span className="tag">{gradeLabel(item.studentGradeLevel)}</span></td>
-                  <td><span className="tag">{item.student?.studentGroup || "-"}</span></td>
+                  <td>
+                    <span className="tag">{gradeLabel(item.studentGradeLevel)}</span>
+                  </td>
+                  <td>
+                    <span className="tag">{item.student?.studentGroup || "-"}</span>
+                  </td>
                   <td>{item.year}</td>
-                  <td><span className={`status-badge status-${String(item.status || "").toLowerCase()}`}>{item.status}</span></td>
+                  <td>
+                    <span
+                      className={`status-badge status-${String(item.status || "").toLowerCase()}`}
+                    >
+                      {item.status}
+                    </span>
+                  </td>
                   <td>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button type="button" className="button secondary" onClick={() => setSelectedEnrollment(item)}>Ver</button>
-                      <button type="button" className="button secondary" onClick={() => startEditEnrollment(item)}>Editar</button>
-                      <button type="button" className="button danger" onClick={() => removeEnrollment(item.id)}>Eliminar</button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => setSelectedEnrollment(item)}
+                      >
+                        Ver
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => startEditEnrollment(item)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="button danger"
+                        onClick={() => removeEnrollment(item.id)}
+                      >
+                        Eliminar
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1264,7 +1456,12 @@ export default function AdminAdmissions() {
           </table>
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-          <button className="button secondary" type="button" disabled={enrollmentsPage <= 1} onClick={() => setEnrollmentsPage(enrollmentsPage - 1)}>
+          <button
+            className="button secondary"
+            type="button"
+            disabled={enrollmentsPage <= 1}
+            onClick={() => setEnrollmentsPage(enrollmentsPage - 1)}
+          >
             Anterior
           </button>
           <div style={{ alignSelf: "center", color: "#6b7280" }}>
@@ -1282,53 +1479,88 @@ export default function AdminAdmissions() {
       </div>
       {selectedEnrollment && (
         <div className="card" style={{ marginTop: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <div className="section-title">Detalle de matricula</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" className="button secondary" onClick={() => startEditEnrollment(selectedEnrollment)}>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => startEditEnrollment(selectedEnrollment)}
+              >
                 Editar
               </button>
-              <button type="button" className="button secondary" onClick={() => setSelectedEnrollment(null)}>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => setSelectedEnrollment(null)}
+              >
                 Cerrar
               </button>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
             <div>
               <strong>Estudiante</strong>
               <div>{selectedEnrollment.studentFullName || "-"}</div>
               <div style={{ color: "#64748b" }}>
-                {selectedEnrollment.studentDocType || "Documento"}: {selectedEnrollment.studentDocNumber || "-"}
+                {selectedEnrollment.studentDocType || "Documento"}:{" "}
+                {selectedEnrollment.studentDocNumber || "-"}
               </div>
             </div>
             <div>
               <strong>Grado y clase</strong>
               <div>{gradeLabel(selectedEnrollment.studentGradeLevel)}</div>
               <div style={{ color: "#64748b" }}>
-                {selectedEnrollment.class?.teacher?.user?.fullName ? `Docente: ${selectedEnrollment.class.teacher.user.fullName}` : "Docente sin asignar"}
+                {selectedEnrollment.class?.teacher?.user?.fullName
+                  ? `Docente: ${selectedEnrollment.class.teacher.user.fullName}`
+                  : "Docente sin asignar"}
               </div>
             </div>
             <div>
               <strong>Matricula</strong>
               <div>Ano {selectedEnrollment.year || "-"}</div>
-              <div><span className={`status-badge status-${String(selectedEnrollment.status || "").toLowerCase()}`}>{selectedEnrollment.status || "-"}</span></div>
+              <div>
+                <span
+                  className={`status-badge status-${String(selectedEnrollment.status || "").toLowerCase()}`}
+                >
+                  {selectedEnrollment.status || "-"}
+                </span>
+              </div>
             </div>
             <div>
               <strong>Acudiente</strong>
               <div>{selectedEnrollment.guardianFullName || "-"}</div>
               <div style={{ color: "#64748b" }}>
-                {selectedEnrollment.guardianRelation || "Acudiente"} · {selectedEnrollment.contactPhone || "Sin telefono"}
+                {selectedEnrollment.guardianRelation || "Acudiente"} ·{" "}
+                {selectedEnrollment.contactPhone || "Sin telefono"}
               </div>
             </div>
             <div>
               <strong>Contacto</strong>
               <div>{selectedEnrollment.contactEmail || "Sin correo"}</div>
-              <div style={{ color: "#64748b" }}>{selectedEnrollment.studentAddress || "Sin direccion"}</div>
+              <div style={{ color: "#64748b" }}>
+                {selectedEnrollment.studentAddress || "Sin direccion"}
+              </div>
             </div>
             <div>
               <strong>Documentos</strong>
               <div style={{ color: "#64748b" }}>
-                {Object.values(selectedEnrollment.documents || {}).filter(Boolean).length} documento(s) marcado(s)
+                {Object.values(selectedEnrollment.documents || {}).filter(Boolean).length}{" "}
+                documento(s) marcado(s)
               </div>
               <div>{selectedEnrollment.documentsNotes || "Sin observaciones"}</div>
             </div>
@@ -1336,7 +1568,12 @@ export default function AdminAdmissions() {
         </div>
       )}
       {editingEnrollmentId && (
-        <form ref={editEnrollmentPanelRef} className="card" onSubmit={saveEnrollmentEdit} style={{ marginTop: 10 }}>
+        <form
+          ref={editEnrollmentPanelRef}
+          className="card"
+          onSubmit={saveEnrollmentEdit}
+          style={{ marginTop: 10 }}
+        >
           <div className="section-title">Editar matricula</div>
           <ActionFeedback
             tone="success"
@@ -1357,7 +1594,12 @@ export default function AdminAdmissions() {
               className="input"
               autoComplete="name"
               value={editingEnrollmentForm.studentFullName}
-              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, studentFullName: e.target.value })}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  studentFullName: e.target.value,
+                })
+              }
             />
           </label>
           <label>
@@ -1366,7 +1608,12 @@ export default function AdminAdmissions() {
               className="input"
               type="date"
               value={editingEnrollmentForm.studentBirthDate}
-              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, studentBirthDate: e.target.value })}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  studentBirthDate: e.target.value,
+                })
+              }
             />
           </label>
           <label>
@@ -1374,7 +1621,12 @@ export default function AdminAdmissions() {
             <input
               className="input"
               value={editingEnrollmentForm.studentBirthPlaceDept}
-              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, studentBirthPlaceDept: e.target.value })}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  studentBirthPlaceDept: e.target.value,
+                })
+              }
             />
           </label>
           <label>
@@ -1382,12 +1634,26 @@ export default function AdminAdmissions() {
             <input
               className="input"
               value={editingEnrollmentForm.studentBirthPlaceCity}
-              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, studentBirthPlaceCity: e.target.value })}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  studentBirthPlaceCity: e.target.value,
+                })
+              }
             />
           </label>
           <label>
             Genero/sexo
-            <select className="input" value={editingEnrollmentForm.studentGender} onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, studentGender: e.target.value })}>
+            <select
+              className="input"
+              value={editingEnrollmentForm.studentGender}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  studentGender: e.target.value,
+                })
+              }
+            >
               <option value="">Selecciona</option>
               <option value="MASCULINO">Masculino</option>
               <option value="FEMENINO">Femenino</option>
@@ -1396,7 +1662,16 @@ export default function AdminAdmissions() {
           </label>
           <label>
             Tipo documento estudiante
-            <select className="input" value={editingEnrollmentForm.studentDocType} onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, studentDocType: e.target.value })}>
+            <select
+              className="input"
+              value={editingEnrollmentForm.studentDocType}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  studentDocType: e.target.value,
+                })
+              }
+            >
               <option value="">Selecciona</option>
               <option value="RC">Registro Civil</option>
               <option value="TI">Tarjeta de Identidad</option>
@@ -1407,13 +1682,33 @@ export default function AdminAdmissions() {
           </label>
           <label>
             Numero documento estudiante
-            <input className="input" value={editingEnrollmentForm.studentDocNumber} onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, studentDocNumber: e.target.value })} />
+            <input
+              className="input"
+              value={editingEnrollmentForm.studentDocNumber}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  studentDocNumber: e.target.value,
+                })
+              }
+            />
           </label>
           <label>
             Grado
-            <select className="input" value={editingEnrollmentForm.studentGradeLevel} onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, studentGradeLevel: e.target.value })}>
+            <select
+              className="input"
+              value={editingEnrollmentForm.studentGradeLevel}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  studentGradeLevel: e.target.value,
+                })
+              }
+            >
               {gradeOptions.map((g) => (
-                <option key={g.value} value={g.value}>{g.label}</option>
+                <option key={g.value} value={g.value}>
+                  {g.label}
+                </option>
               ))}
             </select>
           </label>
@@ -1422,25 +1717,44 @@ export default function AdminAdmissions() {
             <select
               className="input"
               value={editingEnrollmentForm.classId}
-              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, classId: e.target.value })}
+              onChange={(e) =>
+                setEditingEnrollmentForm({ ...editingEnrollmentForm, classId: e.target.value })
+              }
             >
               <option value="">Selecciona una clase</option>
               {classes
-                .filter((cls) => !editingEnrollmentForm.studentGradeLevel || getClassGradeLevel(cls) === editingEnrollmentForm.studentGradeLevel)
+                .filter(
+                  (cls) =>
+                    !editingEnrollmentForm.studentGradeLevel ||
+                    getClassGradeLevel(cls) === editingEnrollmentForm.studentGradeLevel
+                )
                 .map((cls) => (
                   <option key={cls.id} value={cls.id}>
-                    {gradeLabel(cls.gradeLevel)}{cls.teacher?.user?.fullName ? ` - ${cls.teacher.user.fullName}` : ""}
+                    {gradeLabel(cls.gradeLevel)}
+                    {cls.teacher?.user?.fullName ? ` - ${cls.teacher.user.fullName}` : ""}
                   </option>
                 ))}
             </select>
           </label>
           <label>
             Ano
-            <input className="input" value={editingEnrollmentForm.year} onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, year: e.target.value })} />
+            <input
+              className="input"
+              value={editingEnrollmentForm.year}
+              onChange={(e) =>
+                setEditingEnrollmentForm({ ...editingEnrollmentForm, year: e.target.value })
+              }
+            />
           </label>
           <label>
             Estado
-            <input className="input" value={editingEnrollmentForm.status} onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, status: e.target.value })} />
+            <input
+              className="input"
+              value={editingEnrollmentForm.status}
+              onChange={(e) =>
+                setEditingEnrollmentForm({ ...editingEnrollmentForm, status: e.target.value })
+              }
+            />
           </label>
           <label>
             Direccion
@@ -1448,7 +1762,12 @@ export default function AdminAdmissions() {
               className="input"
               autoComplete="street-address"
               value={editingEnrollmentForm.studentAddress}
-              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, studentAddress: e.target.value })}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  studentAddress: e.target.value,
+                })
+              }
             />
           </label>
           <label>
@@ -1457,12 +1776,26 @@ export default function AdminAdmissions() {
               className="input"
               autoComplete="name"
               value={editingEnrollmentForm.guardianFullName}
-              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, guardianFullName: e.target.value })}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  guardianFullName: e.target.value,
+                })
+              }
             />
           </label>
           <label>
             Tipo documento acudiente
-            <select className="input" value={editingEnrollmentForm.guardianDocType} onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, guardianDocType: e.target.value })}>
+            <select
+              className="input"
+              value={editingEnrollmentForm.guardianDocType}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  guardianDocType: e.target.value,
+                })
+              }
+            >
               <option value="">Selecciona</option>
               {guardianDocTypeOptions.map((item) => (
                 <option key={item.value} value={item.value}>
@@ -1473,11 +1806,29 @@ export default function AdminAdmissions() {
           </label>
           <label>
             Documento acudiente
-            <input className="input" value={editingEnrollmentForm.guardianDocNumber} onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, guardianDocNumber: e.target.value })} />
+            <input
+              className="input"
+              value={editingEnrollmentForm.guardianDocNumber}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  guardianDocNumber: e.target.value,
+                })
+              }
+            />
           </label>
           <label>
             Parentesco
-            <select className="input" value={editingEnrollmentForm.guardianRelation} onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, guardianRelation: e.target.value })}>
+            <select
+              className="input"
+              value={editingEnrollmentForm.guardianRelation}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  guardianRelation: e.target.value,
+                })
+              }
+            >
               <option value="">Selecciona</option>
               {guardianRelationOptions.map((item) => (
                 <option key={item.value} value={item.value}>
@@ -1492,7 +1843,9 @@ export default function AdminAdmissions() {
               className="input"
               autoComplete="tel"
               value={editingEnrollmentForm.contactPhone}
-              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, contactPhone: e.target.value })}
+              onChange={(e) =>
+                setEditingEnrollmentForm({ ...editingEnrollmentForm, contactPhone: e.target.value })
+              }
             />
           </label>
           <label>
@@ -1502,7 +1855,9 @@ export default function AdminAdmissions() {
               autoComplete="email"
               type="email"
               value={editingEnrollmentForm.contactEmail}
-              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, contactEmail: e.target.value })}
+              onChange={(e) =>
+                setEditingEnrollmentForm({ ...editingEnrollmentForm, contactEmail: e.target.value })
+              }
             />
           </label>
           <div style={{ fontWeight: 600, margin: "10px 0 6px" }}>Documentos (opcionales)</div>
@@ -1511,10 +1866,15 @@ export default function AdminAdmissions() {
               <input
                 type="checkbox"
                 checked={editingEnrollmentForm.documents.civilRegistry}
-                onChange={(e) => setEditingEnrollmentForm({
-                  ...editingEnrollmentForm,
-                  documents: { ...editingEnrollmentForm.documents, civilRegistry: e.target.checked }
-                })}
+                onChange={(e) =>
+                  setEditingEnrollmentForm({
+                    ...editingEnrollmentForm,
+                    documents: {
+                      ...editingEnrollmentForm.documents,
+                      civilRegistry: e.target.checked,
+                    },
+                  })
+                }
               />
               Registro civil o tarjeta de identidad
             </label>
@@ -1522,10 +1882,12 @@ export default function AdminAdmissions() {
               <input
                 type="checkbox"
                 checked={editingEnrollmentForm.documents.guardianId}
-                onChange={(e) => setEditingEnrollmentForm({
-                  ...editingEnrollmentForm,
-                  documents: { ...editingEnrollmentForm.documents, guardianId: e.target.checked }
-                })}
+                onChange={(e) =>
+                  setEditingEnrollmentForm({
+                    ...editingEnrollmentForm,
+                    documents: { ...editingEnrollmentForm.documents, guardianId: e.target.checked },
+                  })
+                }
               />
               Documento del acudiente
             </label>
@@ -1533,10 +1895,15 @@ export default function AdminAdmissions() {
               <input
                 type="checkbox"
                 checked={editingEnrollmentForm.documents.residenceProof}
-                onChange={(e) => setEditingEnrollmentForm({
-                  ...editingEnrollmentForm,
-                  documents: { ...editingEnrollmentForm.documents, residenceProof: e.target.checked }
-                })}
+                onChange={(e) =>
+                  setEditingEnrollmentForm({
+                    ...editingEnrollmentForm,
+                    documents: {
+                      ...editingEnrollmentForm.documents,
+                      residenceProof: e.target.checked,
+                    },
+                  })
+                }
               />
               Soporte de residencia
             </label>
@@ -1544,10 +1911,15 @@ export default function AdminAdmissions() {
               <input
                 type="checkbox"
                 checked={editingEnrollmentForm.documents.healthCertificate}
-                onChange={(e) => setEditingEnrollmentForm({
-                  ...editingEnrollmentForm,
-                  documents: { ...editingEnrollmentForm.documents, healthCertificate: e.target.checked }
-                })}
+                onChange={(e) =>
+                  setEditingEnrollmentForm({
+                    ...editingEnrollmentForm,
+                    documents: {
+                      ...editingEnrollmentForm.documents,
+                      healthCertificate: e.target.checked,
+                    },
+                  })
+                }
               />
               Certificado de afiliacion a salud (EPS)
             </label>
@@ -1555,10 +1927,15 @@ export default function AdminAdmissions() {
               <input
                 type="checkbox"
                 checked={editingEnrollmentForm.documents.vaccinationCard}
-                onChange={(e) => setEditingEnrollmentForm({
-                  ...editingEnrollmentForm,
-                  documents: { ...editingEnrollmentForm.documents, vaccinationCard: e.target.checked }
-                })}
+                onChange={(e) =>
+                  setEditingEnrollmentForm({
+                    ...editingEnrollmentForm,
+                    documents: {
+                      ...editingEnrollmentForm.documents,
+                      vaccinationCard: e.target.checked,
+                    },
+                  })
+                }
               />
               Carne de vacunacion
             </label>
@@ -1566,10 +1943,15 @@ export default function AdminAdmissions() {
               <input
                 type="checkbox"
                 checked={editingEnrollmentForm.documents.previousReport}
-                onChange={(e) => setEditingEnrollmentForm({
-                  ...editingEnrollmentForm,
-                  documents: { ...editingEnrollmentForm.documents, previousReport: e.target.checked }
-                })}
+                onChange={(e) =>
+                  setEditingEnrollmentForm({
+                    ...editingEnrollmentForm,
+                    documents: {
+                      ...editingEnrollmentForm.documents,
+                      previousReport: e.target.checked,
+                    },
+                  })
+                }
               />
               Boletin o constancia anterior
             </label>
@@ -1579,7 +1961,12 @@ export default function AdminAdmissions() {
             <input
               className="input"
               value={editingEnrollmentForm.documentsNotes}
-              onChange={(e) => setEditingEnrollmentForm({ ...editingEnrollmentForm, documentsNotes: e.target.value })}
+              onChange={(e) =>
+                setEditingEnrollmentForm({
+                  ...editingEnrollmentForm,
+                  documentsNotes: e.target.value,
+                })
+              }
             />
           </label>
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -1611,25 +1998,47 @@ export default function AdminAdmissions() {
             setPage(1);
           }}
         />
-        <select className="input" value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)}>
+        <select
+          className="input"
+          value={gradeFilter}
+          onChange={(e) => setGradeFilter(e.target.value)}
+        >
           <option value="">Todos los niveles</option>
           {gradeOptions.map((g) => (
-            <option key={g.value} value={g.value}>{g.label}</option>
+            <option key={g.value} value={g.value}>
+              {g.label}
+            </option>
           ))}
         </select>
-        <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <select
+          className="input"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
           <option value="">Todos los estados</option>
           <option value="PENDING">Pendiente</option>
           <option value="APPROVED">Aprobado</option>
           <option value="REJECTED">Rechazado</option>
         </select>
-        <button className="button secondary" type="button" onClick={() => downloadFile("/admissions/export/excel", "admissions-report.xlsx")}>
+        <button
+          className="button secondary"
+          type="button"
+          onClick={() => downloadFile("/admissions/export/excel", "admissions-report.xlsx")}
+        >
           Exportar Excel
         </button>
-        <button className="button secondary" type="button" onClick={() => downloadFile("/admissions/export/pdf", "admissions.pdf")}>
+        <button
+          className="button secondary"
+          type="button"
+          onClick={() => downloadFile("/admissions/export/pdf", "admissions.pdf")}
+        >
           Exportar PDF
         </button>
-        <button className="button secondary" type="button" onClick={() => downloadFile("/enrollments/export/pdf", "matriculas-estudiantes.pdf")}>
+        <button
+          className="button secondary"
+          type="button"
+          onClick={() => downloadFile("/enrollments/export/pdf", "matriculas-estudiantes.pdf")}
+        >
           Exportar matriculas PDF
         </button>
       </div>
@@ -1643,13 +2052,24 @@ export default function AdminAdmissions() {
         <button className="button secondary" type="button" onClick={saveCurrentFilter}>
           Guardar filtro
         </button>
-        <select className="input" value={selectedFilterId} onChange={(e) => applySavedFilter(e.target.value)}>
+        <select
+          className="input"
+          value={selectedFilterId}
+          onChange={(e) => applySavedFilter(e.target.value)}
+        >
           <option value="">Filtros guardados</option>
           {savedFilters.map((f) => (
-            <option key={f.id} value={f.id}>{f.name}</option>
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
           ))}
         </select>
-        <button className="button secondary" type="button" disabled={!selectedFilterId} onClick={deleteSavedFilter}>
+        <button
+          className="button secondary"
+          type="button"
+          disabled={!selectedFilterId}
+          onClick={deleteSavedFilter}
+        >
           Eliminar filtro
         </button>
       </div>
@@ -1666,41 +2086,48 @@ export default function AdminAdmissions() {
           { key: "grade", label: "Nivel" },
           { key: "status", label: "Estado" },
           { key: "due", label: "Vence aprobacion" },
-          { key: "days", label: "Dias para aprobar" }
+          { key: "days", label: "Dias para aprobar" },
         ]}
         rows={[...admissions]
           .sort((a, b) => {
-            const aDue = a.status === "PENDING" ? (getApprovalDueDate(a.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
-            const bDue = b.status === "PENDING" ? (getApprovalDueDate(b.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+            const aDue =
+              a.status === "PENDING"
+                ? (getApprovalDueDate(a.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY)
+                : Number.POSITIVE_INFINITY;
+            const bDue =
+              b.status === "PENDING"
+                ? (getApprovalDueDate(b.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY)
+                : Number.POSITIVE_INFINITY;
             return aDue - bDue;
           })
           .map((a) => ({
-          student: a.studentName,
-          grade: gradeLabel(a.gradeLevel),
-          status: a.status,
-          due: (() => {
-            if (a.status !== "PENDING") return "-";
-            const dueDate = getApprovalDueDate(a.createdAt);
-            if (!dueDate) return "-";
-            const diffDays = getRemainingDays(dueDate.toISOString()) ?? 0;
-            const className = diffDays < 0 ? "due-overdue" : diffDays <= 2 ? "due-soon" : "due-ok";
-            return (
-              <span className={className}>
-                {diffDays < 0 ? <span className="due-alert">!</span> : null}
-                {dueDate.toISOString().slice(0, 10)}
-              </span>
-            );
-          })(),
-          days: (() => {
-            if (a.status !== "PENDING") return "-";
-            const dueDate = getApprovalDueDate(a.createdAt);
-            if (!dueDate) return "-";
-            const diffDays = getRemainingDays(dueDate.toISOString()) ?? 0;
-            if (diffDays < 0) return <span className="due-overdue">Vencida</span>;
-            const className = diffDays <= 2 ? "due-soon" : "due-ok";
-            return <span className={className}>{diffDays}</span>;
-          })()
-        }))}
+            student: a.studentName,
+            grade: gradeLabel(a.gradeLevel),
+            status: a.status,
+            due: (() => {
+              if (a.status !== "PENDING") return "-";
+              const dueDate = getApprovalDueDate(a.createdAt);
+              if (!dueDate) return "-";
+              const diffDays = getRemainingDays(dueDate.toISOString()) ?? 0;
+              const className =
+                diffDays < 0 ? "due-overdue" : diffDays <= 2 ? "due-soon" : "due-ok";
+              return (
+                <span className={className}>
+                  {diffDays < 0 ? <span className="due-alert">!</span> : null}
+                  {dueDate.toISOString().slice(0, 10)}
+                </span>
+              );
+            })(),
+            days: (() => {
+              if (a.status !== "PENDING") return "-";
+              const dueDate = getApprovalDueDate(a.createdAt);
+              if (!dueDate) return "-";
+              const diffDays = getRemainingDays(dueDate.toISOString()) ?? 0;
+              if (diffDays < 0) return <span className="due-overdue">Vencida</span>;
+              const className = diffDays <= 2 ? "due-soon" : "due-ok";
+              return <span className={className}>{diffDays}</span>;
+            })(),
+          }))}
       />
       {editingId && (
         <form ref={editPanelRef} className="card" onSubmit={saveEdit} style={{ marginTop: 10 }}>
@@ -1728,15 +2155,25 @@ export default function AdminAdmissions() {
           </label>
           <label>
             Nivel
-            <select className="input" value={editingForm.gradeLevel} onChange={(e) => setEditingForm({ ...editingForm, gradeLevel: e.target.value })}>
+            <select
+              className="input"
+              value={editingForm.gradeLevel}
+              onChange={(e) => setEditingForm({ ...editingForm, gradeLevel: e.target.value })}
+            >
               {gradeOptions.map((g) => (
-                <option key={g.value} value={g.value}>{g.label}</option>
+                <option key={g.value} value={g.value}>
+                  {g.label}
+                </option>
               ))}
             </select>
           </label>
           <label>
             Notas
-            <input className="input" value={editingForm.notes} onChange={(e) => setEditingForm({ ...editingForm, notes: e.target.value })} />
+            <input
+              className="input"
+              value={editingForm.notes}
+              onChange={(e) => setEditingForm({ ...editingForm, notes: e.target.value })}
+            />
           </label>
           <div style={{ fontWeight: 600, margin: "10px 0 6px" }}>Documentos de admision</div>
           <div style={{ display: "grid", gap: 6 }}>
@@ -1747,7 +2184,7 @@ export default function AdminAdmissions() {
                 onChange={(e) =>
                   setEditingForm((prev) => ({
                     ...prev,
-                    documents: { ...prev.documents, studentIdentity: e.target.checked }
+                    documents: { ...prev.documents, studentIdentity: e.target.checked },
                   }))
                 }
               />
@@ -1760,7 +2197,7 @@ export default function AdminAdmissions() {
                 onChange={(e) =>
                   setEditingForm((prev) => ({
                     ...prev,
-                    documents: { ...prev.documents, parentsIds: e.target.checked }
+                    documents: { ...prev.documents, parentsIds: e.target.checked },
                   }))
                 }
               />
@@ -1773,7 +2210,7 @@ export default function AdminAdmissions() {
                 onChange={(e) =>
                   setEditingForm((prev) => ({
                     ...prev,
-                    documents: { ...prev.documents, recentReportCards: e.target.checked }
+                    documents: { ...prev.documents, recentReportCards: e.target.checked },
                   }))
                 }
               />
@@ -1786,7 +2223,7 @@ export default function AdminAdmissions() {
                 onChange={(e) =>
                   setEditingForm((prev) => ({
                     ...prev,
-                    documents: { ...prev.documents, previousSchoolCertificates: e.target.checked }
+                    documents: { ...prev.documents, previousSchoolCertificates: e.target.checked },
                   }))
                 }
               />
@@ -1799,7 +2236,7 @@ export default function AdminAdmissions() {
                 onChange={(e) =>
                   setEditingForm((prev) => ({
                     ...prev,
-                    documents: { ...prev.documents, addressProof: e.target.checked }
+                    documents: { ...prev.documents, addressProof: e.target.checked },
                   }))
                 }
               />
@@ -1812,7 +2249,7 @@ export default function AdminAdmissions() {
                 onChange={(e) =>
                   setEditingForm((prev) => ({
                     ...prev,
-                    documents: { ...prev.documents, vaccinationCard: e.target.checked }
+                    documents: { ...prev.documents, vaccinationCard: e.target.checked },
                   }))
                 }
               />
@@ -1820,7 +2257,9 @@ export default function AdminAdmissions() {
             </label>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button className="button" disabled={editingBusy}>{editingBusy ? "Guardando..." : "Guardar cambios"}</button>
+            <button className="button" disabled={editingBusy}>
+              {editingBusy ? "Guardando..." : "Guardar cambios"}
+            </button>
             <button
               type="button"
               className="button secondary"
@@ -1837,12 +2276,30 @@ export default function AdminAdmissions() {
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
         {admissions.map((a) => (
-          <div key={a.id} className="card" style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", padding: 12 }}>
+          <div
+            key={a.id}
+            className="card"
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: 12,
+            }}
+          >
             <div style={{ color: "#6b7280" }}>{a.studentName}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "stretch" }}>
-              <button className="button secondary" onClick={() => startEdit(a)}>Editar</button>
-              <button className="button secondary" onClick={() => setStatus(a.id, "APPROVED")}>Aprobar</button>
-              <button className="button danger" onClick={() => setStatus(a.id, "REJECTED")}>Rechazar</button>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "stretch" }}
+            >
+              <button className="button secondary" onClick={() => startEdit(a)}>
+                Editar
+              </button>
+              <button className="button secondary" onClick={() => setStatus(a.id, "APPROVED")}>
+                Aprobar
+              </button>
+              <button className="button danger" onClick={() => setStatus(a.id, "REJECTED")}>
+                Rechazar
+              </button>
             </div>
           </div>
         ))}
@@ -1854,11 +2311,14 @@ export default function AdminAdmissions() {
         <div style={{ alignSelf: "center", color: "#6b7280" }}>
           Pagina {page} de {Math.max(1, Math.ceil(total / 10))}
         </div>
-        <button className="button secondary" disabled={page >= Math.ceil(total / 10)} onClick={() => setPage(page + 1)}>
+        <button
+          className="button secondary"
+          disabled={page >= Math.ceil(total / 10)}
+          onClick={() => setPage(page + 1)}
+        >
           Siguiente
         </button>
       </div>
     </Section>
   );
 }
-

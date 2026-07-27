@@ -14,15 +14,11 @@ function hasFlag(name) {
 }
 
 function detectContainerId(composeFile) {
-  const output = execFileSync(
-    "docker",
-    ["compose", "-f", composeFile, "ps", "-q", "db"],
-    { encoding: "utf8" }
-  ).trim();
+  const output = execFileSync("docker", ["compose", "-f", composeFile, "ps", "-q", "db"], {
+    encoding: "utf8",
+  }).trim();
   if (!output) {
-    throw new Error(
-      "No se pudo detectar el contenedor de DB. Ejecuta: npm run infra:up"
-    );
+    throw new Error("No se pudo detectar el contenedor de DB. Ejecuta: npm run infra:up");
   }
   return output;
 }
@@ -30,7 +26,12 @@ function detectContainerId(composeFile) {
 function latestBackup(outputDir) {
   const files = fs
     .readdirSync(outputDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.startsWith("school-platform-backup-") && entry.name.endsWith(".sql"))
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.startsWith("school-platform-backup-") &&
+        entry.name.endsWith(".sql")
+    )
     .map((entry) => path.join(outputDir, entry.name))
     .sort();
   return files.length ? files[files.length - 1] : "";
@@ -38,7 +39,9 @@ function latestBackup(outputDir) {
 
 async function restoreFromFile({ containerId, dbUser, dbName, filePath, dryRun }) {
   if (dryRun) {
-    console.log(`[dry-run] docker exec -i ${containerId} psql -v ON_ERROR_STOP=1 -U ${dbUser} -d ${dbName} < ${filePath}`);
+    console.log(
+      `[dry-run] docker exec -i ${containerId} psql -v ON_ERROR_STOP=1 -U ${dbUser} -d ${dbName} < ${filePath}`
+    );
     return;
   }
 
@@ -46,18 +49,7 @@ async function restoreFromFile({ containerId, dbUser, dbName, filePath, dryRun }
     const input = fs.createReadStream(filePath, { encoding: "utf8" });
     const child = spawn(
       "docker",
-      [
-        "exec",
-        "-i",
-        containerId,
-        "psql",
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-U",
-        dbUser,
-        "-d",
-        dbName
-      ],
+      ["exec", "-i", containerId, "psql", "-v", "ON_ERROR_STOP=1", "-U", dbUser, "-d", dbName],
       { stdio: ["pipe", "inherit", "pipe"] }
     );
 
@@ -104,7 +96,11 @@ async function main() {
   const containerId = explicitContainer || detectContainerId(composeFile);
   await restoreFromFile({ containerId, dbUser, dbName, filePath, dryRun });
 
-  console.log(dryRun ? `[dry-run] restore listo (simulado) desde: ${filePath}` : `Restore completado desde: ${filePath}`);
+  console.log(
+    dryRun
+      ? `[dry-run] restore listo (simulado) desde: ${filePath}`
+      : `Restore completado desde: ${filePath}`
+  );
 }
 
 main().catch((error) => {

@@ -22,7 +22,9 @@ export default function FilterBar({ filters }: Props) {
           </select>
         </label>
       ))}
-      <button className="button" type="button">Aplicar</button>
+      <button className="button" type="button">
+        Aplicar
+      </button>
     </div>
   );
 }

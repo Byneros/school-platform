@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+
 import ActionFeedback from "../components/ActionFeedback";
-import Section from "../components/Section";
-import DataTable from "../components/DataTable";
 import Autocomplete from "../components/Autocomplete";
+import DataTable from "../components/DataTable";
+import Section from "../components/Section";
+import useSuggestions from "../hooks/useSuggestions";
 import { apiDownload, apiGet, apiPost, apiPut } from "../services/api";
 import { gradeLabel, gradeOptions } from "../services/grades";
-import useSuggestions from "../hooks/useSuggestions";
 import { feedbackTitles } from "../utils/feedback";
 
 export default function AdminAcademicClosure() {
@@ -30,7 +31,7 @@ export default function AdminAcademicClosure() {
 
   const searchOptions = useSuggestions({
     endpoint: "/suggestions?type=academic-closure",
-    query: search
+    query: search,
   });
 
   const query = useMemo(
@@ -42,7 +43,7 @@ export default function AdminAcademicClosure() {
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(gradeFilter ? { gradeLevel: gradeFilter } : {}),
         ...(groupFilter ? { group: groupFilter } : {}),
-        ...(search ? { search } : {})
+        ...(search ? { search } : {}),
       }).toString(),
     [year, page, statusFilter, gradeFilter, groupFilter, search]
   );
@@ -115,11 +116,13 @@ export default function AdminAcademicClosure() {
     try {
       const res = await apiPut("/academic-closure/settings", {
         minAverage: Number(minAverageRule),
-        maxFailedSubjects: Number(maxFailedRule)
+        maxFailedSubjects: Number(maxFailedRule),
       });
       setMinAverageRule(String(res.minAverage));
       setMaxFailedRule(String(res.maxFailedSubjects));
-      setMessage(`Reglas guardadas: promedio >= ${res.minAverage}, reprobadas <= ${res.maxFailedSubjects}.`);
+      setMessage(
+        `Reglas guardadas: promedio >= ${res.minAverage}, reprobadas <= ${res.maxFailedSubjects}.`
+      );
       setHistoryPage(1);
       loadHistory();
     } catch (e: any) {
@@ -150,11 +153,17 @@ export default function AdminAcademicClosure() {
   };
 
   const download = async (type: "excel" | "pdf") => {
-    const blob = await apiDownload(`/academic-closure/export/${type}?${query.replace(/(^|&)page=[^&]*/g, "").replace(/(^|&)pageSize=[^&]*/g, "").replace(/^&/, "")}`);
+    const blob = await apiDownload(
+      `/academic-closure/export/${type}?${query
+        .replace(/(^|&)page=[^&]*/g, "")
+        .replace(/(^|&)pageSize=[^&]*/g, "")
+        .replace(/^&/, "")}`
+    );
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = type === "excel" ? `cierre-academico-${year}.xlsx` : `cierre-academico-${year}.pdf`;
+    a.download =
+      type === "excel" ? `cierre-academico-${year}.xlsx` : `cierre-academico-${year}.pdf`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -167,8 +176,17 @@ export default function AdminAcademicClosure() {
         Ejecuta el cierre por ano y consolida estado final: PROMOTED, NOT_PROMOTED o PENDING.
       </div>
       <div className="card">
-        <div className="section-title" style={{ marginBottom: 8 }}>Reglas de promocion</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(110px, 1fr))", gap: 8, marginBottom: 8 }}>
+        <div className="section-title" style={{ marginBottom: 8 }}>
+          Reglas de promocion
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(110px, 1fr))",
+            gap: 8,
+            marginBottom: 8,
+          }}
+        >
           <input
             className="input"
             type="number"
@@ -187,21 +205,49 @@ export default function AdminAcademicClosure() {
             onChange={(e) => setMaxFailedRule(e.target.value)}
             placeholder="Max reprobadas"
           />
-          <button className="button secondary" type="button" onClick={saveRules} disabled={rulesBusy}>
+          <button
+            className="button secondary"
+            type="button"
+            onClick={saveRules}
+            disabled={rulesBusy}
+          >
             {rulesBusy ? "Guardando..." : "Guardar reglas"}
           </button>
         </div>
 
-        <div className="section-title" style={{ marginBottom: 8 }}>Ejecucion de cierre</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(110px, 1fr))", gap: 8 }}>
-          <input className="input" value={year} onChange={(e) => setYear(e.target.value)} placeholder="Ano" />
-          <select className="input" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+        <div className="section-title" style={{ marginBottom: 8 }}>
+          Ejecucion de cierre
+        </div>
+        <div
+          style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(110px, 1fr))", gap: 8 }}
+        >
+          <input
+            className="input"
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+            placeholder="Ano"
+          />
+          <select
+            className="input"
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+          >
             <option value="">Todos los estados</option>
             <option value="PROMOTED">PROMOTED</option>
             <option value="NOT_PROMOTED">NOT_PROMOTED</option>
             <option value="PENDING">PENDING</option>
           </select>
-          <select className="input" value={gradeFilter} onChange={(e) => { setGradeFilter(e.target.value); setPage(1); }}>
+          <select
+            className="input"
+            value={gradeFilter}
+            onChange={(e) => {
+              setGradeFilter(e.target.value);
+              setPage(1);
+            }}
+          >
             <option value="">Todos los grados</option>
             {gradeOptions.map((g) => (
               <option key={g.value} value={g.value}>
@@ -209,7 +255,15 @@ export default function AdminAcademicClosure() {
               </option>
             ))}
           </select>
-          <input className="input" placeholder="Grupo" value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setPage(1); }} />
+          <input
+            className="input"
+            placeholder="Grupo"
+            value={groupFilter}
+            onChange={(e) => {
+              setGroupFilter(e.target.value);
+              setPage(1);
+            }}
+          />
           <Autocomplete
             className="input"
             placeholder="Buscar estudiante"
@@ -220,11 +274,17 @@ export default function AdminAcademicClosure() {
               setPage(1);
             }}
           />
-          <button className="button" type="button" onClick={runClosure}>Ejecutar cierre</button>
+          <button className="button" type="button" onClick={runClosure}>
+            Ejecutar cierre
+          </button>
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <button className="button secondary" type="button" onClick={() => download("excel")}>Exportar Excel</button>
-          <button className="button secondary" type="button" onClick={() => download("pdf")}>Exportar PDF</button>
+          <button className="button secondary" type="button" onClick={() => download("excel")}>
+            Exportar Excel
+          </button>
+          <button className="button secondary" type="button" onClick={() => download("pdf")}>
+            Exportar PDF
+          </button>
         </div>
         <ActionFeedback
           tone="success"
@@ -252,31 +312,53 @@ export default function AdminAcademicClosure() {
           { key: "failedSubjects", label: "Reprobadas" },
           { key: "status", label: "Estado final" },
           { key: "closedBy", label: "Cerrado por" },
-          { key: "closedAt", label: "Fecha cierre" }
+          { key: "closedAt", label: "Fecha cierre" },
         ]}
         rows={
           loading
-            ? [{ student: "Cargando...", grade: "", group: "", finalAverage: "", totalSubjects: "", failedSubjects: "", status: "", closedBy: "", closedAt: "" }]
+            ? [
+                {
+                  student: "Cargando...",
+                  grade: "",
+                  group: "",
+                  finalAverage: "",
+                  totalSubjects: "",
+                  failedSubjects: "",
+                  status: "",
+                  closedBy: "",
+                  closedAt: "",
+                },
+              ]
             : rows.map((r) => ({
                 student: r.enrollment?.student?.fullName || r.enrollment?.studentFullName || "-",
-                grade: r.enrollment?.class?.gradeLevel ? gradeLabel(r.enrollment.class.gradeLevel) : "-",
+                grade: r.enrollment?.class?.gradeLevel
+                  ? gradeLabel(r.enrollment.class.gradeLevel)
+                  : "-",
                 group: r.enrollment?.student?.studentGroup || "-",
                 finalAverage: Number(r.finalAverage || 0).toFixed(2),
                 totalSubjects: r.totalSubjects,
                 failedSubjects: r.failedSubjects,
                 status: r.status,
                 closedBy: r.closedBy?.fullName || "-",
-                closedAt: String(r.closedAt || "").slice(0, 10)
+                closedAt: String(r.closedAt || "").slice(0, 10),
               }))
         }
       />
 
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-        <button className="button secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>Anterior</button>
+        <button className="button secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+          Anterior
+        </button>
         <div style={{ alignSelf: "center", color: "#6b7280" }}>
           Pagina {page} de {Math.max(1, Math.ceil(total / 10))}
         </div>
-        <button className="button secondary" disabled={page >= Math.ceil(total / 10)} onClick={() => setPage(page + 1)}>Siguiente</button>
+        <button
+          className="button secondary"
+          disabled={page >= Math.ceil(total / 10)}
+          onClick={() => setPage(page + 1)}
+        >
+          Siguiente
+        </button>
       </div>
 
       <Section title="Historial de reglas de promocion">
@@ -287,41 +369,73 @@ export default function AdminAcademicClosure() {
             { key: "previous", label: "Regla anterior" },
             { key: "next", label: "Regla nueva" },
             { key: "origin", label: "Origen de restauracion" },
-            { key: "actions", label: "Accion" }
+            { key: "actions", label: "Accion" },
           ]}
           rows={
             historyRows.length === 0
-              ? [{ changedAt: "Sin cambios registrados", changedBy: "-", previous: "-", next: "-", origin: "-", actions: "", isRestored: "0" }]
+              ? [
+                  {
+                    changedAt: "Sin cambios registrados",
+                    changedBy: "-",
+                    previous: "-",
+                    next: "-",
+                    origin: "-",
+                    actions: "",
+                    isRestored: "0",
+                  },
+                ]
               : historyRows.map((h) => ({
-                  changedAt: String(h.changedAt || "").slice(0, 19).replace("T", " "),
+                  changedAt: String(h.changedAt || "")
+                    .slice(0, 19)
+                    .replace("T", " "),
                   changedBy: h.changedByName || h.changedById || "-",
                   previous: `Prom >= ${h.previous?.minAverage ?? "-"} | Rep <= ${h.previous?.maxFailedSubjects ?? "-"}`,
                   next: `Prom >= ${h.next?.minAverage ?? "-"} | Rep <= ${h.next?.maxFailedSubjects ?? "-"}`,
                   origin: h.restoredFrom
-                    ? `Restaurada desde ${String(h.restoredFrom.changedAt || "").slice(0, 19).replace("T", " ")} por ${h.restoredFrom.changedByName || "-"} (Prom >= ${h.restoredFrom.next?.minAverage ?? "-"}, Rep <= ${h.restoredFrom.next?.maxFailedSubjects ?? "-"})`
+                    ? `Restaurada desde ${String(h.restoredFrom.changedAt || "")
+                        .slice(0, 19)
+                        .replace(
+                          "T",
+                          " "
+                        )} por ${h.restoredFrom.changedByName || "-"} (Prom >= ${h.restoredFrom.next?.minAverage ?? "-"}, Rep <= ${h.restoredFrom.next?.maxFailedSubjects ?? "-"})`
                     : "-",
                   isRestored: h.restoredFromId ? "1" : "0",
                   actions: h.id ? (
-                    <button className="button secondary" type="button" onClick={() => restoreRulesVersion(h.id)} style={{ padding: "4px 8px", fontSize: 12 }}>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => restoreRulesVersion(h.id)}
+                      style={{ padding: "4px 8px", fontSize: 12 }}
+                    >
                       Restaurar version
                     </button>
                   ) : (
                     "No disponible"
-                  )
+                  ),
                 }))
           }
           rowStyle={(row) =>
-            String(row.isRestored || "0") === "1"
-              ? { background: "#fffbeb" }
-              : undefined
+            String(row.isRestored || "0") === "1" ? { background: "#fffbeb" } : undefined
           }
         />
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-          <button className="button secondary" disabled={historyPage <= 1} onClick={() => setHistoryPage(historyPage - 1)}>Anterior</button>
+          <button
+            className="button secondary"
+            disabled={historyPage <= 1}
+            onClick={() => setHistoryPage(historyPage - 1)}
+          >
+            Anterior
+          </button>
           <div style={{ alignSelf: "center", color: "#6b7280" }}>
             Pagina {historyPage} de {Math.max(1, Math.ceil(historyTotal / 10))}
           </div>
-          <button className="button secondary" disabled={historyPage >= Math.ceil(historyTotal / 10)} onClick={() => setHistoryPage(historyPage + 1)}>Siguiente</button>
+          <button
+            className="button secondary"
+            disabled={historyPage >= Math.ceil(historyTotal / 10)}
+            onClick={() => setHistoryPage(historyPage + 1)}
+          >
+            Siguiente
+          </button>
         </div>
       </Section>
     </Section>

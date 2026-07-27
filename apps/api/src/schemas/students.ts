@@ -17,17 +17,17 @@ export const createStudentSchema = z.object({
       "OCTAVO",
       "NOVENO",
       "DECIMO",
-      "ONCE"
+      "ONCE",
     ]),
     studentGroup: z.string().trim().min(1).max(1).optional(),
     birthDate: z.string().datetime().optional(),
-    isActive: z.boolean().optional()
-  })
+    isActive: z.boolean().optional(),
+  }),
 });
 
 export const updateStudentSchema = z.object({
   params: z.object({
-    id: z.string().min(1)
+    id: z.string().min(1),
   }),
   body: z.object({
     fullName: z.string().min(1).optional(),
@@ -46,11 +46,11 @@ export const updateStudentSchema = z.object({
         "OCTAVO",
         "NOVENO",
         "DECIMO",
-        "ONCE"
+        "ONCE",
       ])
       .optional(),
     studentGroup: z.string().trim().min(1).max(1).optional(),
     birthDate: z.string().datetime().optional(),
-    isActive: z.boolean().optional()
-  })
+    isActive: z.boolean().optional(),
+  }),
 });

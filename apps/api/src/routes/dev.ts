@@ -19,17 +19,17 @@ router.get("/info", async (_req, res) => {
       .catch(() => false),
     prisma.user.groupBy({
       by: ["role"],
-      _count: { role: true }
+      _count: { role: true },
     }),
     prisma.refreshSession.count({
       where: {
         revokedAt: null,
-        expiresAt: { gt: new Date() }
-      }
+        expiresAt: { gt: new Date() },
+      },
     }),
     prisma.feedback.count({
-      where: { status: "OPEN" }
-    })
+      where: { status: "OPEN" },
+    }),
   ]);
 
   return res.json({
@@ -39,20 +39,22 @@ router.get("/info", async (_req, res) => {
     uptimeSeconds,
     timestamp: new Date().toISOString(),
     checks: {
-      db: dbOk ? "up" : "down"
+      db: dbOk ? "up" : "down",
     },
     metrics: {
       usersByRole: Object.fromEntries(usersByRole.map((item) => [item.role, item._count.role])),
       activeSessions,
-      feedbackOpen
+      feedbackOpen,
     },
     cache: getCacheMetrics(),
-    rateLimit: getRateLimitMetrics()
+    rateLimit: getRateLimitMetrics(),
   });
 });
 
 router.get("/users", async (req, res) => {
-  const role = String(req.query.role || "").trim().toUpperCase();
+  const role = String(req.query.role || "")
+    .trim()
+    .toUpperCase();
   const search = String(req.query.search || "").trim();
 
   const users = await prisma.user.findMany({
@@ -62,10 +64,10 @@ router.get("/users", async (req, res) => {
         ? {
             OR: [
               { fullName: { contains: search, mode: "insensitive" } },
-              { email: { contains: search, mode: "insensitive" } }
-            ]
+              { email: { contains: search, mode: "insensitive" } },
+            ],
           }
-        : {})
+        : {}),
     },
     select: {
       id: true,
@@ -73,10 +75,10 @@ router.get("/users", async (req, res) => {
       role: true,
       fullName: true,
       isActive: true,
-      createdAt: true
+      createdAt: true,
     },
     orderBy: [{ role: "asc" }, { createdAt: "desc" }],
-    take: 200
+    take: 200,
   });
 
   res.json({ data: users });
@@ -85,7 +87,7 @@ router.get("/users", async (req, res) => {
 router.get("/sessions", async (_req, res) => {
   const sessions = await prisma.refreshSession.findMany({
     where: {
-      expiresAt: { gt: new Date() }
+      expiresAt: { gt: new Date() },
     },
     select: {
       id: true,
@@ -102,12 +104,12 @@ router.get("/sessions", async (_req, res) => {
         select: {
           fullName: true,
           email: true,
-          role: true
-        }
-      }
+          role: true,
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
-    take: 100
+    take: 100,
   });
 
   res.json({ data: sessions });
@@ -117,25 +119,25 @@ router.post("/database/purge", async (req, res) => {
   const confirmation = String(req.body?.confirmation || "").trim();
   if (confirmation !== "BORRAR BASE DE DATOS") {
     return res.status(400).json({
-      message: "Confirmacion invalida. Escribe exactamente: BORRAR BASE DE DATOS"
+      message: "Confirmacion invalida. Escribe exactamente: BORRAR BASE DE DATOS",
     });
   }
 
   const auth = (req as any).auth;
   const developerUsers = await prisma.user.findMany({
     where: { role: "DEVELOPER" },
-    select: { id: true, email: true }
+    select: { id: true, email: true },
   });
   if (!developerUsers.length) {
     return res.status(409).json({
-      message: "No hay usuarios desarrolladores para preservar. Operacion cancelada."
+      message: "No hay usuarios desarrolladores para preservar. Operacion cancelada.",
     });
   }
 
   const developerUserIds = new Set(developerUsers.map((user) => user.id));
   if (!developerUserIds.has(auth.userId)) {
     return res.status(403).json({
-      message: "El usuario autenticado no esta en la lista de desarrolladores preservados."
+      message: "El usuario autenticado no esta en la lista de desarrolladores preservados.",
     });
   }
 
@@ -168,27 +170,27 @@ router.post("/database/purge", async (req, res) => {
   await capture(
     "refreshSessions",
     prisma.refreshSession.deleteMany({
-      where: { userId: { notIn: Array.from(developerUserIds) } }
+      where: { userId: { notIn: Array.from(developerUserIds) } },
     })
   );
   await capture(
     "users",
     prisma.user.deleteMany({
-      where: { role: { not: "DEVELOPER" } }
+      where: { role: { not: "DEVELOPER" } },
     })
   );
 
   const remainingDevelopers = await prisma.user.findMany({
     where: { role: "DEVELOPER" },
     select: { id: true, email: true, fullName: true, isActive: true },
-    orderBy: { createdAt: "asc" }
+    orderBy: { createdAt: "asc" },
   });
 
   return res.json({
     ok: true,
     message: "Base de datos borrada. Se conservaron los usuarios desarrolladores.",
     deleted,
-    remainingDevelopers
+    remainingDevelopers,
   });
 });
 

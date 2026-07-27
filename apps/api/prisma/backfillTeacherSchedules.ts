@@ -48,8 +48,8 @@ function buildSlots(subjects: string[], gradeLevels: string[]) {
         startTime,
         endTime,
         gradeLevel,
-        group: "A"
-      }
+        group: "A",
+      },
     ];
     hours[subject] = 1;
     modes[subject] = true;
@@ -62,8 +62,8 @@ async function main() {
   const teachers = await prisma.teacher.findMany({
     include: {
       user: { select: { fullName: true, email: true } },
-      classes: { select: { gradeLevel: true } }
-    }
+      classes: { select: { gradeLevel: true } },
+    },
   });
 
   let updated = 0;
@@ -79,7 +79,9 @@ async function main() {
       ? teacher.subjects.map((s) => String(s).trim()).filter(Boolean)
       : [];
     const safeSubjects = subjects.length ? subjects : ["General"];
-    const gradeLevels = Array.from(new Set(teacher.classes.map((c) => String(c.gradeLevel || "")).filter(Boolean)));
+    const gradeLevels = Array.from(
+      new Set(teacher.classes.map((c) => String(c.gradeLevel || "")).filter(Boolean))
+    );
     const { schedules, hours, modes } = buildSlots(safeSubjects, gradeLevels);
 
     await prisma.teacher.update({
@@ -88,8 +90,8 @@ async function main() {
         subjects: safeSubjects as any,
         subjectSchedules: schedules as any,
         subjectHours: hours as any,
-        subjectHoursMode: modes as any
-      }
+        subjectHoursMode: modes as any,
+      },
     });
 
     updated += 1;

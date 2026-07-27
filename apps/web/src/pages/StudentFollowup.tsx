@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+
 import ActionFeedback from "../components/ActionFeedback";
-import Section from "../components/Section";
-import KpiCard from "../components/KpiCard";
 import DataTable from "../components/DataTable";
+import KpiCard from "../components/KpiCard";
+import Section from "../components/Section";
+import { useAuth } from "../context/AuthContext";
 import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
 import { gradeLabel } from "../services/grades";
-import { useAuth } from "../context/AuthContext";
 import { feedbackTitles, inferFeedbackTone } from "../utils/feedback";
 
 type StudentOption = {
@@ -20,7 +21,7 @@ type StudentOption = {
 const observationTypeOptions = [
   { value: "", label: "Todos los tipos" },
   { value: "ACADEMIC", label: "Academico" },
-  { value: "COEXISTENCE", label: "Convivencia" }
+  { value: "COEXISTENCE", label: "Convivencia" },
 ];
 
 function typeLabel(value: string) {
@@ -62,7 +63,12 @@ export default function StudentFollowup() {
   const [followUps, setFollowUps] = useState<any[]>([]);
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [followUpMessage, setFollowUpMessage] = useState("");
-  const [summary, setSummary] = useState<{ total: number; academic: number; coexistence: number; pendingFollowUps: number } | null>(null);
+  const [summary, setSummary] = useState<{
+    total: number;
+    academic: number;
+    coexistence: number;
+    pendingFollowUps: number;
+  } | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [detailObservation, setDetailObservation] = useState<any>(null);
 
@@ -73,17 +79,21 @@ export default function StudentFollowup() {
   const shouldShowTimeline = !isParent || data.length > 0;
   type CertificateType = "STUDY" | "ENROLLMENT";
 
-  const certificateTypes: Array<{ type: CertificateType; kind: "study" | "enrollment"; label: string }> = [
+  const certificateTypes: Array<{
+    type: CertificateType;
+    kind: "study" | "enrollment";
+    label: string;
+  }> = [
     { type: "STUDY", kind: "study", label: "Constancia de estudio" },
-    { type: "ENROLLMENT", kind: "enrollment", label: "Certificado de matricula" }
+    { type: "ENROLLMENT", kind: "enrollment", label: "Certificado de matricula" },
   ];
 
   const loadStudents = () => {
     const request = isParent
       ? apiGet("/parent/children")
       : isTeacher
-      ? apiGet("/student-observations/allowed-students")
-      : apiGet("/students/simple");
+        ? apiGet("/student-observations/allowed-students")
+        : apiGet("/students/simple");
     return request
       .then((res) => {
         const list = Array.isArray(res) ? res : [];
@@ -100,7 +110,7 @@ export default function StudentFollowup() {
       ...(studentId ? { studentId } : {}),
       ...(typeFilter ? { type: typeFilter } : {}),
       ...(fromDate ? { fromDate } : {}),
-      ...(toDate ? { toDate } : {})
+      ...(toDate ? { toDate } : {}),
     }).toString();
 
     return apiGet(`/student-observations?${query}`)
@@ -120,7 +130,7 @@ export default function StudentFollowup() {
     setFollowUpLoading(true);
     const query = new URLSearchParams({
       days: "7",
-      ...(studentId ? { studentId } : {})
+      ...(studentId ? { studentId } : {}),
     }).toString();
     apiGet(`/student-observations/follow-ups?${query}`)
       .then((res) => {
@@ -155,7 +165,6 @@ export default function StudentFollowup() {
 
   useEffect(() => {
     if (!isParent || !studentId) {
-      setCertificateRequests([]);
       return;
     }
     setCertificateLoading(true);
@@ -169,7 +178,6 @@ export default function StudentFollowup() {
 
   useEffect(() => {
     if (!studentId) {
-      setSummary(null);
       return;
     }
     setSummaryLoading(true);
@@ -179,7 +187,7 @@ export default function StudentFollowup() {
           total: Number(res.total || 0),
           academic: Number(res.academic || 0),
           coexistence: Number(res.coexistence || 0),
-          pendingFollowUps: Number(res.pendingFollowUps || 0)
+          pendingFollowUps: Number(res.pendingFollowUps || 0),
         });
       })
       .catch(() => setSummary(null))
@@ -219,7 +227,7 @@ export default function StudentFollowup() {
         ...(formType === "COEXISTENCE" ? { coexistenceOffense: convivenciaOffense } : {}),
         ...(formType === "COEXISTENCE" || formType === "ACADEMIC" ? { autoDetail: false } : {}),
         ...(formDate ? { date: formDate } : {}),
-        ...(followUpDate ? { followUpDate } : {})
+        ...(followUpDate ? { followUpDate } : {}),
       });
       setFormDetail("");
       setFormDescription("");
@@ -269,12 +277,18 @@ export default function StudentFollowup() {
       return;
     }
     try {
-      const path = kind === "study" ? `/reports/certificate/study/${studentId}` : `/reports/certificate/enrollment/${studentId}`;
+      const path =
+        kind === "study"
+          ? `/reports/certificate/study/${studentId}`
+          : `/reports/certificate/enrollment/${studentId}`;
       const blob = await apiDownload(path);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = kind === "study" ? `constancia-estudio-${studentId}.pdf` : `certificado-matricula-${studentId}.pdf`;
+      a.download =
+        kind === "study"
+          ? `constancia-estudio-${studentId}.pdf`
+          : `certificado-matricula-${studentId}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -332,14 +346,16 @@ export default function StudentFollowup() {
         kind === "protocolos"
           ? "protocolos-convivencia.pdf"
           : kind === "acta"
-          ? "acta-comite-convivencia.pdf"
-          : "cartel-ruta-convivencia.pdf";
+            ? "acta-comite-convivencia.pdf"
+            : "cartel-ruta-convivencia.pdf";
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
     } catch (error: any) {
-      setCertificateMessage(error?.message || "No se pudo descargar la herramienta de convivencia.");
+      setCertificateMessage(
+        error?.message || "No se pudo descargar la herramienta de convivencia."
+      );
     }
   };
 
@@ -352,7 +368,9 @@ export default function StudentFollowup() {
     setCertificateMessage("");
     try {
       await apiPost("/reports/certificate/requests", { studentId, type });
-      const res = await apiGet(`/reports/certificate/requests/me?studentId=${encodeURIComponent(studentId)}`);
+      const res = await apiGet(
+        `/reports/certificate/requests/me?studentId=${encodeURIComponent(studentId)}`
+      );
       setCertificateRequests(Array.isArray(res?.data) ? res.data : []);
       setCertificateMessage("Solicitud enviada al area administrativa.");
     } catch (error: any) {
@@ -423,7 +441,13 @@ export default function StudentFollowup() {
   const buildConvivenciaDetail = (description: string, protocol: string, offense?: string) => {
     const templates: Record<
       string,
-      { label: string; procedure: string[]; commitments: string[]; followups: string[]; citations: string[] }
+      {
+        label: string;
+        procedure: string[];
+        commitments: string[];
+        followups: string[];
+        citations: string[];
+      }
     > = {
       TIPO_I: {
         label: "Tipo I (conflictos leves)",
@@ -434,18 +458,18 @@ export default function StudentFollowup() {
           "Se promueve la mediacion y reconciliacion.",
           "Se establecen compromisos de convivencia.",
           "Se registra el hecho en el observador del estudiante.",
-          "El docente realiza seguimiento para evitar repeticion."
+          "El docente realiza seguimiento para evitar repeticion.",
         ],
         commitments: [
           "Respetar los acuerdos de convivencia definidos.",
           "Participar en actividades de mediacion y reparacion.",
-          "Evitar reincidencia y reportar nuevas situaciones."
+          "Evitar reincidencia y reportar nuevas situaciones.",
         ],
         followups: [
           "Seguimiento docente inicial (fecha: ____ / responsable: ____).",
-          "Verificacion de compromisos a 15 dias (fecha: ____ / responsable: ____)."
+          "Verificacion de compromisos a 15 dias (fecha: ____ / responsable: ____).",
         ],
-        citations: ["Citar a acudientes si hay reincidencia (fecha: ____ / medio: ____)."]
+        citations: ["Citar a acudientes si hay reincidencia (fecha: ____ / medio: ____)."],
       },
       TIPO_II: {
         label: "Tipo II (agresion o acoso escolar)",
@@ -456,21 +480,21 @@ export default function StudentFollowup() {
           "Se analiza la situacion y se escuchan las partes.",
           "Se cita a padres o acudientes.",
           "Se establecen acciones pedagogicas o correctivas.",
-          "Se realiza seguimiento institucional."
+          "Se realiza seguimiento institucional.",
         ],
         commitments: [
           "Compromiso pedagogico firmado por el estudiante.",
           "Plan de apoyo socioemocional y seguimiento.",
-          "Cumplir medidas correctivas definidas por el comite."
+          "Cumplir medidas correctivas definidas por el comite.",
         ],
         followups: [
           "Seguimiento institucional semanal (fecha: ____ / responsable: ____).",
-          "Informe de avance al Comite de Convivencia (fecha: ____)."
+          "Informe de avance al Comite de Convivencia (fecha: ____).",
         ],
         citations: [
           "Citar a padres/acudientes (fecha: ____ / medio: ____).",
-          "Registro en acta del Comite de Convivencia."
-        ]
+          "Registro en acta del Comite de Convivencia.",
+        ],
       },
       TIPO_III: {
         label: "Tipo III (situaciones que pueden constituir delito)",
@@ -480,22 +504,22 @@ export default function StudentFollowup() {
           "Se activa la Ruta de Atencion Externa.",
           "Se informa a las autoridades competentes.",
           "Se registra el caso en el sistema institucional.",
-          "Se realiza seguimiento institucional."
+          "Se realiza seguimiento institucional.",
         ],
         commitments: [
           "Garantizar proteccion inmediata del estudiante.",
           "Coordinar con entidades externas y soporte psicosocial.",
-          "Registrar avances y decisiones institucionales."
+          "Registrar avances y decisiones institucionales.",
         ],
         followups: [
           "Seguimiento institucional permanente (fecha: ____ / responsable: ____).",
-          "Reporte de avances a entidades competentes (fecha: ____)."
+          "Reporte de avances a entidades competentes (fecha: ____).",
         ],
         citations: [
           "Citar a padres/acudientes de forma inmediata (fecha: ____ / medio: ____).",
-          "Notificar a ICBF/Policia/Fiscalia segun corresponda."
-        ]
-      }
+          "Notificar a ICBF/Policia/Fiscalia segun corresponda.",
+        ],
+      },
     };
 
     const template = templates[protocol] || templates.TIPO_I;
@@ -507,7 +531,7 @@ export default function StudentFollowup() {
       "Descripcion de la situacion:",
       description,
       "",
-      "Procedimiento aplicado:"
+      "Procedimiento aplicado:",
     ];
     template.procedure.forEach((line, index) => lines.push(`${index + 1}. ${line}`));
     lines.push("", "Compromisos automaticos:");
@@ -530,7 +554,7 @@ export default function StudentFollowup() {
       "Hacer ruido o distracciones durante la explicacion del docente.",
       "Levantarse del puesto sin permiso.",
       "Burlas leves entre companeros.",
-      "Incumplir normas basicas del aula."
+      "Incumplir normas basicas del aula.",
     ],
     TIPO_II: [
       "Insultar o faltar al respeto a un companero.",
@@ -542,7 +566,7 @@ export default function StudentFollowup() {
       "Desobedecer de forma reiterada a los docentes.",
       "Participar en peleas dentro de la institucion.",
       "Esconder o robar objetos de poco valor a companeros.",
-      "Actos de discriminacion por apariencia, origen o creencias."
+      "Actos de discriminacion por apariencia, origen o creencias.",
     ],
     TIPO_III: [
       "Agresion fisica grave que cause lesiones.",
@@ -554,8 +578,8 @@ export default function StudentFollowup() {
       "Abuso o acoso sexual.",
       "Extorsion o intimidacion a companeros.",
       "Daño grave a la infraestructura del colegio.",
-      "Publicar contenido intimo o humillante de otros estudiantes."
-    ]
+      "Publicar contenido intimo o humillante de otros estudiantes.",
+    ],
   };
 
   const offenseOptions = offenseOptionsByProtocol[convivenciaProtocol] || [];
@@ -568,18 +592,20 @@ export default function StudentFollowup() {
         "Se diseña un plan de apoyo pedagogico.",
         "Se acuerdan estrategias con el estudiante.",
         "Se comunica a padres o acudientes.",
-        "Se registra el seguimiento en el observador."
+        "Se registra el seguimiento en el observador.",
       ],
       commitments: [
         "Cumplir el plan de apoyo y tareas asignadas.",
         "Asistir a refuerzos o tutorias programadas.",
-        "Mantener comunicacion con docente y acudientes."
+        "Mantener comunicacion con docente y acudientes.",
       ],
       followups: [
         "Seguimiento semanal del avance (fecha: ____ / responsable: ____).",
-        "Reevaluacion del desempeño a 30 dias (fecha: ____ / responsable: ____)."
+        "Reevaluacion del desempeño a 30 dias (fecha: ____ / responsable: ____).",
       ],
-      citations: ["Citar a padres/acudientes si persiste la dificultad (fecha: ____ / medio: ____)."]
+      citations: [
+        "Citar a padres/acudientes si persiste la dificultad (fecha: ____ / medio: ____).",
+      ],
     };
 
     const lines: string[] = [
@@ -587,7 +613,7 @@ export default function StudentFollowup() {
       "Descripcion de la situacion:",
       description,
       "",
-      "Procedimiento aplicado:"
+      "Procedimiento aplicado:",
     ];
     template.procedure.forEach((line, index) => lines.push(`${index + 1}. ${line}`));
     lines.push("", "Compromisos automaticos:");
@@ -601,7 +627,9 @@ export default function StudentFollowup() {
 
   useEffect(() => {
     if (formType === "COEXISTENCE") {
-      setFormDetail(buildConvivenciaDetail(formDescription.trim(), convivenciaProtocol, convivenciaOffense));
+      setFormDetail(
+        buildConvivenciaDetail(formDescription.trim(), convivenciaProtocol, convivenciaOffense)
+      );
       return;
     }
     if (formType === "ACADEMIC") {
@@ -617,7 +645,9 @@ export default function StudentFollowup() {
     }
     setVerifyError("");
     try {
-      const res = await apiGet(`/reports/certificate/verify/${encodeURIComponent(verifyCode.trim().toUpperCase())}`);
+      const res = await apiGet(
+        `/reports/certificate/verify/${encodeURIComponent(verifyCode.trim().toUpperCase())}`
+      );
       setVerifyResult(res.certificate || null);
     } catch (error: any) {
       setVerifyResult(null);
@@ -629,7 +659,8 @@ export default function StudentFollowup() {
     <div className="grid" style={{ gap: 20 }}>
       <Section title="Seguimiento estudiantil">
         <div className="help-card">
-          Consulta observaciones del estudiante y gestiona certificados desde el area administrativa.
+          Consulta observaciones del estudiante y gestiona certificados desde el area
+          administrativa.
         </div>
         <div className="card">
           <label>
@@ -656,7 +687,9 @@ export default function StudentFollowup() {
               {students.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.fullName}
-                  {s.gradeLevel ? ` - ${gradeLabel(s.gradeLevel)}${s.studentGroup ? s.studentGroup : ""}` : ""}
+                  {s.gradeLevel
+                    ? ` - ${gradeLabel(s.gradeLevel)}${s.studentGroup ? s.studentGroup : ""}`
+                    : ""}
                   {s.latestYear ? ` (${s.latestYear})` : ""}
                 </option>
               ))}
@@ -664,7 +697,12 @@ export default function StudentFollowup() {
           </label>
           {isParent && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-              <button className="button secondary" type="button" onClick={refreshParentObservations} disabled={parentRefreshBusy}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={refreshParentObservations}
+                disabled={parentRefreshBusy}
+              >
                 {parentRefreshBusy ? "Actualizando..." : "Actualizar observaciones"}
               </button>
             </div>
@@ -672,11 +710,17 @@ export default function StudentFollowup() {
           {isParent && students.length === 0 && (
             <div style={{ color: "#64748b", marginTop: 6, display: "grid", gap: 8 }}>
               <div>
-                No hay estudiantes asociados a tu cuenta. Verifica que el correo del acudiente coincida con el registrado en la matrícula.
+                No hay estudiantes asociados a tu cuenta. Verifica que el correo del acudiente
+                coincida con el registrado en la matrícula.
                 {user?.email ? ` Correo actual: ${user.email}.` : ""}
               </div>
               <div>
-                <button className="button secondary" type="button" onClick={requestAssociation} disabled={associationBusy}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={requestAssociation}
+                  disabled={associationBusy}
+                >
                   {associationBusy ? "Enviando solicitud..." : "Solicitar asociación"}
                 </button>
               </div>
@@ -699,26 +743,58 @@ export default function StudentFollowup() {
         />
         {studentId && (
           <div className="grid grid-4" style={{ marginTop: 10 }}>
-            <KpiCard title="Observaciones" value={summaryLoading ? "..." : String(summary?.total || 0)} trend="Total" tone="primary" />
-            <KpiCard title="Academico" value={summaryLoading ? "..." : String(summary?.academic || 0)} trend="Tipo academico" tone="success" />
-            <KpiCard title="Convivencia" value={summaryLoading ? "..." : String(summary?.coexistence || 0)} trend="Tipo convivencia" tone="warning" />
-            <KpiCard title="Seguimientos" value={summaryLoading ? "..." : String(summary?.pendingFollowUps || 0)} trend="Pendientes" tone="danger" />
+            <KpiCard
+              title="Observaciones"
+              value={summaryLoading ? "..." : String(summary?.total || 0)}
+              trend="Total"
+              tone="primary"
+            />
+            <KpiCard
+              title="Academico"
+              value={summaryLoading ? "..." : String(summary?.academic || 0)}
+              trend="Tipo academico"
+              tone="success"
+            />
+            <KpiCard
+              title="Convivencia"
+              value={summaryLoading ? "..." : String(summary?.coexistence || 0)}
+              trend="Tipo convivencia"
+              tone="warning"
+            />
+            <KpiCard
+              title="Seguimientos"
+              value={summaryLoading ? "..." : String(summary?.pendingFollowUps || 0)}
+              trend="Pendientes"
+              tone="danger"
+            />
           </div>
         )}
         {isAdmin ? (
           <>
             <div className="card" style={{ marginTop: 10 }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button className="button secondary" type="button" onClick={() => downloadCertificate("study")}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => downloadCertificate("study")}
+                >
                   Constancia de estudio (PDF)
                 </button>
-                <button className="button secondary" type="button" onClick={() => downloadCertificate("enrollment")}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => downloadCertificate("enrollment")}
+                >
                   Certificado de matricula (PDF)
                 </button>
                 <button className="button secondary" type="button" onClick={downloadObserverFormat}>
                   Exportar observador (PDF)
                 </button>
-                <button className="button secondary" type="button" onClick={downloadObserverTemplates}>
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={downloadObserverTemplates}
+                >
                   Plantillas observador (PDF)
                 </button>
               </div>
@@ -745,12 +821,20 @@ export default function StudentFollowup() {
               />
               {verifyResult && (
                 <div style={{ marginTop: 8, color: "#334155" }}>
-                  Valido: {verifyResult.type} #{verifyResult.serial}/{verifyResult.year} - {verifyResult.code}
+                  Valido: {verifyResult.type} #{verifyResult.serial}/{verifyResult.year} -{" "}
+                  {verifyResult.code}
                   <br />
-                  Estudiante: {verifyResult.student?.fullName || "-"} ({verifyResult.student?.gradeLevel ? gradeLabel(verifyResult.student.gradeLevel) : "-"}
-                  {verifyResult.student?.studentGroup ? `-${verifyResult.student.studentGroup}` : ""})
+                  Estudiante: {verifyResult.student?.fullName || "-"} (
+                  {verifyResult.student?.gradeLevel
+                    ? gradeLabel(verifyResult.student.gradeLevel)
+                    : "-"}
+                  {verifyResult.student?.studentGroup
+                    ? `-${verifyResult.student.studentGroup}`
+                    : ""}
+                  )
                   <br />
-                  Emitido por: {verifyResult.issuedBy?.fullName || "-"} ({verifyResult.issuedBy?.role || "-"})
+                  Emitido por: {verifyResult.issuedBy?.fullName || "-"} (
+                  {verifyResult.issuedBy?.role || "-"})
                 </div>
               )}
             </div>
@@ -772,18 +856,34 @@ export default function StudentFollowup() {
                     status === "APPROVED"
                       ? "Aprobado"
                       : status === "PENDING"
-                      ? "En revision"
-                      : status === "REJECTED"
-                      ? "Rechazado"
-                      : "Sin solicitud";
+                        ? "En revision"
+                        : status === "REJECTED"
+                          ? "Rechazado"
+                          : "Sin solicitud";
                   return (
-                    <div key={item.type} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <div
+                      key={item.type}
+                      style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}
+                    >
                       <strong style={{ minWidth: 180 }}>{item.label}</strong>
-                      <span style={{ color: status === "APPROVED" ? "#166534" : status === "REJECTED" ? "#b91c1c" : "#475569" }}>
+                      <span
+                        style={{
+                          color:
+                            status === "APPROVED"
+                              ? "#166534"
+                              : status === "REJECTED"
+                                ? "#b91c1c"
+                                : "#475569",
+                        }}
+                      >
                         {statusLabel}
                       </span>
                       {status === "APPROVED" ? (
-                        <button className="button secondary" type="button" onClick={() => downloadCertificate(item.kind)}>
+                        <button
+                          className="button secondary"
+                          type="button"
+                          onClick={() => downloadCertificate(item.kind)}
+                        >
                           Descargar PDF
                         </button>
                       ) : (
@@ -793,7 +893,11 @@ export default function StudentFollowup() {
                           disabled={certificateLoading || status === "PENDING"}
                           onClick={() => requestCertificate(item.type)}
                         >
-                          {status === "REJECTED" ? "Reenviar solicitud" : status === "PENDING" ? "En revision" : "Solicitar autorizacion"}
+                          {status === "REJECTED"
+                            ? "Reenviar solicitud"
+                            : status === "PENDING"
+                              ? "En revision"
+                              : "Solicitar autorizacion"}
                         </button>
                       )}
                     </div>
@@ -810,20 +914,33 @@ export default function StudentFollowup() {
           <div className="card">
             <div className="section-title">Ruta Integral para la Convivencia Escolar</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="button secondary" type="button" onClick={() => downloadConvivenciaTool("protocolos")}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => downloadConvivenciaTool("protocolos")}
+              >
                 Protocolos Tipo I-II-III (PDF)
               </button>
-              <button className="button secondary" type="button" onClick={() => downloadConvivenciaTool("acta")}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => downloadConvivenciaTool("acta")}
+              >
                 Acta Comite de Convivencia (PDF)
               </button>
-              <button className="button secondary" type="button" onClick={() => downloadConvivenciaTool("cartel")}>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={() => downloadConvivenciaTool("cartel")}
+              >
                 Cartel Ruta de Convivencia (PDF)
               </button>
             </div>
           </div>
           {noTeacherStudents ? (
             <div className="card" style={{ color: "#64748b" }}>
-              No tienes grados o grupos asignados para registrar observaciones. Contacta al administrador para asignarte horarios/grade-group.
+              No tienes grados o grupos asignados para registrar observaciones. Contacta al
+              administrador para asignarte horarios/grade-group.
             </div>
           ) : (
             <form className="card" onSubmit={createObservation}>
@@ -869,7 +986,9 @@ export default function StudentFollowup() {
                         setConvivenciaProtocol(nextProtocol);
                         const nextOffense = offenseOptionsByProtocol[nextProtocol]?.[0] || "";
                         setConvivenciaOffense(nextOffense);
-                        setFormDetail(buildConvivenciaDetail(formDescription.trim(), nextProtocol, nextOffense));
+                        setFormDetail(
+                          buildConvivenciaDetail(formDescription.trim(), nextProtocol, nextOffense)
+                        );
                       }}
                     >
                       <option value="TIPO_I">Tipo I (conflictos leves)</option>
@@ -885,7 +1004,13 @@ export default function StudentFollowup() {
                       onChange={(e) => {
                         const nextOffense = e.target.value;
                         setConvivenciaOffense(nextOffense);
-                        setFormDetail(buildConvivenciaDetail(formDescription.trim(), convivenciaProtocol, nextOffense));
+                        setFormDetail(
+                          buildConvivenciaDetail(
+                            formDescription.trim(),
+                            convivenciaProtocol,
+                            nextOffense
+                          )
+                        );
                       }}
                     >
                       <option value="">Selecciona la falta</option>
@@ -903,19 +1028,31 @@ export default function StudentFollowup() {
               )}
               <label>
                 Fecha (opcional)
-                <input type="date" className="input" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+                <input
+                  type="date"
+                  className="input"
+                  value={formDate}
+                  onChange={(e) => setFormDate(e.target.value)}
+                />
               </label>
               <label>
                 Fecha de seguimiento (opcional)
-                <input type="date" className="input" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
+                <input
+                  type="date"
+                  className="input"
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                />
               </label>
               <div style={{ color: "#64748b", marginTop: -6 }}>
-                Si agregas una fecha, aparecera en "Seguimientos pendientes".
+                Si agregas una fecha, aparecera en &quot;Seguimientos pendientes&quot;.
               </div>
               {formType === "COEXISTENCE" || formType === "ACADEMIC" ? (
                 <>
                   <label>
-                    {formType === "ACADEMIC" ? "Descripcion academica" : "Descripcion de la situacion"}
+                    {formType === "ACADEMIC"
+                      ? "Descripcion academica"
+                      : "Descripcion de la situacion"}
                     <textarea
                       className="input"
                       rows={3}
@@ -925,7 +1062,12 @@ export default function StudentFollowup() {
                   </label>
                   <label>
                     Detalle automatico (editable)
-                    <textarea className="input" rows={8} value={formDetail} onChange={(e) => setFormDetail(e.target.value)} />
+                    <textarea
+                      className="input"
+                      rows={8}
+                      value={formDetail}
+                      onChange={(e) => setFormDetail(e.target.value)}
+                    />
                   </label>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
@@ -935,7 +1077,11 @@ export default function StudentFollowup() {
                         const description = formDescription.trim();
                         setFormDetail(
                           formType === "COEXISTENCE"
-                            ? buildConvivenciaDetail(description, convivenciaProtocol, convivenciaOffense)
+                            ? buildConvivenciaDetail(
+                                description,
+                                convivenciaProtocol,
+                                convivenciaOffense
+                              )
                             : buildAcademicDetail(description)
                         );
                       }}
@@ -947,7 +1093,12 @@ export default function StudentFollowup() {
               ) : (
                 <label>
                   Observacion
-                  <textarea className="input" rows={4} value={formDetail} onChange={(e) => setFormDetail(e.target.value)} />
+                  <textarea
+                    className="input"
+                    rows={4}
+                    value={formDetail}
+                    onChange={(e) => setFormDetail(e.target.value)}
+                  />
                 </label>
               )}
               <ActionFeedback
@@ -990,30 +1141,52 @@ export default function StudentFollowup() {
                   { key: "grade", label: "Grado" },
                   { key: "type", label: "Tipo" },
                   { key: "detail", label: "Detalle" },
-                  { key: "actions", label: "Acciones" }
+                  { key: "actions", label: "Acciones" },
                 ]}
                 rows={
                   followUpLoading
                     ? [
-                        { date: "Cargando...", status: "", student: "", grade: "", type: "", detail: "", actions: "" }
+                        {
+                          date: "Cargando...",
+                          status: "",
+                          student: "",
+                          grade: "",
+                          type: "",
+                          detail: "",
+                          actions: "",
+                        },
                       ]
                     : followUps.length === 0
-                    ? [
-                        { date: "Sin seguimientos pendientes", status: "", student: "", grade: "", type: "", detail: "", actions: "" }
-                      ]
-                    : followUps.map((row) => ({
-                        date: row.followUpDate ? `${String(row.followUpDate).slice(0, 10)} (${daysUntil(row.followUpDate)})` : "-",
-                        status: formatFollowUpStatus(row.followUpCompleted),
-                        student: row.student?.fullName || "-",
-                        grade: row.student?.gradeLevel ? gradeLabel(row.student.gradeLevel) : "-",
-                        type: typeLabel(row.type),
-                        detail: row.detail || "",
-                        actions: (
-                          <button className="button secondary" type="button" onClick={() => markFollowUpDone(row.id)}>
-                            Marcar hecho
-                          </button>
-                        )
-                      }))
+                      ? [
+                          {
+                            date: "Sin seguimientos pendientes",
+                            status: "",
+                            student: "",
+                            grade: "",
+                            type: "",
+                            detail: "",
+                            actions: "",
+                          },
+                        ]
+                      : followUps.map((row) => ({
+                          date: row.followUpDate
+                            ? `${String(row.followUpDate).slice(0, 10)} (${daysUntil(row.followUpDate)})`
+                            : "-",
+                          status: formatFollowUpStatus(row.followUpCompleted),
+                          student: row.student?.fullName || "-",
+                          grade: row.student?.gradeLevel ? gradeLabel(row.student.gradeLevel) : "-",
+                          type: typeLabel(row.type),
+                          detail: row.detail || "",
+                          actions: (
+                            <button
+                              className="button secondary"
+                              type="button"
+                              onClick={() => markFollowUpDone(row.id)}
+                            >
+                              Marcar hecho
+                            </button>
+                          ),
+                        }))
                 }
               />
             </>
@@ -1033,17 +1206,38 @@ export default function StudentFollowup() {
               </div>
             ) : (
               data.slice(0, 6).map((row) => (
-                <div key={row.id} style={{ display: "grid", gap: 6, padding: 10, border: "1px solid #e2e8f0", borderRadius: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                <div
+                  key={row.id}
+                  style={{
+                    display: "grid",
+                    gap: 6,
+                    padding: 10,
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     <strong>{row.student?.fullName || "-"}</strong>
                     <span style={{ color: "#64748b" }}>{String(row.date || "").slice(0, 10)}</span>
                   </div>
                   <div style={{ color: "#475569" }}>
-                    {typeLabel(row.type)} {row.coexistenceProtocol ? `- ${protocolLabel(row.coexistenceProtocol)}` : ""}
+                    {typeLabel(row.type)}{" "}
+                    {row.coexistenceProtocol ? `- ${protocolLabel(row.coexistenceProtocol)}` : ""}
                   </div>
                   <div style={{ color: "#334155" }}>{row.detail || "-"}</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button className="button secondary" type="button" onClick={() => openDetail(row)}>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => openDetail(row)}
+                    >
                       Ver detalle
                     </button>
                   </div>
@@ -1057,15 +1251,29 @@ export default function StudentFollowup() {
       <Section title="Historial de observaciones">
         {!noTeacherStudents && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-            <select className="input" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <select
+              className="input"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
               {observationTypeOptions.map((o) => (
                 <option key={o.value || "all"} value={o.value}>
                   {o.label}
                 </option>
               ))}
             </select>
-            <input type="date" className="input" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-            <input type="date" className="input" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            <input
+              type="date"
+              className="input"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+            />
+            <input
+              type="date"
+              className="input"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+            />
           </div>
         )}
         {noTeacherStudents ? (
@@ -1085,13 +1293,13 @@ export default function StudentFollowup() {
               ...(!isParent
                 ? [
                     { key: "followUp", label: "Seguimiento" },
-                    { key: "followUpStatus", label: "Estado seguimiento" }
+                    { key: "followUpStatus", label: "Estado seguimiento" },
                   ]
                 : []),
               { key: "detail", label: "Detalle" },
               ...(!isAdmin ? [{ key: "view", label: "Ver" }] : []),
               { key: "author", label: "Registrado por" },
-              ...(isAdmin ? [{ key: "actions", label: "Acciones" }] : [])
+              ...(isAdmin ? [{ key: "actions", label: "Acciones" }] : []),
             ]}
             rows={
               loading
@@ -1106,8 +1314,8 @@ export default function StudentFollowup() {
                       offense: "",
                       detail: "",
                       author: "",
-                      ...(isAdmin ? { actions: "" } : {})
-                    }
+                      ...(isAdmin ? { actions: "" } : {}),
+                    },
                   ]
                 : data.map((row) => ({
                     date: String(row.date || "").slice(0, 10),
@@ -1115,13 +1323,18 @@ export default function StudentFollowup() {
                     grade: row.student?.gradeLevel ? gradeLabel(row.student.gradeLevel) : "-",
                     group: row.student?.studentGroup || "-",
                     type: typeLabel(row.type),
-                    protocol: row.type === "COEXISTENCE" ? protocolLabel(row.coexistenceProtocol) : "-",
+                    protocol:
+                      row.type === "COEXISTENCE" ? protocolLabel(row.coexistenceProtocol) : "-",
                     offense: row.type === "COEXISTENCE" ? row.coexistenceOffense || "-" : "-",
                     followUp: row.followUpDate ? String(row.followUpDate).slice(0, 10) : "-",
                     followUpStatus: formatFollowUpStatus(row.followUpCompleted),
                     detail: row.detail || "",
                     view: (
-                      <button className="button secondary" type="button" onClick={() => openDetail(row)}>
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => openDetail(row)}
+                      >
                         Ver
                       </button>
                     ),
@@ -1130,74 +1343,147 @@ export default function StudentFollowup() {
                       ? {
                           actions: (
                             <div style={{ display: "flex", gap: 6 }}>
-                              <button className="button secondary" type="button" onClick={() => openDetail(row)}>
+                              <button
+                                className="button secondary"
+                                type="button"
+                                onClick={() => openDetail(row)}
+                              >
                                 Ver
                               </button>
-                              <button className="button danger" type="button" onClick={() => deleteObservation(row.id)}>
+                              <button
+                                className="button danger"
+                                type="button"
+                                onClick={() => deleteObservation(row.id)}
+                              >
                                 Eliminar
                               </button>
                             </div>
-                          )
+                          ),
                         }
-                      : {})
+                      : {}),
                   }))
             }
           />
         )}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-          <button className="button secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+          <button
+            className="button secondary"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
             Anterior
           </button>
           <div style={{ alignSelf: "center", color: "#6b7280" }}>
             Pagina {page} de {Math.max(1, Math.ceil(total / 10))}
           </div>
-          <button className="button secondary" disabled={page >= Math.ceil(total / 10)} onClick={() => setPage(page + 1)}>
+          <button
+            className="button secondary"
+            disabled={page >= Math.ceil(total / 10)}
+            onClick={() => setPage(page + 1)}
+          >
             Siguiente
           </button>
         </div>
       </Section>
       {detailObservation && (
         <div
+          role="dialog"
+          aria-modal="true"
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(15, 23, 42, 0.5)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             zIndex: 60,
-            padding: 16
+            padding: 16,
           }}
-          onClick={() => setDetailObservation(null)}
         >
+          {/* Fondo del modal */}
+          <button
+            type="button"
+            aria-label="Cerrar ventana"
+            onClick={() => setDetailObservation(null)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(15, 23, 42, 0.5)",
+              border: "none",
+              padding: 0,
+              margin: 0,
+              cursor: "default",
+            }}
+          />
+
+          {/* Contenido */}
           <div
             className="card"
-            style={{ maxWidth: 720, width: "100%", maxHeight: "80vh", overflow: "auto" }}
-            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "relative",
+              maxWidth: 720,
+              width: "100%",
+              maxHeight: "80vh",
+              overflow: "auto",
+              zIndex: 1,
+            }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
               <div className="section-title">Detalle de observacion</div>
-              <button className="button secondary" onClick={() => setDetailObservation(null)}>Cerrar</button>
+              <button className="button secondary" onClick={() => setDetailObservation(null)}>
+                Cerrar
+              </button>
             </div>
             <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
-              <div><strong>Estudiante:</strong> {detailObservation.student?.fullName || "-"}</div>
-              <div><strong>Fecha:</strong> {String(detailObservation.date || "").slice(0, 10)}</div>
-              <div><strong>Tipo:</strong> {typeLabel(detailObservation.type)}</div>
+              <div>
+                <strong>Estudiante:</strong> {detailObservation.student?.fullName || "-"}
+              </div>
+              <div>
+                <strong>Fecha:</strong> {String(detailObservation.date || "").slice(0, 10)}
+              </div>
+              <div>
+                <strong>Tipo:</strong> {typeLabel(detailObservation.type)}
+              </div>
               {detailObservation.type === "COEXISTENCE" && (
                 <>
-                  <div><strong>Protocolo:</strong> {protocolLabel(detailObservation.coexistenceProtocol)}</div>
-                  <div><strong>Falta:</strong> {detailObservation.coexistenceOffense || "-"}</div>
+                  <div>
+                    <strong>Protocolo:</strong>{" "}
+                    {protocolLabel(detailObservation.coexistenceProtocol)}
+                  </div>
+                  <div>
+                    <strong>Falta:</strong> {detailObservation.coexistenceOffense || "-"}
+                  </div>
                 </>
               )}
               {!isParent && (
                 <>
-                  <div><strong>Seguimiento:</strong> {detailObservation.followUpDate ? String(detailObservation.followUpDate).slice(0, 10) : "-"}</div>
-                  <div><strong>Estado seguimiento:</strong> {formatFollowUpStatus(detailObservation.followUpCompleted)}</div>
+                  <div>
+                    <strong>Seguimiento:</strong>{" "}
+                    {detailObservation.followUpDate
+                      ? String(detailObservation.followUpDate).slice(0, 10)
+                      : "-"}
+                  </div>
+                  <div>
+                    <strong>Estado seguimiento:</strong>{" "}
+                    {formatFollowUpStatus(detailObservation.followUpCompleted)}
+                  </div>
                 </>
               )}
-              <div><strong>Detalle:</strong></div>
-              <pre style={{ whiteSpace: "pre-wrap", margin: 0, color: "#334155" }}>{detailObservation.detail || "-"}</pre>
-              <div><strong>Registrado por:</strong> {detailObservation.createdBy?.fullName || "-"}</div>
+              <div>
+                <strong>Detalle:</strong>
+              </div>
+              <pre style={{ whiteSpace: "pre-wrap", margin: 0, color: "#334155" }}>
+                {detailObservation.detail || "-"}
+              </pre>
+              <div>
+                <strong>Registrado por:</strong> {detailObservation.createdBy?.fullName || "-"}
+              </div>
             </div>
           </div>
         </div>

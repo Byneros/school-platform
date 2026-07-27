@@ -10,7 +10,7 @@ const guardianRelationSchema = z.enum([
   "TIA",
   "HERMANO",
   "HERMANA",
-  "ACUDIENTE_LEGAL"
+  "ACUDIENTE_LEGAL",
 ]);
 
 export const createAdmissionSchema = z.object({
@@ -30,7 +30,7 @@ export const createAdmissionSchema = z.object({
       "OCTAVO",
       "NOVENO",
       "DECIMO",
-      "ONCE"
+      "ONCE",
     ]),
     notes: z.string().optional(),
     documents: z
@@ -40,7 +40,7 @@ export const createAdmissionSchema = z.object({
         recentReportCards: z.boolean().optional(),
         previousSchoolCertificates: z.boolean().optional(),
         addressProof: z.boolean().optional(),
-        vaccinationCard: z.boolean().optional()
+        vaccinationCard: z.boolean().optional(),
       })
       .optional(),
     studentFullName: z.string().optional(),
@@ -56,22 +56,22 @@ export const createAdmissionSchema = z.object({
     guardianDocNumber: z.string().optional(),
     guardianRelation: guardianRelationSchema.optional(),
     contactPhone: z.string().optional(),
-    contactEmail: z.string().email().optional()
-  })
+    contactEmail: z.string().email().optional(),
+  }),
 });
 
 export const updateAdmissionStatusSchema = z.object({
   params: z.object({
-    id: z.string().min(1)
+    id: z.string().min(1),
   }),
   body: z.object({
-    status: z.enum(["PENDING", "APPROVED", "REJECTED"])
-  })
+    status: z.enum(["PENDING", "APPROVED", "REJECTED"]),
+  }),
 });
 
 export const updateAdmissionSchema = z.object({
   params: z.object({
-    id: z.string().min(1)
+    id: z.string().min(1),
   }),
   body: z.object({
     studentName: z.string().min(1).optional(),
@@ -90,7 +90,7 @@ export const updateAdmissionSchema = z.object({
         "OCTAVO",
         "NOVENO",
         "DECIMO",
-        "ONCE"
+        "ONCE",
       ])
       .optional(),
     notes: z.string().optional(),
@@ -101,11 +101,11 @@ export const updateAdmissionSchema = z.object({
         recentReportCards: z.boolean().optional(),
         previousSchoolCertificates: z.boolean().optional(),
         addressProof: z.boolean().optional(),
-        vaccinationCard: z.boolean().optional()
+        vaccinationCard: z.boolean().optional(),
       })
       .optional(),
     guardianDocType: guardianDocTypeSchema.optional(),
     guardianDocNumber: z.string().optional(),
-    guardianRelation: guardianRelationSchema.optional()
-  })
+    guardianRelation: guardianRelationSchema.optional(),
+  }),
 });

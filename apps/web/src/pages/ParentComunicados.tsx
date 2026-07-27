@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import Section from "../components/Section";
+
 import DataTable from "../components/DataTable";
+import Section from "../components/Section";
 import { apiGet } from "../services/api";
 import { isDueProcessNotification } from "../utils/notificationPriority";
 
@@ -10,27 +11,34 @@ export default function ParentComunicados() {
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState("");
   const prioritizedItems = useMemo(
-    () => [...items].sort((a, b) => Number(isDueProcessNotification(b?.notification)) - Number(isDueProcessNotification(a?.notification))),
+    () =>
+      [...items].sort(
+        (a, b) =>
+          Number(isDueProcessNotification(b?.notification)) -
+          Number(isDueProcessNotification(a?.notification))
+      ),
     [items]
   );
 
   useEffect(() => {
-    apiGet(`/parent/notifications?page=${page}&pageSize=10${statusFilter ? `&status=${statusFilter}` : ""}`).then((res) => {
-      setItems(res.data || []);
-      setTotal(res.total || 0);
-    }).catch(() => undefined);
+    apiGet(
+      `/parent/notifications?page=${page}&pageSize=10${statusFilter ? `&status=${statusFilter}` : ""}`
+    )
+      .then((res) => {
+        setItems(res.data || []);
+        setTotal(res.total || 0);
+      })
+      .catch(() => undefined);
   }, [page, statusFilter]);
 
   return (
     <Section title="Comunicados">
-      <div className="help-card">
-        Revisa los comunicados oficiales del colegio.
-      </div>
+      <div className="help-card">Revisa los comunicados oficiales del colegio.</div>
       <DataTable
         columns={[
           { key: "title", label: "Titulo" },
           { key: "status", label: "Estado" },
-          { key: "date", label: "Fecha" }
+          { key: "date", label: "Fecha" },
         ]}
         rowStyle={(row) =>
           (row as any).__priority
@@ -45,19 +53,31 @@ export default function ParentComunicados() {
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <span>{i.notification?.title || ""}</span>
                 {dueProcess && (
-                  <span style={{ padding: "2px 8px", borderRadius: 999, background: "#fee2e2", color: "#b91c1c", fontSize: 12 }}>
+                  <span
+                    style={{
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      background: "#fee2e2",
+                      color: "#b91c1c",
+                      fontSize: 12,
+                    }}
+                  >
                     Prioridad
                   </span>
                 )}
               </div>
             ),
             status: i.notification?.status || "SENT",
-            date: i.notification?.createdAt?.slice(0, 10) || ""
+            date: i.notification?.createdAt?.slice(0, 10) || "",
           };
         })}
       />
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <select
+          className="input"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
           <option value="">Todos los estados</option>
           <option value="PENDING">Pendiente</option>
           <option value="APPROVED">Aprobado</option>
@@ -72,7 +92,11 @@ export default function ParentComunicados() {
         <div style={{ alignSelf: "center", color: "#6b7280" }}>
           Pagina {page} de {Math.max(1, Math.ceil(total / 10))}
         </div>
-        <button className="button secondary" disabled={page >= Math.ceil(total / 10)} onClick={() => setPage(page + 1)}>
+        <button
+          className="button secondary"
+          disabled={page >= Math.ceil(total / 10)}
+          onClick={() => setPage(page + 1)}
+        >
           Siguiente
         </button>
       </div>

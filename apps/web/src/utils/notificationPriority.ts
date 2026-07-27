@@ -19,4 +19,6 @@ export const isDueProcessNotification = (input?: NotificationPriorityInput | nul
 };
 
 export const prioritizeDueProcess = <T extends NotificationPriorityInput>(items: T[]) =>
-  [...items].sort((a, b) => Number(isDueProcessNotification(b)) - Number(isDueProcessNotification(a)));
+  [...items].sort(
+    (a, b) => Number(isDueProcessNotification(b)) - Number(isDueProcessNotification(a))
+  );
