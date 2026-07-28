@@ -8,9 +8,6 @@ import readXlsxFile from "read-excel-file/node";
 import writeXlsxFile from "write-excel-file/node";
 import type { SheetData } from "write-excel-file/node";
 import { randomUUID } from "crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import bcrypt from "bcryptjs";
 import { buildCsvReport, buildXlsxReportBuffer, sendTabularPdf } from "../utils/reportExport.js";
 import { getBrandingSettings } from "../utils/brandingSettings.js";
@@ -24,11 +21,10 @@ import { isDeveloperRole } from "../utils/rbac.js";
 
 const router = Router();
 const CERT_REQUEST_APPROVAL_WINDOW_MS = 24 * 60 * 60 * 1000;
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const importHistoryPath = path.resolve(__dirname, "..", "data", "import-history.json");
 
 type WorkbookSheet = { sheet: string; data: SheetData };
 type ImportedWorkbook = Map<string, unknown[][]>;
+type ImportDb = Prisma.TransactionClient | typeof prisma;
 
 async function buildWorkbookBuffer(sheets: WorkbookSheet[]) {
   const raw = await writeXlsxFile(sheets).toBuffer();
@@ -46,21 +42,6 @@ function normalizeImportedRow(row: unknown[]) {
 function isLikelyXlsxBuffer(buffer: Buffer) {
   if (buffer.length < 4) return false;
   return buffer[0] === 0x50 && buffer[1] === 0x4b;
-}
-
-async function readImportHistory() {
-  try {
-    const raw = await fs.readFile(importHistoryPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function writeImportHistory(entries: any[]) {
-  await fs.mkdir(path.dirname(importHistoryPath), { recursive: true });
-  await fs.writeFile(importHistoryPath, JSON.stringify(entries, null, 2));
 }
 
 function classGradeLevelValue(classEntity: any) {
@@ -2281,7 +2262,7 @@ router.get("/import-template/excel", requireAuth, requireRole(["ADMIN"]), async 
     "socialWeight",
   ]);
   addSheet("ESTUDIANTES", ["fullName", "birthDate", "gradeLevel", "studentGroup", "isActive"]);
-  addSheet("CLASES", ["teacherEmail", "gradeLevel", "schedule"]);
+  addSheet("CLASES", ["teacherEmail", "gradeLevel", "studentGroup", "academicYear", "schedule"]);
   addSheet("MATRICULAS", [
     "studentDocType",
     "studentDocNumber",
@@ -2334,7 +2315,10 @@ router.get("/import-template/excel", requireAuth, requireRole(["ADMIN"]), async 
 });
 
 router.get("/import-template/history", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
-  const history = await readImportHistory();
+  const history = await prisma.importHistory.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
   res.json({ data: history });
 });
 
@@ -2396,6 +2380,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       enrollments: 0,
     },
     skipped: 0,
+    warnings: [] as Array<{ sheet: string; row: number; message: string }>,
     errors: [] as Array<{ sheet: string; row: number; message: string }>,
     defaultPasswordUsed: false,
   };
@@ -2479,6 +2464,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   ];
 
   const modeIsImport = result.mode === "import";
+  let db: ImportDb = prisma;
 
   const digitsOnly = (value: any) => String(value || "").replace(/\D+/g, "");
   const slugify = (value: any) =>
@@ -2491,6 +2477,320 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       .slice(0, 40);
   const isEmailLike = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+
+  const addError = (sheet: string, row: number, message: string) => {
+    result.errors.push({ sheet, row, message });
+    if (row > 1) result.skipped += 1;
+  };
+
+  const addWarning = (sheet: string, row: number, message: string) => {
+    result.warnings.push({ sheet, row, message });
+  };
+
+  const expectedSheets: Record<
+    string,
+    {
+      required: string[];
+      optional?: string[];
+      emails?: string[];
+      dates?: string[];
+      booleans?: string[];
+      numbers?: string[];
+      enums?: Record<string, string[]>;
+    }
+  > = {
+    USUARIOS: {
+      required: ["email", "fullName", "role"],
+      optional: ["isActive", "password"],
+      emails: ["email"],
+      booleans: ["isActive"],
+      enums: { role: roleValues },
+    },
+    DOCENTES: {
+      required: ["userEmail"],
+      optional: [
+        "subjects",
+        "subjectHours",
+        "subjectSchedules",
+        "subjectHoursMode",
+        "cognitiveWeight",
+        "personalWeight",
+        "socialWeight",
+      ],
+      emails: ["userEmail"],
+      numbers: ["cognitiveWeight", "personalWeight", "socialWeight"],
+    },
+    ESTUDIANTES: {
+      required: ["fullName", "gradeLevel"],
+      optional: ["birthDate", "studentGroup", "isActive"],
+      dates: ["birthDate"],
+      booleans: ["isActive"],
+      enums: { gradeLevel: gradeValues },
+    },
+    CLASES: {
+      required: ["teacherEmail", "gradeLevel", "studentGroup", "academicYear"],
+      optional: ["schedule"],
+      emails: ["teacherEmail"],
+      numbers: ["academicYear"],
+      enums: { gradeLevel: gradeValues },
+    },
+    MATRICULAS: {
+      required: ["teacherEmail", "studentGradeLevel", "studentGroup", "academicYear"],
+      optional: [
+        "studentDocType",
+        "studentDocNumber",
+        "studentFullName",
+        "studentBirthDate",
+        "status",
+        "studentAddress",
+        "guardianFullName",
+        "guardianDocType",
+        "guardianDocNumber",
+        "guardianRelation",
+        "contactPhone",
+        "contactEmail",
+      ],
+      emails: ["teacherEmail", "contactEmail"],
+      dates: ["studentBirthDate"],
+      numbers: ["academicYear"],
+      enums: { studentGradeLevel: gradeValues },
+    },
+    ACUDIENTES: {
+      required: ["parentEmail"],
+      optional: ["studentId", "studentDocNumber", "studentFullName", "relation"],
+      emails: ["parentEmail"],
+    },
+    ADMISIONES: {
+      required: ["studentName", "gradeLevel"],
+      optional: [
+        "status",
+        "guardianFullName",
+        "guardianDocNumber",
+        "guardianRelation",
+        "contactPhone",
+        "contactEmail",
+        "studentBirthDate",
+        "studentDocType",
+        "studentDocNumber",
+        "studentAddress",
+      ],
+      emails: ["contactEmail"],
+      dates: ["studentBirthDate"],
+      enums: { gradeLevel: gradeValues, status: ["PENDING", "APPROVED", "REJECTED"] },
+    },
+    FACTURAS: {
+      required: ["studentDocNumber", "amount", "dueDate"],
+      optional: ["status"],
+      dates: ["dueDate"],
+      numbers: ["amount"],
+      enums: { status: ["PENDING", "PAID", "OVERDUE"] },
+    },
+    PAGOS: {
+      required: ["invoiceId", "amount", "paidAt", "method"],
+      optional: ["reference"],
+      dates: ["paidAt"],
+      numbers: ["amount"],
+    },
+  };
+
+  const prevalidateWorkbook = async () => {
+    const knownSheets = new Set(Object.keys(expectedSheets));
+    const userEmails = new Map<string, number>();
+    const userRoles = new Map<string, string>();
+    const classKeys = new Set<string>();
+    const studentNames = new Set<string>();
+    const enrollmentDocNumbers = new Set<string>();
+
+    for (const sheet of workbook.keys()) {
+      if (!knownSheets.has(sheet)) addWarning(sheet, 1, "Hoja no reconocida; sera ignorada.");
+    }
+
+    for (const [sheet, config] of Object.entries(expectedSheets)) {
+      const parsed = sheetRows(sheet);
+      if (!parsed.headers.length && !parsed.rows.length) continue;
+      const allowed = new Set([...(config.required || []), ...(config.optional || [])]);
+      const missing = config.required.filter((h) => !parsed.headers.includes(h));
+      if (missing.length) addError(sheet, 1, `Faltan columnas requeridas: ${missing.join(", ")}`);
+      for (const header of parsed.headers) {
+        if (header && !allowed.has(header))
+          addWarning(sheet, 1, `Columna no reconocida: ${header}.`);
+      }
+      parsed.rows.forEach((row, index) => {
+        const rowNumber = index + 2;
+        for (const field of config.required) {
+          if (!normalizeText(row[field])) addError(sheet, rowNumber, `${field} es obligatorio.`);
+        }
+        for (const field of config.emails || []) {
+          const value = normalizeText(row[field]);
+          if (value && !isEmailLike(value))
+            addError(sheet, rowNumber, `${field} no es un correo valido.`);
+        }
+        for (const field of config.dates || []) {
+          const value = row[field];
+          if (value !== undefined && value !== null && normalizeText(value) && !parseDate(value)) {
+            addError(sheet, rowNumber, `${field} no es una fecha valida.`);
+          }
+        }
+        for (const field of config.booleans || []) {
+          const value = row[field];
+          if (value !== undefined && value !== null && normalizeText(value)) {
+            const text = normalizeText(value).toLowerCase();
+            if (!["true", "1", "si", "sí", "sÃ­", "yes", "false", "0", "no"].includes(text)) {
+              addError(sheet, rowNumber, `${field} no es booleano valido.`);
+            }
+          }
+        }
+        for (const field of config.numbers || []) {
+          const value = row[field];
+          if (
+            value !== undefined &&
+            value !== null &&
+            normalizeText(value) &&
+            !Number.isFinite(Number(value))
+          ) {
+            addError(sheet, rowNumber, `${field} no es numerico.`);
+          }
+        }
+        for (const [field, values] of Object.entries(config.enums || {})) {
+          const value = normalizeText(row[field]).toUpperCase();
+          if (value && !values.includes(value)) {
+            addError(sheet, rowNumber, `${field} no esta dentro de los valores permitidos.`);
+          }
+        }
+      });
+    }
+
+    sheetRows("USUARIOS").rows.forEach((row, index) => {
+      const email = normalizeEmail(row.email);
+      const role = normalizeText(row.role).toUpperCase();
+      if (!email) return;
+      if (userEmails.has(email))
+        addError("USUARIOS", index + 2, `Correo duplicado en la plantilla: ${email}.`);
+      userEmails.set(email, index + 2);
+      if (role) userRoles.set(email, role);
+    });
+
+    sheetRows("ESTUDIANTES").rows.forEach((row) => {
+      const fullName = normalizeText(row.fullName);
+      if (fullName) studentNames.add(fullName.toLowerCase());
+    });
+
+    sheetRows("CLASES").rows.forEach((row, index) => {
+      const teacherEmail = normalizeEmail(row.teacherEmail);
+      const gradeLevel = normalizeText(row.gradeLevel).toUpperCase();
+      const studentGroup = normalizeText(row.studentGroup);
+      const academicYear = Number(row.academicYear);
+      if (
+        teacherEmail &&
+        userRoles.get(teacherEmail) &&
+        userRoles.get(teacherEmail) !== "TEACHER"
+      ) {
+        addError(
+          "CLASES",
+          index + 2,
+          `${teacherEmail} existe en USUARIOS pero no tiene rol TEACHER.`
+        );
+      }
+      if (teacherEmail && gradeLevel && studentGroup && Number.isFinite(academicYear)) {
+        classKeys.add(`${teacherEmail}|${gradeLevel}|${studentGroup}|${academicYear}`);
+      }
+    });
+
+    sheetRows("MATRICULAS").rows.forEach((row, index) => {
+      const teacherEmail = normalizeEmail(row.teacherEmail);
+      const gradeLevel = normalizeText(row.studentGradeLevel).toUpperCase();
+      const studentGroup = normalizeText(row.studentGroup);
+      const academicYear = Number(row.academicYear);
+      const studentName = normalizeText(row.studentFullName);
+      const docNumber = normalizeText(row.studentDocNumber);
+      const classKey = `${teacherEmail}|${gradeLevel}|${studentGroup}|${academicYear}`;
+      if (
+        teacherEmail &&
+        userRoles.get(teacherEmail) &&
+        userRoles.get(teacherEmail) !== "TEACHER"
+      ) {
+        addError(
+          "MATRICULAS",
+          index + 2,
+          `${teacherEmail} existe en USUARIOS pero no tiene rol TEACHER.`
+        );
+      }
+      if (
+        teacherEmail &&
+        gradeLevel &&
+        studentGroup &&
+        Number.isFinite(academicYear) &&
+        !classKeys.has(classKey)
+      ) {
+        addWarning(
+          "MATRICULAS",
+          index + 2,
+          "La clase no esta en la hoja CLASES; se buscara en la base de datos."
+        );
+      }
+      if (studentName) studentNames.add(studentName.toLowerCase());
+      if (docNumber) {
+        if (enrollmentDocNumbers.has(docNumber)) {
+          addWarning("MATRICULAS", index + 2, `Documento repetido en matriculas: ${docNumber}.`);
+        }
+        enrollmentDocNumbers.add(docNumber);
+      }
+    });
+
+    sheetRows("ACUDIENTES").rows.forEach((row, index) => {
+      const parentEmail = normalizeEmail(row.parentEmail);
+      const studentName = normalizeText(row.studentFullName);
+      const studentDocNumber = normalizeText(row.studentDocNumber || row.studentId);
+      if (parentEmail && userRoles.get(parentEmail) && userRoles.get(parentEmail) !== "PARENT") {
+        addError(
+          "ACUDIENTES",
+          index + 2,
+          `${parentEmail} existe en USUARIOS pero no tiene rol PARENT.`
+        );
+      }
+      if (!studentName && !studentDocNumber) {
+        addError(
+          "ACUDIENTES",
+          index + 2,
+          "Debe indicar studentDocNumber, studentId o studentFullName."
+        );
+      }
+      if (studentName && !studentNames.has(studentName.toLowerCase())) {
+        addWarning(
+          "ACUDIENTES",
+          index + 2,
+          "El estudiante no esta en la plantilla; se buscara en la base de datos."
+        );
+      }
+    });
+
+    const relationChecks: Array<Promise<void>> = [];
+    for (const [index, row] of sheetRows("DOCENTES").rows.entries()) {
+      const email = normalizeEmail(row.userEmail);
+      if (email && !userRoles.has(email)) {
+        relationChecks.push(
+          prisma.user.findUnique({ where: { email }, select: { role: true } }).then((user) => {
+            if (!user) addError("DOCENTES", index + 2, `No existe el usuario ${email}.`);
+            else if (user.role !== "TEACHER")
+              addError("DOCENTES", index + 2, `${email} no tiene rol TEACHER.`);
+          })
+        );
+      }
+    }
+    for (const [index, row] of sheetRows("CLASES").rows.entries()) {
+      const email = normalizeEmail(row.teacherEmail);
+      if (email && !userRoles.has(email)) {
+        relationChecks.push(
+          prisma.user.findUnique({ where: { email }, select: { role: true } }).then((user) => {
+            if (!user) addError("CLASES", index + 2, `No existe el docente ${email}.`);
+            else if (user.role !== "TEACHER")
+              addError("CLASES", index + 2, `${email} no tiene rol TEACHER.`);
+          })
+        );
+      }
+    }
+    await Promise.all(relationChecks);
+  };
 
   const uniqueParentEmail = async (baseEmail: string) => {
     const normalizedBase = String(baseEmail || "")
@@ -2505,7 +2805,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     let candidate = `${localPart}@${domain}`;
     let suffix = 1;
     while (true) {
-      const existing = await prisma.user.findUnique({
+      const existing = await db.user.findUnique({
         where: { email: candidate },
         select: { id: true, role: true },
       });
@@ -2517,22 +2817,22 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
 
   const ensureRoleProfile = async (user: { id: string; role: string }) => {
     if (user.role === "TEACHER") {
-      const teacher = await prisma.teacher.findUnique({
+      const teacher = await db.teacher.findUnique({
         where: { userId: user.id },
         select: { id: true },
       });
       if (!teacher) {
-        await prisma.teacher.create({ data: { user: { connect: { id: user.id } } } });
+        await db.teacher.create({ data: { user: { connect: { id: user.id } } } });
         result.created.teachers += 1;
       }
     }
     if (user.role === "PARENT") {
-      const parent = await prisma.parent.findUnique({
+      const parent = await db.parent.findUnique({
         where: { userId: user.id },
         select: { id: true },
       });
       if (!parent) {
-        await prisma.parent.create({ data: { userId: user.id } });
+        await db.parent.create({ data: { userId: user.id } });
         result.created.parents += 1;
       }
     }
@@ -2544,7 +2844,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     const contactEmail = normalizeEmail(enrollmentData.contactEmail);
 
     if (isEmailLike(contactEmail)) {
-      const user = await prisma.user.findUnique({
+      const user = await db.user.findUnique({
         where: { email: contactEmail },
         select: { id: true, role: true, fullName: true },
       });
@@ -2552,14 +2852,14 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     }
 
     if (guardianDoc && guardianDoc !== "SIN_DOCUMENTO" && guardianDoc !== "N/A") {
-      const matchingEnrollment = await prisma.enrollment.findFirst({
+      const matchingEnrollment = await db.enrollment.findFirst({
         where: {
           guardianDocNumber: { equals: guardianDoc, mode: "insensitive" },
         },
         select: { studentId: true },
       });
       if (matchingEnrollment) {
-        const guardian = await prisma.guardian.findFirst({
+        const guardian = await db.guardian.findFirst({
           where: { studentId: matchingEnrollment.studentId },
           include: {
             parent: {
@@ -2578,7 +2878,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     }
 
     if (guardianName && guardianName !== "Acudiente") {
-      const user = await prisma.user.findFirst({
+      const user = await db.user.findFirst({
         where: {
           role: "PARENT",
           fullName: { equals: guardianName, mode: "insensitive" },
@@ -2613,7 +2913,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       const parentEmail = await uniqueParentEmail(preferredEmail);
       const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
       result.defaultPasswordUsed = true;
-      user = await prisma.user.create({
+      user = await db.user.create({
         data: {
           email: parentEmail,
           fullName: guardianName,
@@ -2634,13 +2934,13 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       return;
     }
 
-    const parent = await prisma.parent.upsert({
+    const parent = await db.parent.upsert({
       where: { userId: user.id },
       update: {},
       create: { userId: user.id },
       select: { id: true },
     });
-    await prisma.guardian.upsert({
+    await db.guardian.upsert({
       where: {
         parentId_studentId: {
           parentId: parent.id,
@@ -2664,10 +2964,10 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   ) => {
     const rawStudentId = normalizeText(row.studentId);
     if (rawStudentId) {
-      const byId = await prisma.student.findUnique({ where: { id: rawStudentId } });
+      const byId = await db.student.findUnique({ where: { id: rawStudentId } });
       if (byId) return byId;
 
-      const byEnrollmentDoc = await prisma.enrollment.findFirst({
+      const byEnrollmentDoc = await db.enrollment.findFirst({
         where: { studentDocNumber: rawStudentId },
         include: { student: true },
       });
@@ -2700,7 +3000,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       return null;
     }
 
-    const existing = await prisma.student.findFirst({
+    const existing = await db.student.findFirst({
       where: {
         fullName: { equals: fullName, mode: "insensitive" },
         ...(birthDate ? { birthDate } : { gradeLevel: gradeLevel as any }),
@@ -2709,11 +3009,11 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     if (existing) {
       const updateData: any = { gradeLevel: gradeLevel as any };
       if (birthDate) updateData.birthDate = birthDate;
-      await prisma.student.update({ where: { id: existing.id }, data: updateData });
+      await db.student.update({ where: { id: existing.id }, data: updateData });
       return { ...existing, ...updateData };
     }
 
-    const created = await prisma.student.create({
+    const created = await db.student.create({
       data: {
         fullName,
         birthDate,
@@ -2728,10 +3028,10 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   const resolveStudentForGuardian = async (row: Record<string, any>, rowNumber: number) => {
     const rawStudentId = normalizeText(row.studentId);
     if (rawStudentId) {
-      const byId = await prisma.student.findUnique({ where: { id: rawStudentId } });
+      const byId = await db.student.findUnique({ where: { id: rawStudentId } });
       if (byId) return byId;
 
-      const byEnrollmentDoc = await prisma.enrollment.findFirst({
+      const byEnrollmentDoc = await db.enrollment.findFirst({
         where: { studentDocNumber: rawStudentId },
         include: { student: true },
       });
@@ -2739,8 +3039,18 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     }
 
     const fullName = normalizeText(row.studentFullName || row.fullName || row.studentName);
+    const studentDocNumber = normalizeText(row.studentDocNumber);
+    if (studentDocNumber) {
+      const byEnrollmentDoc = await db.enrollment.findFirst({
+        where: { studentDocNumber },
+        include: { student: true },
+        orderBy: [{ year: "desc" }],
+      });
+      if (byEnrollmentDoc?.student) return byEnrollmentDoc.student;
+    }
+
     if (fullName) {
-      const byName = await prisma.student.findFirst({
+      const byName = await db.student.findFirst({
         where: { fullName: { equals: fullName, mode: "insensitive" } },
         orderBy: { createdAt: "desc" },
       });
@@ -2764,7 +3074,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     academicYear: number,
     rowNumber: number
   ) => {
-    const teacherUser = await prisma.user.findUnique({
+    const teacherUser = await db.user.findUnique({
       where: {
         email: teacherEmail,
       },
@@ -2781,7 +3091,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       return null;
     }
 
-    const teacher = await prisma.teacher.findUnique({
+    const teacher = await db.teacher.findUnique({
       where: {
         userId: teacherUser.id,
       },
@@ -2798,7 +3108,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       return null;
     }
 
-    const classEntity = await prisma.class.findFirst({
+    const classEntity = await db.class.findFirst({
       where: {
         teacherId: teacher.id,
         gradeLevel: gradeLevel as any,
@@ -2821,560 +3131,613 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     return classEntity;
   };
 
-  const usersSheet = sheetRows("USUARIOS");
-  if (
-    usersSheet.rows.length &&
-    ensureHeaders("USUARIOS", usersSheet.headers, ["email", "fullName", "role"])
-  ) {
-    for (let i = 0; i < usersSheet.rows.length; i += 1) {
-      const row = usersSheet.rows[i];
-      const email = normalizeEmail(row.email);
-      const fullName = normalizeText(row.fullName);
-      const role = normalizeText(row.role).toUpperCase();
-      const isActive = parseBoolean(row.isActive, true);
-      const password = normalizeText(row.password);
-      if (!email || !fullName || !roleValues.includes(role)) {
-        result.errors.push({
-          sheet: "USUARIOS",
-          row: i + 2,
-          message: "Datos incompletos o rol invalido.",
-        });
-        result.skipped += 1;
-        continue;
-      }
-      if (modeIsImport) {
-        const existing = await prisma.user.findUnique({ where: { email } });
-        if (existing) {
-          const update: any = { fullName, role: role as any, isActive };
-          if (password) {
-            update.passwordHash = await bcrypt.hash(password, 10);
+  await prevalidateWorkbook();
+
+  const executeImport = async () => {
+    const usersSheet = sheetRows("USUARIOS");
+    if (
+      usersSheet.rows.length &&
+      ensureHeaders("USUARIOS", usersSheet.headers, ["email", "fullName", "role"])
+    ) {
+      for (let i = 0; i < usersSheet.rows.length; i += 1) {
+        const row = usersSheet.rows[i];
+        const email = normalizeEmail(row.email);
+        const fullName = normalizeText(row.fullName);
+        const role = normalizeText(row.role).toUpperCase();
+        const isActive = parseBoolean(row.isActive, true);
+        const password = normalizeText(row.password);
+        if (!email || !fullName || !roleValues.includes(role)) {
+          result.errors.push({
+            sheet: "USUARIOS",
+            row: i + 2,
+            message: "Datos incompletos o rol invalido.",
+          });
+          result.skipped += 1;
+          continue;
+        }
+        if (modeIsImport) {
+          const existing = await db.user.findUnique({ where: { email } });
+          if (existing) {
+            const update: any = { fullName, role: role as any, isActive };
+            if (password) {
+              update.passwordHash = await bcrypt.hash(password, 10);
+            }
+            const updated = await db.user.update({
+              where: { id: existing.id },
+              data: update,
+              select: { id: true, role: true },
+            });
+            await ensureRoleProfile(updated);
+            result.updated.users += 1;
+          } else {
+            const passwordValue = password || DEFAULT_PASSWORD;
+            if (!password) result.defaultPasswordUsed = true;
+            const passwordHash = await bcrypt.hash(passwordValue, 10);
+            const created = await db.user.create({
+              data: { email, fullName, role: role as any, isActive, passwordHash },
+            });
+            if (role === "TEACHER") {
+              await db.teacher.create({ data: { user: { connect: { id: created.id } } } });
+              result.created.teachers += 1;
+            }
+            if (role === "PARENT") {
+              await db.parent.create({ data: { userId: created.id } });
+              result.created.parents += 1;
+            }
+            result.created.users += 1;
           }
-          const updated = await prisma.user.update({
-            where: { id: existing.id },
-            data: update,
-            select: { id: true, role: true },
-          });
-          await ensureRoleProfile(updated);
-          result.updated.users += 1;
-        } else {
-          const passwordValue = password || DEFAULT_PASSWORD;
-          if (!password) result.defaultPasswordUsed = true;
-          const passwordHash = await bcrypt.hash(passwordValue, 10);
-          const created = await prisma.user.create({
-            data: { email, fullName, role: role as any, isActive, passwordHash },
-          });
-          if (role === "TEACHER") {
-            await prisma.teacher.create({ data: { user: { connect: { id: created.id } } } });
+        }
+      }
+    }
+
+    const teachersSheet = sheetRows("DOCENTES");
+    if (
+      teachersSheet.rows.length &&
+      ensureHeaders("DOCENTES", teachersSheet.headers, ["userEmail"])
+    ) {
+      for (let i = 0; i < teachersSheet.rows.length; i += 1) {
+        const row = teachersSheet.rows[i];
+        const email = normalizeEmail(row.userEmail);
+        if (!email) {
+          result.errors.push({ sheet: "DOCENTES", row: i + 2, message: "userEmail requerido." });
+          result.skipped += 1;
+          continue;
+        }
+        if (modeIsImport) {
+          const user = await db.user.findUnique({ where: { email } });
+          if (!user) {
+            result.errors.push({
+              sheet: "DOCENTES",
+              row: i + 2,
+              message: "Usuario no encontrado para el docente.",
+            });
+            result.skipped += 1;
+            continue;
+          }
+          if (user.role !== "TEACHER") {
+            await db.user.update({ where: { id: user.id }, data: { role: "TEACHER" } });
+          }
+          const subjects = row.subjects
+            ? Array.isArray(row.subjects)
+              ? row.subjects
+              : String(row.subjects)
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+            : [];
+          const optionalNumber = (value: unknown) => {
+            if (value === null || value === undefined || value === "") return undefined;
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : undefined;
+          };
+          const updateData: any = {
+            subjects,
+            subjectHours: parseJson(row.subjectHours) || undefined,
+            subjectSchedules: parseJson(row.subjectSchedules) || undefined,
+            subjectHoursMode: parseJson(row.subjectHoursMode) || undefined,
+            cognitiveWeight: optionalNumber(row.cognitiveWeight),
+            personalWeight: optionalNumber(row.personalWeight),
+            socialWeight: optionalNumber(row.socialWeight),
+          };
+          const teacher = await db.teacher.findUnique({ where: { userId: user.id } });
+          if (teacher) {
+            await db.teacher.update({ where: { id: teacher.id }, data: updateData });
+            result.updated.teachers += 1;
+          } else {
+            await db.teacher.create({
+              data: { user: { connect: { id: user.id } }, ...updateData },
+            });
             result.created.teachers += 1;
           }
-          if (role === "PARENT") {
-            await prisma.parent.create({ data: { userId: created.id } });
-            result.created.parents += 1;
-          }
-          result.created.users += 1;
         }
       }
     }
-  }
 
-  const teachersSheet = sheetRows("DOCENTES");
-  if (
-    teachersSheet.rows.length &&
-    ensureHeaders("DOCENTES", teachersSheet.headers, ["userEmail"])
-  ) {
-    for (let i = 0; i < teachersSheet.rows.length; i += 1) {
-      const row = teachersSheet.rows[i];
-      const email = normalizeEmail(row.userEmail);
-      if (!email) {
-        result.errors.push({ sheet: "DOCENTES", row: i + 2, message: "userEmail requerido." });
-        result.skipped += 1;
-        continue;
-      }
-      if (modeIsImport) {
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
+    const studentsSheet = sheetRows("ESTUDIANTES");
+    if (
+      studentsSheet.rows.length &&
+      ensureHeaders("ESTUDIANTES", studentsSheet.headers, ["fullName", "gradeLevel"])
+    ) {
+      for (let i = 0; i < studentsSheet.rows.length; i += 1) {
+        const row = studentsSheet.rows[i];
+        const fullName = normalizeText(row.fullName);
+        const gradeLevel = normalizeText(row.gradeLevel).toUpperCase();
+        if (!fullName || !gradeValues.includes(gradeLevel)) {
           result.errors.push({
-            sheet: "DOCENTES",
+            sheet: "ESTUDIANTES",
             row: i + 2,
-            message: "Usuario no encontrado para el docente.",
+            message: "Nombre o grado invalido.",
           });
           result.skipped += 1;
           continue;
         }
-        if (user.role !== "TEACHER") {
-          await prisma.user.update({ where: { id: user.id }, data: { role: "TEACHER" } });
-        }
-        const subjects = row.subjects
-          ? Array.isArray(row.subjects)
-            ? row.subjects
-            : String(row.subjects)
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean)
-          : [];
-        const optionalNumber = (value: unknown) => {
-          if (value === null || value === undefined || value === "") return undefined;
-          const parsed = Number(value);
-          return Number.isFinite(parsed) ? parsed : undefined;
-        };
-        const updateData: any = {
-          subjects,
-          subjectHours: parseJson(row.subjectHours) || undefined,
-          subjectSchedules: parseJson(row.subjectSchedules) || undefined,
-          subjectHoursMode: parseJson(row.subjectHoursMode) || undefined,
-          cognitiveWeight: optionalNumber(row.cognitiveWeight),
-          personalWeight: optionalNumber(row.personalWeight),
-          socialWeight: optionalNumber(row.socialWeight),
-        };
-        const teacher = await prisma.teacher.findUnique({ where: { userId: user.id } });
-        if (teacher) {
-          await prisma.teacher.update({ where: { id: teacher.id }, data: updateData });
-          result.updated.teachers += 1;
-        } else {
-          await prisma.teacher.create({
-            data: { user: { connect: { id: user.id } }, ...updateData },
+        if (modeIsImport) {
+          const birthDate = parseDate(row.birthDate);
+          const studentGroup = normalizeText(row.studentGroup) || null;
+          const isActive = parseBoolean(row.isActive, true);
+          const existing = await db.student.findFirst({
+            where: {
+              fullName,
+              ...(birthDate ? { birthDate } : {}),
+              ...(birthDate
+                ? {}
+                : { gradeLevel: gradeLevel as any, studentGroup: studentGroup || undefined }),
+            },
           });
-          result.created.teachers += 1;
+          if (existing) {
+            await db.student.update({
+              where: { id: existing.id },
+              data: { gradeLevel: gradeLevel as any, studentGroup, birthDate, isActive },
+            });
+            result.updated.students += 1;
+          } else {
+            await db.student.create({
+              data: { fullName, birthDate, gradeLevel: gradeLevel as any, studentGroup, isActive },
+            });
+            result.created.students += 1;
+          }
         }
       }
     }
-  }
 
-  const studentsSheet = sheetRows("ESTUDIANTES");
-  if (
-    studentsSheet.rows.length &&
-    ensureHeaders("ESTUDIANTES", studentsSheet.headers, ["fullName", "gradeLevel"])
-  ) {
-    for (let i = 0; i < studentsSheet.rows.length; i += 1) {
-      const row = studentsSheet.rows[i];
-      const fullName = normalizeText(row.fullName);
-      const gradeLevel = normalizeText(row.gradeLevel).toUpperCase();
-      if (!fullName || !gradeValues.includes(gradeLevel)) {
-        result.errors.push({
-          sheet: "ESTUDIANTES",
-          row: i + 2,
-          message: "Nombre o grado invalido.",
-        });
-        result.skipped += 1;
-        continue;
-      }
-      if (modeIsImport) {
-        const birthDate = parseDate(row.birthDate);
-        const studentGroup = normalizeText(row.studentGroup) || null;
-        const isActive = parseBoolean(row.isActive, true);
-        const existing = await prisma.student.findFirst({
-          where: {
-            fullName,
-            ...(birthDate ? { birthDate } : {}),
-            ...(birthDate
-              ? {}
-              : { gradeLevel: gradeLevel as any, studentGroup: studentGroup || undefined }),
-          },
-        });
-        if (existing) {
-          await prisma.student.update({
-            where: { id: existing.id },
-            data: { gradeLevel: gradeLevel as any, studentGroup, birthDate, isActive },
-          });
-          result.updated.students += 1;
-        } else {
-          await prisma.student.create({
-            data: { fullName, birthDate, gradeLevel: gradeLevel as any, studentGroup, isActive },
-          });
-          result.created.students += 1;
-        }
-      }
-    }
-  }
-
-  const classesSheet = sheetRows("CLASES");
-  if (
-    classesSheet.rows.length &&
-    ensureHeaders("CLASES", classesSheet.headers, [
-      "teacherEmail",
-      "gradeLevel",
-      "studentGroup",
-      "academicYear",
-    ])
-  ) {
-    for (let i = 0; i < classesSheet.rows.length; i += 1) {
-      const row = classesSheet.rows[i];
-      const teacherEmail = normalizeEmail(row.teacherEmail);
-      const gradeLevel = normalizeText(row.gradeLevel).toUpperCase();
-      const studentGroup = normalizeText(row.studentGroup);
-      const academicYear = Number(row.academicYear);
-      if (
-        !teacherEmail ||
-        !gradeValues.includes(gradeLevel) ||
-        !studentGroup ||
-        Number.isNaN(academicYear)
-      ) {
-        result.errors.push({
-          sheet: "CLASES",
-          row: i + 2,
-          message: "teacherEmail, gradeLevel, studentGroup y academicYear son obligatorios.",
-        });
-        result.skipped += 1;
-        continue;
-      }
-      if (modeIsImport) {
-        const teacherUser = await prisma.user.findUnique({ where: { email: teacherEmail } });
-        if (!teacherUser) {
-          result.errors.push({ sheet: "CLASES", row: i + 2, message: "Docente no encontrado." });
-          result.skipped += 1;
-          continue;
-        }
-        const teacher = await prisma.teacher.findUnique({ where: { userId: teacherUser.id } });
-        if (!teacher) {
+    const classesSheet = sheetRows("CLASES");
+    if (
+      classesSheet.rows.length &&
+      ensureHeaders("CLASES", classesSheet.headers, [
+        "teacherEmail",
+        "gradeLevel",
+        "studentGroup",
+        "academicYear",
+      ])
+    ) {
+      for (let i = 0; i < classesSheet.rows.length; i += 1) {
+        const row = classesSheet.rows[i];
+        const teacherEmail = normalizeEmail(row.teacherEmail);
+        const gradeLevel = normalizeText(row.gradeLevel).toUpperCase();
+        const studentGroup = normalizeText(row.studentGroup);
+        const academicYear = Number(row.academicYear);
+        if (
+          !teacherEmail ||
+          !gradeValues.includes(gradeLevel) ||
+          !studentGroup ||
+          Number.isNaN(academicYear)
+        ) {
           result.errors.push({
             sheet: "CLASES",
             row: i + 2,
-            message: "Perfil docente no encontrado.",
+            message: "teacherEmail, gradeLevel, studentGroup y academicYear son obligatorios.",
           });
           result.skipped += 1;
           continue;
         }
-        const schedule = parseJson(row.schedule) || undefined;
-        const existing = await prisma.class.findFirst({
-          where: {
-            teacherId: teacher.id,
-            gradeLevel: gradeLevel as any,
-            studentGroup,
-            academicYear,
-          },
-        });
-        if (existing) {
-          await prisma.class.update({ where: { id: existing.id }, data: { schedule } });
-          result.updated.classes += 1;
-        } else {
-          await prisma.class.create({
-            data: {
+        if (modeIsImport) {
+          const teacherUser = await db.user.findUnique({ where: { email: teacherEmail } });
+          if (!teacherUser) {
+            result.errors.push({ sheet: "CLASES", row: i + 2, message: "Docente no encontrado." });
+            result.skipped += 1;
+            continue;
+          }
+          const teacher = await db.teacher.findUnique({ where: { userId: teacherUser.id } });
+          if (!teacher) {
+            result.errors.push({
+              sheet: "CLASES",
+              row: i + 2,
+              message: "Perfil docente no encontrado.",
+            });
+            result.skipped += 1;
+            continue;
+          }
+          const schedule = parseJson(row.schedule) || undefined;
+          const existing = await db.class.findFirst({
+            where: {
               teacherId: teacher.id,
               gradeLevel: gradeLevel as any,
               studentGroup,
               academicYear,
-              schedule,
             },
           });
-          result.created.classes += 1;
+          if (existing) {
+            await db.class.update({ where: { id: existing.id }, data: { schedule } });
+            result.updated.classes += 1;
+          } else {
+            await db.class.create({
+              data: {
+                teacherId: teacher.id,
+                gradeLevel: gradeLevel as any,
+                studentGroup,
+                academicYear,
+                schedule,
+              },
+            });
+            result.created.classes += 1;
+          }
         }
       }
     }
-  }
 
-  const enrollSheet = sheetRows("MATRICULAS");
-  if (
-    enrollSheet.rows.length &&
-    ensureHeaders("MATRICULAS", enrollSheet.headers, [
-      "teacherEmail",
-      "studentGradeLevel",
-      "studentGroup",
-      "academicYear",
-    ])
-  ) {
-    for (let i = 0; i < enrollSheet.rows.length; i += 1) {
-      const row = enrollSheet.rows[i];
-      const teacherEmail = normalizeEmail(row.teacherEmail);
-      const gradeLevel = normalizeText(row.studentGradeLevel).toUpperCase();
-      const studentGroup = normalizeText(row.studentGroup);
-      const academicYear = Number(row.academicYear);
+    const enrollSheet = sheetRows("MATRICULAS");
+    if (
+      enrollSheet.rows.length &&
+      ensureHeaders("MATRICULAS", enrollSheet.headers, [
+        "teacherEmail",
+        "studentGradeLevel",
+        "studentGroup",
+        "academicYear",
+      ])
+    ) {
+      for (let i = 0; i < enrollSheet.rows.length; i += 1) {
+        const row = enrollSheet.rows[i];
+        const teacherEmail = normalizeEmail(row.teacherEmail);
+        const gradeLevel = normalizeText(row.studentGradeLevel).toUpperCase();
+        const studentGroup = normalizeText(row.studentGroup);
+        const academicYear = Number(row.academicYear);
 
-      if (!teacherEmail || !gradeLevel || !studentGroup || !academicYear) {
-        result.errors.push({
-          sheet: "MATRICULAS",
-          row: i + 2,
-          message: "teacherEmail, studentGradeLevel, studentGroup y academicYear son obligatorios.",
-        });
+        if (!teacherEmail || !gradeLevel || !studentGroup || !academicYear) {
+          result.errors.push({
+            sheet: "MATRICULAS",
+            row: i + 2,
+            message:
+              "teacherEmail, studentGradeLevel, studentGroup y academicYear son obligatorios.",
+          });
 
-        result.skipped += 1;
-        continue;
+          result.skipped += 1;
+          continue;
+        }
+        if (modeIsImport) {
+          const classEntity = await resolveClass(
+            teacherEmail,
+            gradeLevel,
+            studentGroup,
+            academicYear,
+            i + 2
+          );
+
+          if (!classEntity) {
+            continue;
+          }
+
+          const classId = classEntity.id;
+          if (!classEntity) {
+            result.errors.push({
+              sheet: "MATRICULAS",
+              row: i + 2,
+              message: "classId no encontrado.",
+            });
+            result.skipped += 1;
+            continue;
+          }
+          const student = await resolveStudentForEnrollment(row, classEntity, i + 2);
+          if (!student) {
+            continue;
+          }
+          const studentId = student.id;
+          const studentGradeLevel = normalizeText(
+            row.studentGradeLevel || row.gradeLevel || classEntity.gradeLevel || student.gradeLevel
+          ).toUpperCase();
+          if (!gradeValues.includes(studentGradeLevel)) {
+            result.errors.push({
+              sheet: "MATRICULAS",
+              row: i + 2,
+              message: "studentGradeLevel invalido.",
+            });
+            result.skipped += 1;
+            continue;
+          }
+          const data: any = {
+            studentId,
+            classId,
+            year: academicYear,
+            status: normalizeText(row.status) || "ACTIVE",
+            studentFullName: normalizeText(row.studentFullName) || student.fullName,
+            studentBirthDate: parseDate(row.studentBirthDate) || student.birthDate,
+            studentDocType: normalizeText(row.studentDocType) || null,
+            studentDocNumber: normalizeText(row.studentDocNumber || row.studentId) || "N/A",
+            studentGradeLevel: studentGradeLevel as any,
+            studentAddress: normalizeText(row.studentAddress) || "",
+            guardianFullName: normalizeText(row.guardianFullName) || "Acudiente",
+            guardianDocType: normalizeText(row.guardianDocType) || null,
+            guardianDocNumber: normalizeText(row.guardianDocNumber) || "SIN_DOCUMENTO",
+            guardianRelation: normalizeText(row.guardianRelation) || "Acudiente",
+            contactPhone: normalizeText(row.contactPhone) || "SIN_TELEFONO",
+            contactEmail: normalizeEmail(row.contactEmail) || "",
+          };
+          const existing = await db.enrollment.findUnique({
+            where: {
+              studentId_classId_year: {
+                studentId,
+                classId,
+                year: academicYear,
+              },
+            },
+          });
+          if (existing) {
+            await db.enrollment.update({ where: { id: existing.id }, data });
+            result.updated.enrollments += 1;
+          } else {
+            await db.enrollment.create({ data });
+            result.created.enrollments += 1;
+          }
+          await ensureParentGuardianFromEnrollment(data, studentId, i + 2);
+        }
       }
-      if (modeIsImport) {
-        const classEntity = await resolveClass(
-          teacherEmail,
-          gradeLevel,
-          studentGroup,
-          academicYear,
-          i + 2
+    }
+
+    const guardiansSheet = sheetRows("ACUDIENTES");
+    if (
+      guardiansSheet.rows.length &&
+      ensureHeaders("ACUDIENTES", guardiansSheet.headers, ["parentEmail"])
+    ) {
+      for (let i = 0; i < guardiansSheet.rows.length; i += 1) {
+        const row = guardiansSheet.rows[i];
+        const parentEmail = normalizeEmail(row.parentEmail);
+        const studentKey = normalizeText(
+          row.studentId ||
+            row.studentDocNumber ||
+            row.studentFullName ||
+            row.fullName ||
+            row.studentName
         );
-
-        if (!classEntity) {
-          continue;
-        }
-
-        const classId = classEntity.id;
-        if (!classEntity) {
-          result.errors.push({
-            sheet: "MATRICULAS",
-            row: i + 2,
-            message: "classId no encontrado.",
-          });
-          result.skipped += 1;
-          continue;
-        }
-        const student = await resolveStudentForEnrollment(row, classEntity, i + 2);
-        if (!student) {
-          continue;
-        }
-        const studentId = student.id;
-        const studentGradeLevel = normalizeText(
-          row.studentGradeLevel || row.gradeLevel || classEntity.gradeLevel || student.gradeLevel
-        ).toUpperCase();
-        if (!gradeValues.includes(studentGradeLevel)) {
-          result.errors.push({
-            sheet: "MATRICULAS",
-            row: i + 2,
-            message: "studentGradeLevel invalido.",
-          });
-          result.skipped += 1;
-          continue;
-        }
-        const data: any = {
-          studentId,
-          classId,
-          year: academicYear,
-          status: normalizeText(row.status) || "ACTIVE",
-          studentFullName: normalizeText(row.studentFullName) || student.fullName,
-          studentBirthDate: parseDate(row.studentBirthDate) || student.birthDate,
-          studentDocType: normalizeText(row.studentDocType) || null,
-          studentDocNumber: normalizeText(row.studentDocNumber || row.studentId) || "N/A",
-          studentGradeLevel: studentGradeLevel as any,
-          studentAddress: normalizeText(row.studentAddress) || "",
-          guardianFullName: normalizeText(row.guardianFullName) || "Acudiente",
-          guardianDocType: normalizeText(row.guardianDocType) || null,
-          guardianDocNumber: normalizeText(row.guardianDocNumber) || "SIN_DOCUMENTO",
-          guardianRelation: normalizeText(row.guardianRelation) || "Acudiente",
-          contactPhone: normalizeText(row.contactPhone) || "SIN_TELEFONO",
-          contactEmail: normalizeEmail(row.contactEmail) || "",
-        };
-        const existing = await prisma.enrollment.findUnique({
-          where: {
-            studentId_classId_year: {
-              studentId,
-              classId,
-              year: academicYear,
-            },
-          },
-        });
-        if (existing) {
-          await prisma.enrollment.update({ where: { id: existing.id }, data });
-          result.updated.enrollments += 1;
-        } else {
-          await prisma.enrollment.create({ data });
-          result.created.enrollments += 1;
-        }
-        await ensureParentGuardianFromEnrollment(data, studentId, i + 2);
-      }
-    }
-  }
-
-  const guardiansSheet = sheetRows("ACUDIENTES");
-  if (
-    guardiansSheet.rows.length &&
-    ensureHeaders("ACUDIENTES", guardiansSheet.headers, ["parentEmail", "studentId"])
-  ) {
-    for (let i = 0; i < guardiansSheet.rows.length; i += 1) {
-      const row = guardiansSheet.rows[i];
-      const parentEmail = normalizeEmail(row.parentEmail);
-      const studentKey = normalizeText(
-        row.studentId || row.studentFullName || row.fullName || row.studentName
-      );
-      if (!parentEmail || !studentKey) {
-        result.errors.push({
-          sheet: "ACUDIENTES",
-          row: i + 2,
-          message: "parentEmail y studentId/studentFullName requeridos.",
-        });
-        result.skipped += 1;
-        continue;
-      }
-      if (modeIsImport) {
-        const student = await resolveStudentForGuardian(row, i + 2);
-        if (!student) {
-          continue;
-        }
-        const studentId = student.id;
-        let user = await prisma.user.findUnique({ where: { email: parentEmail } });
-        if (!user) {
-          const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
-          result.defaultPasswordUsed = true;
-          user = await prisma.user.create({
-            data: {
-              email: parentEmail,
-              fullName: parentEmail.split("@")[0] || "Acudiente",
-              role: "PARENT",
-              isActive: true,
-              passwordHash,
-            },
-          });
-          await prisma.parent.create({ data: { userId: user.id } });
-          result.created.users += 1;
-          result.created.parents += 1;
-        }
-        if (user.role !== "PARENT") {
+        if (!parentEmail || !studentKey) {
           result.errors.push({
             sheet: "ACUDIENTES",
             row: i + 2,
-            message: "El usuario existe pero no tiene rol PARENT.",
+            message: "parentEmail y studentId/studentFullName requeridos.",
           });
           result.skipped += 1;
           continue;
         }
-        const parent = await prisma.parent.upsert({
-          where: { userId: user.id },
-          update: {},
-          create: { userId: user.id },
-        });
-        const relation = normalizeText(row.relation) || "Acudiente";
-        await prisma.guardian.upsert({
-          where: {
-            parentId_studentId: {
-              parentId: parent.id,
-              studentId,
+        if (modeIsImport) {
+          const student = await resolveStudentForGuardian(row, i + 2);
+          if (!student) {
+            continue;
+          }
+          const studentId = student.id;
+          let user = await db.user.findUnique({ where: { email: parentEmail } });
+          if (!user) {
+            const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+            result.defaultPasswordUsed = true;
+            user = await db.user.create({
+              data: {
+                email: parentEmail,
+                fullName: parentEmail.split("@")[0] || "Acudiente",
+                role: "PARENT",
+                isActive: true,
+                passwordHash,
+              },
+            });
+            await db.parent.create({ data: { userId: user.id } });
+            result.created.users += 1;
+            result.created.parents += 1;
+          }
+          if (user.role !== "PARENT") {
+            result.errors.push({
+              sheet: "ACUDIENTES",
+              row: i + 2,
+              message: "El usuario existe pero no tiene rol PARENT.",
+            });
+            result.skipped += 1;
+            continue;
+          }
+          const parent = await db.parent.upsert({
+            where: { userId: user.id },
+            update: {},
+            create: { userId: user.id },
+          });
+          const relation = normalizeText(row.relation) || "Acudiente";
+          await db.guardian.upsert({
+            where: {
+              parentId_studentId: {
+                parentId: parent.id,
+                studentId,
+              },
             },
-          },
-          update: { relation },
-          create: { parentId: parent.id, studentId, relation },
-        });
-        result.created.guardians += 1;
+            update: { relation },
+            create: { parentId: parent.id, studentId, relation },
+          });
+          result.created.guardians += 1;
+        }
       }
     }
-  }
 
-  const admissionsSheet = sheetRows("ADMISIONES");
-  if (
-    admissionsSheet.rows.length &&
-    ensureHeaders("ADMISIONES", admissionsSheet.headers, ["studentName", "gradeLevel"])
-  ) {
-    for (let i = 0; i < admissionsSheet.rows.length; i += 1) {
-      const row = admissionsSheet.rows[i];
-      const studentName = normalizeText(row.studentName);
-      const gradeLevel = normalizeText(row.gradeLevel).toUpperCase();
-      if (!studentName || !gradeValues.includes(gradeLevel)) {
-        result.errors.push({
-          sheet: "ADMISIONES",
-          row: i + 2,
-          message: "studentName o gradeLevel invalido.",
-        });
-        result.skipped += 1;
-        continue;
-      }
-      if (modeIsImport) {
-        const admissionStatusRaw = normalizeText(row.status).toUpperCase();
-        const admissionStatus: AdmissionStatus = ["PENDING", "APPROVED", "REJECTED"].includes(
-          admissionStatusRaw
-        )
-          ? (admissionStatusRaw as AdmissionStatus)
-          : "PENDING";
-        await prisma.admission.create({
-          data: {
-            studentName,
-            gradeLevel: gradeLevel as any,
-            status: admissionStatus,
-            guardianFullName: normalizeText(row.guardianFullName) || "",
-            guardianDocNumber: normalizeText(row.guardianDocNumber) || "",
-            guardianRelation: normalizeText(row.guardianRelation) || "",
-            contactPhone: normalizeText(row.contactPhone) || "",
-            contactEmail: normalizeText(row.contactEmail) || "",
-            studentBirthDate: parseDate(row.studentBirthDate) || null,
-            studentDocType: normalizeText(row.studentDocType) || "",
-            studentDocNumber: normalizeText(row.studentDocNumber) || "",
-            studentAddress: normalizeText(row.studentAddress) || "",
-          },
-        });
-        result.created.admissions += 1;
+    const admissionsSheet = sheetRows("ADMISIONES");
+    if (
+      admissionsSheet.rows.length &&
+      ensureHeaders("ADMISIONES", admissionsSheet.headers, ["studentName", "gradeLevel"])
+    ) {
+      for (let i = 0; i < admissionsSheet.rows.length; i += 1) {
+        const row = admissionsSheet.rows[i];
+        const studentName = normalizeText(row.studentName);
+        const gradeLevel = normalizeText(row.gradeLevel).toUpperCase();
+        if (!studentName || !gradeValues.includes(gradeLevel)) {
+          result.errors.push({
+            sheet: "ADMISIONES",
+            row: i + 2,
+            message: "studentName o gradeLevel invalido.",
+          });
+          result.skipped += 1;
+          continue;
+        }
+        if (modeIsImport) {
+          const admissionStatusRaw = normalizeText(row.status).toUpperCase();
+          const admissionStatus: AdmissionStatus = ["PENDING", "APPROVED", "REJECTED"].includes(
+            admissionStatusRaw
+          )
+            ? (admissionStatusRaw as AdmissionStatus)
+            : "PENDING";
+          await db.admission.create({
+            data: {
+              studentName,
+              gradeLevel: gradeLevel as any,
+              status: admissionStatus,
+              guardianFullName: normalizeText(row.guardianFullName) || "",
+              guardianDocNumber: normalizeText(row.guardianDocNumber) || "",
+              guardianRelation: normalizeText(row.guardianRelation) || "",
+              contactPhone: normalizeText(row.contactPhone) || "",
+              contactEmail: normalizeText(row.contactEmail) || "",
+              studentBirthDate: parseDate(row.studentBirthDate) || null,
+              studentDocType: normalizeText(row.studentDocType) || "",
+              studentDocNumber: normalizeText(row.studentDocNumber) || "",
+              studentAddress: normalizeText(row.studentAddress) || "",
+            },
+          });
+          result.created.admissions += 1;
+        }
       }
     }
-  }
 
-  const invoicesSheet = sheetRows("FACTURAS");
-  if (
-    invoicesSheet.rows.length &&
-    ensureHeaders("FACTURAS", invoicesSheet.headers, ["studentDocNumber", "amount", "dueDate"])
-  ) {
-    for (let i = 0; i < invoicesSheet.rows.length; i += 1) {
-      const row = invoicesSheet.rows[i];
-      const studentDocNumber = normalizeText(row.studentDocNumber);
-      const amount = Number(row.amount);
-      const dueDate = parseDate(row.dueDate);
-      if (!studentDocNumber || !amount || !dueDate) {
-        result.errors.push({
-          sheet: "FACTURAS",
-          row: i + 2,
-          message: "studentDocNumber, amount o dueDate inválido.",
-        });
-        result.skipped += 1;
-        continue;
-      }
-      if (modeIsImport) {
-        const invoiceStatusRaw = normalizeText(row.status).toUpperCase();
-
-        const enrollmentForStudent = await prisma.enrollment.findFirst({
-          where: { studentDocNumber },
-          include: { student: true },
-          orderBy: [{ year: "desc" }],
-        });
-
-        if (!enrollmentForStudent?.student) {
+    const invoicesSheet = sheetRows("FACTURAS");
+    if (
+      invoicesSheet.rows.length &&
+      ensureHeaders("FACTURAS", invoicesSheet.headers, ["studentDocNumber", "amount", "dueDate"])
+    ) {
+      for (let i = 0; i < invoicesSheet.rows.length; i += 1) {
+        const row = invoicesSheet.rows[i];
+        const studentDocNumber = normalizeText(row.studentDocNumber);
+        const amount = Number(row.amount);
+        const dueDate = parseDate(row.dueDate);
+        if (!studentDocNumber || !amount || !dueDate) {
           result.errors.push({
             sheet: "FACTURAS",
             row: i + 2,
-            message: `No existe un estudiante con documento ${studentDocNumber}.`,
+            message: "studentDocNumber, amount o dueDate inválido.",
           });
-
           result.skipped += 1;
           continue;
         }
-        const invoiceStatus: InvoiceStatus = ["PENDING", "PAID", "OVERDUE"].includes(
-          invoiceStatusRaw
-        )
-          ? (invoiceStatusRaw as InvoiceStatus)
-          : "PENDING";
-        await prisma.invoice.create({
-          data: {
-            studentId: enrollmentForStudent.studentId,
-            amount,
-            dueDate,
-            status: invoiceStatus,
-          },
-        });
-        result.created.invoices += 1;
+        if (modeIsImport) {
+          const invoiceStatusRaw = normalizeText(row.status).toUpperCase();
+
+          const enrollmentForStudent = await db.enrollment.findFirst({
+            where: { studentDocNumber },
+            include: { student: true },
+            orderBy: [{ year: "desc" }],
+          });
+
+          if (!enrollmentForStudent?.student) {
+            result.errors.push({
+              sheet: "FACTURAS",
+              row: i + 2,
+              message: `No existe un estudiante con documento ${studentDocNumber}.`,
+            });
+
+            result.skipped += 1;
+            continue;
+          }
+          const invoiceStatus: InvoiceStatus = ["PENDING", "PAID", "OVERDUE"].includes(
+            invoiceStatusRaw
+          )
+            ? (invoiceStatusRaw as InvoiceStatus)
+            : "PENDING";
+          await db.invoice.create({
+            data: {
+              studentId: enrollmentForStudent.studentId,
+              amount,
+              dueDate,
+              status: invoiceStatus,
+            },
+          });
+          result.created.invoices += 1;
+        }
       }
     }
-  }
 
-  const paymentsSheet = sheetRows("PAGOS");
-  if (
-    paymentsSheet.rows.length &&
-    ensureHeaders("PAGOS", paymentsSheet.headers, ["invoiceId", "amount", "paidAt", "method"])
-  ) {
-    for (let i = 0; i < paymentsSheet.rows.length; i += 1) {
-      const row = paymentsSheet.rows[i];
-      const invoiceId = normalizeText(row.invoiceId);
-      const amount = Number(row.amount);
-      const paidAt = parseDate(row.paidAt);
-      const method = normalizeText(row.method);
-      if (!invoiceId || !amount || !paidAt || !method) {
-        result.errors.push({
-          sheet: "PAGOS",
-          row: i + 2,
-          message: "invoiceId, amount, paidAt o method invalido.",
-        });
-        result.skipped += 1;
-        continue;
+    const paymentsSheet = sheetRows("PAGOS");
+    if (
+      paymentsSheet.rows.length &&
+      ensureHeaders("PAGOS", paymentsSheet.headers, ["invoiceId", "amount", "paidAt", "method"])
+    ) {
+      for (let i = 0; i < paymentsSheet.rows.length; i += 1) {
+        const row = paymentsSheet.rows[i];
+        const invoiceId = normalizeText(row.invoiceId);
+        const amount = Number(row.amount);
+        const paidAt = parseDate(row.paidAt);
+        const method = normalizeText(row.method);
+        if (!invoiceId || !amount || !paidAt || !method) {
+          result.errors.push({
+            sheet: "PAGOS",
+            row: i + 2,
+            message: "invoiceId, amount, paidAt o method invalido.",
+          });
+          result.skipped += 1;
+          continue;
+        }
+        if (modeIsImport) {
+          await db.payment.create({
+            data: {
+              invoiceId,
+              amount,
+              paidAt,
+              method,
+              reference: normalizeText(row.reference) || null,
+            },
+          });
+          result.created.payments += 1;
+        }
       }
-      if (modeIsImport) {
-        await prisma.payment.create({
-          data: {
-            invoiceId,
-            amount,
-            paidAt,
-            method,
-            reference: normalizeText(row.reference) || null,
+    }
+  };
+
+  if (result.errors.length === 0) {
+    if (modeIsImport) {
+      try {
+        await prisma.$transaction(
+          async (tx) => {
+            db = tx;
+            await executeImport();
+            if (result.errors.length > 0) {
+              throw new Error("IMPORT_VALIDATION_FAILED");
+            }
           },
-        });
-        result.created.payments += 1;
+          { timeout: 120_000 }
+        );
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== "IMPORT_VALIDATION_FAILED") {
+          throw error;
+        }
+        result.created = {
+          users: 0,
+          teachers: 0,
+          parents: 0,
+          students: 0,
+          classes: 0,
+          enrollments: 0,
+          guardians: 0,
+          admissions: 0,
+          invoices: 0,
+          payments: 0,
+        };
+        result.updated = {
+          users: 0,
+          teachers: 0,
+          students: 0,
+          classes: 0,
+          enrollments: 0,
+        };
+      } finally {
+        db = prisma;
       }
+    } else {
+      await executeImport();
     }
   }
 
@@ -3383,25 +3746,28 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     where: { id: auth.userId },
     select: { fullName: true, email: true },
   });
-  const history = await readImportHistory();
-  const entry = {
-    id: randomUUID(),
-    createdAt: new Date().toISOString(),
-    createdById: auth.userId,
-    createdByName: creator?.fullName || "-",
-    createdByEmail: creator?.email || "",
-    mode: result.mode,
-    summary: {
-      created: result.created,
-      updated: result.updated,
-      skipped: result.skipped,
-      errorsCount: Array.isArray(result.errors) ? result.errors.length : 0,
-      defaultPasswordUsed: result.defaultPasswordUsed,
-    },
-    errors: Array.isArray(result.errors) ? result.errors.slice(0, 50) : [],
+  const status =
+    result.errors.length > 0 ? "FAILED" : result.warnings.length > 0 ? "WARNING" : "OK";
+  const summary = {
+    created: result.created,
+    updated: result.updated,
+    skipped: result.skipped,
+    warningsCount: result.warnings.length,
+    errorsCount: result.errors.length,
+    defaultPasswordUsed: result.defaultPasswordUsed,
   };
-  const nextHistory = [entry, ...history].slice(0, 100);
-  await writeImportHistory(nextHistory);
+  await prisma.importHistory.create({
+    data: {
+      createdById: auth.userId,
+      createdByName: creator?.fullName || "-",
+      createdByEmail: creator?.email || "",
+      mode: result.mode,
+      status,
+      summary,
+      warnings: result.warnings.slice(0, 50),
+      errors: result.errors.slice(0, 50),
+    },
+  });
 
   res.json(result);
 });

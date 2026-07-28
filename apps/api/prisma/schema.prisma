@@ -151,8 +151,28 @@ model User {
   notificationsCreated Notification[] @relation("NotificationCreator")
   notificationsApproved Notification[] @relation("NotificationApprover")
   notificationsTargeted Notification[] @relation("NotificationTarget")
+  importHistories ImportHistory[] @relation("ImportHistoryCreator")
 
   @@unique([docType, docNumber])
+}
+
+model ImportHistory {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  createdById    String?
+  createdByName  String?
+  createdByEmail String?
+  mode           String
+  status         String
+  summary        Json
+  warnings       Json?
+  errors         Json?
+
+  createdBy User? @relation("ImportHistoryCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([createdById, createdAt])
+  @@index([mode, status, createdAt])
 }
 
 model Feedback {

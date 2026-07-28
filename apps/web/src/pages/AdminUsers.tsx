@@ -894,6 +894,23 @@ export default function AdminUsers() {
               matriculas {importResult.updated?.enrollments || 0}
             </div>
             <div>Omitidos: {importResult.skipped || 0}</div>
+            {Array.isArray(importResult.warnings) && importResult.warnings.length > 0 && (
+              <div style={{ marginTop: 6 }}>
+                <strong>Advertencias:</strong>
+                <ul style={{ margin: "6px 0 0 16px", color: "#9a3412" }}>
+                  {importResult.warnings.slice(0, 10).map((warning: any, idx: number) => (
+                    <li key={`${warning.sheet}-${warning.row}-${idx}`}>
+                      {warning.sheet} fila {warning.row}: {warning.message}
+                    </li>
+                  ))}
+                </ul>
+                {importResult.warnings.length > 10 && (
+                  <div style={{ color: "#9a3412" }}>
+                    ...{importResult.warnings.length - 10} advertencias mas.
+                  </div>
+                )}
+              </div>
+            )}
             {importResult.defaultPasswordUsed && (
               <div style={{ color: "#9a3412" }}>
                 Se uso contrasena temporal para algunos usuarios.
@@ -952,7 +969,9 @@ export default function AdminUsers() {
                     <th>Creados</th>
                     <th>Actualizados</th>
                     <th>Omitidos</th>
+                    <th>Advertencias</th>
                     <th>Errores</th>
+                    <th>Estado</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -982,7 +1001,9 @@ export default function AdminUsers() {
                           : 0}
                       </td>
                       <td>{row.summary?.skipped || 0}</td>
+                      <td>{row.summary?.warningsCount || 0}</td>
                       <td>{row.summary?.errorsCount || 0}</td>
+                      <td>{row.status || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
