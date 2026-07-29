@@ -3045,10 +3045,25 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     });
 
     if (classes.length === 0) {
+      const availableClasses = await db.class.findMany({
+        where: {
+          gradeLevel: gradeLevel as any,
+          academicYear,
+        },
+        select: { studentGroup: true },
+        orderBy: { studentGroup: "asc" },
+        take: 10,
+      });
+      const groups = Array.from(
+        new Set(availableClasses.map((c) => c.studentGroup).filter(Boolean))
+      );
+      const groupHint = groups.length
+        ? ` Grupos disponibles para ${gradeLevel}-${academicYear}: ${groups.join(", ")}.`
+        : " Crea primero la clase en la hoja CLASES o desde la plataforma.";
       result.errors.push({
         sheet: "MATRICULAS",
         row: rowNumber,
-        message: `No existe una clase para ${gradeLevel}-${studentGroup}-${academicYear}.`,
+        message: `No existe una clase para ${gradeLevel}-${studentGroup}-${academicYear}.${groupHint}`,
       });
 
       result.skipped += 1;
