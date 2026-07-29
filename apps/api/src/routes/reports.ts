@@ -2268,11 +2268,10 @@ router.get("/import-template/excel", requireAuth, requireRole(["ADMIN"]), async 
     "studentDocNumber",
     "studentFullName",
     "studentBirthDate",
-
-    "teacherEmail",
     "studentGradeLevel",
     "studentGroup",
     "academicYear",
+    "classId",
 
     "status",
 
@@ -2535,8 +2534,9 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       enums: { gradeLevel: gradeValues },
     },
     MATRICULAS: {
-      required: ["teacherEmail", "studentGradeLevel", "studentGroup", "academicYear"],
+      required: ["studentGradeLevel", "studentGroup", "academicYear"],
       optional: [
+        "classId",
         "studentDocType",
         "studentDocNumber",
         "studentFullName",
@@ -2550,7 +2550,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         "contactPhone",
         "contactEmail",
       ],
-      emails: ["teacherEmail", "contactEmail"],
+      emails: ["contactEmail"],
       dates: ["studentBirthDate"],
       numbers: ["academicYear"],
       enums: { studentGradeLevel: gradeValues },
@@ -2692,36 +2692,18 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         );
       }
       if (teacherEmail && gradeLevel && studentGroup && Number.isFinite(academicYear)) {
-        classKeys.add(`${teacherEmail}|${gradeLevel}|${studentGroup}|${academicYear}`);
+        classKeys.add(`${gradeLevel}|${studentGroup}|${academicYear}`);
       }
     });
 
     sheetRows("MATRICULAS").rows.forEach((row, index) => {
-      const teacherEmail = normalizeEmail(row.teacherEmail);
       const gradeLevel = normalizeText(row.studentGradeLevel).toUpperCase();
       const studentGroup = normalizeText(row.studentGroup);
       const academicYear = Number(row.academicYear);
       const studentName = normalizeText(row.studentFullName);
       const docNumber = normalizeText(row.studentDocNumber);
-      const classKey = `${teacherEmail}|${gradeLevel}|${studentGroup}|${academicYear}`;
-      if (
-        teacherEmail &&
-        userRoles.get(teacherEmail) &&
-        userRoles.get(teacherEmail) !== "TEACHER"
-      ) {
-        addError(
-          "MATRICULAS",
-          index + 2,
-          `${teacherEmail} existe en USUARIOS pero no tiene rol TEACHER.`
-        );
-      }
-      if (
-        teacherEmail &&
-        gradeLevel &&
-        studentGroup &&
-        Number.isFinite(academicYear) &&
-        !classKeys.has(classKey)
-      ) {
+      const classKey = `${gradeLevel}|${studentGroup}|${academicYear}`;
+      if (gradeLevel && studentGroup && Number.isFinite(academicYear) && !classKeys.has(classKey)) {
         addWarning(
           "MATRICULAS",
           index + 2,
@@ -3068,67 +3050,73 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   };
 
   const resolveClass = async (
-    teacherEmail: string,
+    classId: string,
     gradeLevel: string,
     studentGroup: string,
     academicYear: number,
     rowNumber: number
   ) => {
-    const teacherUser = await db.user.findUnique({
-      where: {
-        email: teacherEmail,
-      },
-    });
-
-    if (!teacherUser) {
-      result.errors.push({
-        sheet: "MATRICULAS",
-        row: rowNumber,
-        message: `No existe el docente ${teacherEmail}.`,
+    if (classId) {
+      const classEntity = await db.class.findUnique({
+        where: { id: classId },
       });
-
-      result.skipped += 1;
-      return null;
+      if (!classEntity) {
+        result.errors.push({
+          sheet: "MATRICULAS",
+          row: rowNumber,
+          message: `No existe la clase con classId ${classId}.`,
+        });
+        result.skipped += 1;
+        return null;
+      }
+      if (
+        classGradeLevelValue(classEntity) !== gradeLevel ||
+        String(classEntity.studentGroup || "") !== studentGroup ||
+        Number(classEntity.academicYear) !== academicYear
+      ) {
+        result.errors.push({
+          sheet: "MATRICULAS",
+          row: rowNumber,
+          message: "classId no corresponde a studentGradeLevel, studentGroup y academicYear.",
+        });
+        result.skipped += 1;
+        return null;
+      }
+      return classEntity;
     }
 
-    const teacher = await db.teacher.findUnique({
+    const classes = await db.class.findMany({
       where: {
-        userId: teacherUser.id,
-      },
-    });
-
-    if (!teacher) {
-      result.errors.push({
-        sheet: "MATRICULAS",
-        row: rowNumber,
-        message: `${teacherEmail} no posee perfil docente.`,
-      });
-
-      result.skipped += 1;
-      return null;
-    }
-
-    const classEntity = await db.class.findFirst({
-      where: {
-        teacherId: teacher.id,
         gradeLevel: gradeLevel as any,
         studentGroup,
         academicYear,
       },
+      take: 2,
     });
 
-    if (!classEntity) {
+    if (classes.length === 0) {
       result.errors.push({
         sheet: "MATRICULAS",
         row: rowNumber,
-        message: `No existe una clase para ${teacherEmail} (${gradeLevel}-${studentGroup}-${academicYear}).`,
+        message: `No existe una clase para ${gradeLevel}-${studentGroup}-${academicYear}.`,
       });
 
       result.skipped += 1;
       return null;
     }
 
-    return classEntity;
+    if (classes.length > 1) {
+      result.errors.push({
+        sheet: "MATRICULAS",
+        row: rowNumber,
+        message: `Hay varias clases para ${gradeLevel}-${studentGroup}-${academicYear}. Indica classId para desambiguar.`,
+      });
+
+      result.skipped += 1;
+      return null;
+    }
+
+    return classes[0];
   };
 
   await prevalidateWorkbook();
@@ -3379,7 +3367,6 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     if (
       enrollSheet.rows.length &&
       ensureHeaders("MATRICULAS", enrollSheet.headers, [
-        "teacherEmail",
         "studentGradeLevel",
         "studentGroup",
         "academicYear",
@@ -3387,17 +3374,16 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     ) {
       for (let i = 0; i < enrollSheet.rows.length; i += 1) {
         const row = enrollSheet.rows[i];
-        const teacherEmail = normalizeEmail(row.teacherEmail);
+        const requestedClassId = normalizeText(row.classId);
         const gradeLevel = normalizeText(row.studentGradeLevel).toUpperCase();
         const studentGroup = normalizeText(row.studentGroup);
         const academicYear = Number(row.academicYear);
 
-        if (!teacherEmail || !gradeLevel || !studentGroup || !academicYear) {
+        if (!gradeLevel || !studentGroup || !academicYear) {
           result.errors.push({
             sheet: "MATRICULAS",
             row: i + 2,
-            message:
-              "teacherEmail, studentGradeLevel, studentGroup y academicYear son obligatorios.",
+            message: "studentGradeLevel, studentGroup y academicYear son obligatorios.",
           });
 
           result.skipped += 1;
@@ -3405,7 +3391,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         }
         if (modeIsImport) {
           const classEntity = await resolveClass(
-            teacherEmail,
+            requestedClassId,
             gradeLevel,
             studentGroup,
             academicYear,
@@ -3417,15 +3403,6 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           }
 
           const classId = classEntity.id;
-          if (!classEntity) {
-            result.errors.push({
-              sheet: "MATRICULAS",
-              row: i + 2,
-              message: "classId no encontrado.",
-            });
-            result.skipped += 1;
-            continue;
-          }
           const student = await resolveStudentForEnrollment(row, classEntity, i + 2);
           if (!student) {
             continue;
