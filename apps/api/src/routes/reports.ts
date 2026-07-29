@@ -3084,7 +3084,56 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     return classes[0];
   };
 
+  const validateEnrollmentClassRelations = async () => {
+    const enrollSheet = sheetRows("MATRICULAS");
+    if (!enrollSheet.rows.length) return;
+    if (
+      !ensureHeaders("MATRICULAS", enrollSheet.headers, [
+        "studentGradeLevel",
+        "studentGroup",
+        "academicYear",
+      ])
+    ) {
+      return;
+    }
+
+    const classesInWorkbook = new Set<string>();
+    sheetRows("CLASES").rows.forEach((row) => {
+      const gradeLevel = normalizeText(row.gradeLevel).toUpperCase();
+      const studentGroup = normalizeText(row.studentGroup);
+      const academicYear = Number(row.academicYear);
+      if (gradeValues.includes(gradeLevel) && studentGroup && Number.isFinite(academicYear)) {
+        classesInWorkbook.add(`${gradeLevel}|${studentGroup}|${academicYear}`);
+      }
+    });
+
+    const checked = new Set<string>();
+    for (let i = 0; i < enrollSheet.rows.length; i += 1) {
+      const row = enrollSheet.rows[i];
+      const gradeLevel = normalizeText(row.studentGradeLevel).toUpperCase();
+      const studentGroup = normalizeText(row.studentGroup);
+      const academicYear = Number(row.academicYear);
+
+      if (
+        !gradeValues.includes(gradeLevel) ||
+        !studentGroup ||
+        !Number.isFinite(academicYear) ||
+        !academicYear
+      ) {
+        continue;
+      }
+
+      const key = `${gradeLevel}|${studentGroup}|${academicYear}`;
+      if (classesInWorkbook.has(key) || checked.has(key)) continue;
+      checked.add(key);
+      await resolveClass(gradeLevel, studentGroup, academicYear, i + 2);
+    }
+  };
+
   await prevalidateWorkbook();
+  if (result.errors.length === 0) {
+    await validateEnrollmentClassRelations();
+  }
 
   const executeImport = async () => {
     const usersSheet = sheetRows("USUARIOS");
