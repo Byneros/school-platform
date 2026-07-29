@@ -2271,7 +2271,6 @@ router.get("/import-template/excel", requireAuth, requireRole(["ADMIN"]), async 
     "studentGradeLevel",
     "studentGroup",
     "academicYear",
-    "classId",
 
     "status",
 
@@ -2536,7 +2535,6 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     MATRICULAS: {
       required: ["studentGradeLevel", "studentGroup", "academicYear"],
       optional: [
-        "classId",
         "studentDocType",
         "studentDocNumber",
         "studentFullName",
@@ -3050,41 +3048,11 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   };
 
   const resolveClass = async (
-    classId: string,
     gradeLevel: string,
     studentGroup: string,
     academicYear: number,
     rowNumber: number
   ) => {
-    if (classId) {
-      const classEntity = await db.class.findUnique({
-        where: { id: classId },
-      });
-      if (!classEntity) {
-        result.errors.push({
-          sheet: "MATRICULAS",
-          row: rowNumber,
-          message: `No existe la clase con classId ${classId}.`,
-        });
-        result.skipped += 1;
-        return null;
-      }
-      if (
-        classGradeLevelValue(classEntity) !== gradeLevel ||
-        String(classEntity.studentGroup || "") !== studentGroup ||
-        Number(classEntity.academicYear) !== academicYear
-      ) {
-        result.errors.push({
-          sheet: "MATRICULAS",
-          row: rowNumber,
-          message: "classId no corresponde a studentGradeLevel, studentGroup y academicYear.",
-        });
-        result.skipped += 1;
-        return null;
-      }
-      return classEntity;
-    }
-
     const classes = await db.class.findMany({
       where: {
         gradeLevel: gradeLevel as any,
@@ -3109,7 +3077,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       result.errors.push({
         sheet: "MATRICULAS",
         row: rowNumber,
-        message: `Hay varias clases para ${gradeLevel}-${studentGroup}-${academicYear}. Indica classId para desambiguar.`,
+        message: `Hay varias clases para ${gradeLevel}-${studentGroup}-${academicYear}. Corrige la duplicidad en CLASES antes de importar matriculas.`,
       });
 
       result.skipped += 1;
@@ -3374,7 +3342,6 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     ) {
       for (let i = 0; i < enrollSheet.rows.length; i += 1) {
         const row = enrollSheet.rows[i];
-        const requestedClassId = normalizeText(row.classId);
         const gradeLevel = normalizeText(row.studentGradeLevel).toUpperCase();
         const studentGroup = normalizeText(row.studentGroup);
         const academicYear = Number(row.academicYear);
@@ -3390,13 +3357,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           continue;
         }
         if (modeIsImport) {
-          const classEntity = await resolveClass(
-            requestedClassId,
-            gradeLevel,
-            studentGroup,
-            academicYear,
-            i + 2
-          );
+          const classEntity = await resolveClass(gradeLevel, studentGroup, academicYear, i + 2);
 
           if (!classEntity) {
             continue;
