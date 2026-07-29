@@ -2595,7 +2595,6 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     const knownSheets = new Set(Object.keys(expectedSheets));
     const userEmails = new Map<string, number>();
     const userRoles = new Map<string, string>();
-    const classKeys = new Set<string>();
     const studentNames = new Set<string>();
     const enrollmentDocNumbers = new Set<string>();
 
@@ -2675,9 +2674,6 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
 
     sheetRows("CLASES").rows.forEach((row, index) => {
       const teacherEmail = normalizeEmail(row.teacherEmail);
-      const gradeLevel = normalizeText(row.gradeLevel).toUpperCase();
-      const studentGroup = normalizeText(row.studentGroup);
-      const academicYear = Number(row.academicYear);
       if (
         teacherEmail &&
         userRoles.get(teacherEmail) &&
@@ -2689,25 +2685,11 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           `${teacherEmail} existe en USUARIOS pero no tiene rol TEACHER.`
         );
       }
-      if (teacherEmail && gradeLevel && studentGroup && Number.isFinite(academicYear)) {
-        classKeys.add(`${gradeLevel}|${studentGroup}|${academicYear}`);
-      }
     });
 
     sheetRows("MATRICULAS").rows.forEach((row, index) => {
-      const gradeLevel = normalizeText(row.studentGradeLevel).toUpperCase();
-      const studentGroup = normalizeText(row.studentGroup);
-      const academicYear = Number(row.academicYear);
       const studentName = normalizeText(row.studentFullName);
       const docNumber = normalizeText(row.studentDocNumber);
-      const classKey = `${gradeLevel}|${studentGroup}|${academicYear}`;
-      if (gradeLevel && studentGroup && Number.isFinite(academicYear) && !classKeys.has(classKey)) {
-        addWarning(
-          "MATRICULAS",
-          index + 2,
-          "La clase no esta en la hoja CLASES; se buscara en la base de datos."
-        );
-      }
       if (studentName) studentNames.add(studentName.toLowerCase());
       if (docNumber) {
         if (enrollmentDocNumbers.has(docNumber)) {
