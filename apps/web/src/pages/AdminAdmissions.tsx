@@ -132,6 +132,7 @@ export default function AdminAdmissions() {
     },
   });
   const [enrollmentForm, setEnrollmentForm] = useState({
+    studentId: "",
     admissionId: "",
     classId: "",
     year: "2026",
@@ -215,6 +216,10 @@ export default function AdminAdmissions() {
     endpoint: "/suggestions?type=enrollments",
     query: enrollmentsSearch,
   });
+  const studentEnrollmentOptions = useSuggestions({
+    endpoint: "/suggestions?type=students",
+    query: enrollmentForm.studentFullName,
+  });
   const enrollmentFeedback = (() => {
     if (enrollmentMessage) {
       return {
@@ -252,11 +257,8 @@ export default function AdminAdmissions() {
   })();
   const missingImportantEnrollmentFields = (() => {
     const required: Array<{ key: keyof typeof enrollmentForm; label: string }> = [
-      { key: "admissionId", label: "Admision aprobada" },
+      { key: "studentId", label: "Estudiante existente" },
       { key: "studentFullName", label: "Nombre del estudiante" },
-      { key: "studentBirthDate", label: "Fecha de nacimiento" },
-      { key: "studentDocType", label: "Tipo de documento del estudiante" },
-      { key: "studentDocNumber", label: "Numero de documento del estudiante" },
       { key: "studentGradeLevel", label: "Nivel/Grado" },
       { key: "guardianFullName", label: "Nombre del acudiente" },
       { key: "guardianDocType", label: "Tipo de documento del acudiente" },
@@ -612,6 +614,7 @@ export default function AdminAdmissions() {
         return;
       }
       await apiPost("/enrollments", {
+        studentId: enrollmentForm.studentId,
         classId: classIdToUse,
         year: Number(enrollmentForm.year),
         status: enrollmentForm.status,
@@ -639,6 +642,7 @@ export default function AdminAdmissions() {
         setAdmissions((prev) => prev.filter((a) => a.id !== enrollmentForm.admissionId));
       }
       setEnrollmentForm({
+        studentId: "",
         admissionId: "",
         classId: "",
         year: "2026",
@@ -682,6 +686,7 @@ export default function AdminAdmissions() {
     if (!adm) return;
     setEnrollmentForm((prev) => ({
       ...prev,
+      studentId: "",
       admissionId: adm.id || "",
       studentFullName: adm.studentFullName || adm.studentName || "",
       studentBirthDate: adm.studentBirthDate ? String(adm.studentBirthDate).slice(0, 10) : "",
@@ -1020,15 +1025,35 @@ export default function AdminAdmissions() {
         </label>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>Datos del estudiante</div>
         <label>
-          Nombre completo
-          <input
+          Estudiante existente
+          <Autocomplete
             className="input"
-            autoComplete="name"
+            placeholder="Buscar estudiante por nombre"
             value={enrollmentForm.studentFullName}
-            onChange={(e) =>
-              setEnrollmentForm({ ...enrollmentForm, studentFullName: e.target.value })
+            options={studentEnrollmentOptions}
+            onChange={(value) =>
+              setEnrollmentForm({ ...enrollmentForm, studentFullName: value, studentId: "" })
+            }
+            onSelectOption={(option) =>
+              setEnrollmentForm({
+                ...enrollmentForm,
+                studentId: String(option.id || ""),
+                studentFullName: option.value || option.label || "",
+                studentGradeLevel: option.gradeLevel || enrollmentForm.studentGradeLevel,
+              })
             }
           />
+          <div
+            style={{
+              marginTop: 6,
+              color: enrollmentForm.studentId ? "#047857" : "#b45309",
+              fontSize: 12,
+            }}
+          >
+            {enrollmentForm.studentId
+              ? "Estudiante seleccionado desde el catalogo maestro."
+              : "Busca y selecciona un estudiante existente. La matricula no crea estudiantes."}
+          </div>
         </label>
         <label>
           Fecha de nacimiento

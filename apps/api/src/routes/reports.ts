@@ -19,6 +19,18 @@ import { validate } from "../utils/validate.js";
 import { composeNotificationBodyWithMeta } from "../utils/notificationMeta.js";
 import { isDeveloperRole } from "../utils/rbac.js";
 
+const admissionStatusMap: Record<string, AdmissionStatus> = {
+  PENDING: "PENDING",
+  PENDIENTE: "PENDING",
+
+  APPROVED: "APPROVED",
+  APROBADO: "APPROVED",
+  ADMITIDO: "APPROVED",
+
+  REJECTED: "REJECTED",
+  RECHAZADO: "REJECTED",
+};
+
 const router = Router();
 const CERT_REQUEST_APPROVAL_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -2261,7 +2273,15 @@ router.get("/import-template/excel", requireAuth, requireRole(["ADMIN"]), async 
     "personalWeight",
     "socialWeight",
   ]);
-  addSheet("ESTUDIANTES", ["fullName", "birthDate", "gradeLevel", "studentGroup", "isActive"]);
+  addSheet("ESTUDIANTES", [
+    "studentDocType",
+    "studentDocNumber",
+    "fullName",
+    "birthDate",
+    "gradeLevel",
+    "studentGroup",
+    "isActive",
+  ]);
   addSheet("CLASES", ["teacherEmail", "gradeLevel", "studentGroup", "academicYear", "schedule"]);
   addSheet("MATRICULAS", [
     "studentDocType",
@@ -2299,7 +2319,7 @@ router.get("/import-template/excel", requireAuth, requireRole(["ADMIN"]), async 
     "studentDocNumber",
     "studentAddress",
   ]);
-  addSheet("FACTURAS", ["studentDocNumber", "amount", "dueDate", "status"]);
+  addSheet("FACTURAS", ["invoiceId", "studentDocNumber", "amount", "dueDate", "status"]);
   addSheet("PAGOS", ["invoiceId", "amount", "paidAt", "method", "reference"]);
 
   const output = await buildWorkbookBuffer(sheets);
@@ -2339,6 +2359,12 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       });
     }
     const sheets = await readXlsxFile(buffer);
+
+    console.log(
+      "Hojas del Excel:",
+      sheets.map((s) => s.sheet)
+    );
+
     workbook = new Map(
       sheets.map((sheet) => [
         sheet.sheet,
@@ -2383,6 +2409,9 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     defaultPasswordUsed: false,
   };
 
+  console.log("HOJAS EN EL EXCEL");
+  console.log([...workbook.keys()]);
+
   const sheetRows = (sheetName: string) => {
     const data = workbook.get(sheetName);
     if (!data?.length) return { headers: [] as string[], rows: [] as Array<Record<string, any>> };
@@ -2398,6 +2427,24 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         });
         return obj;
       });
+
+    console.log("================================");
+    console.log("SHEET:", sheetName);
+    console.log("HEADERS:", headers.length);
+    console.log("ROWS:", parsedRows.length);
+
+    if (parsedRows.length > 0) {
+      console.log("PRIMERA FILA:");
+      console.log(parsedRows[0]);
+
+      console.log("ULTIMA FILA:");
+      console.log(parsedRows[parsedRows.length - 1]);
+    }
+
+    return {
+      headers,
+      rows: parsedRows,
+    };
     return { headers, rows: parsedRows };
   };
 
@@ -2463,6 +2510,9 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
 
   const modeIsImport = result.mode === "import";
   let db: ImportDb = prisma;
+  // Cache de estudiantes para la importación
+  const studentCacheByDocument = new Map<string, any>();
+  const studentCacheById = new Map<string, any>();
 
   const digitsOnly = (value: any) => String(value || "").replace(/\D+/g, "");
   const slugify = (value: any) =>
@@ -2519,7 +2569,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       numbers: ["cognitiveWeight", "personalWeight", "socialWeight"],
     },
     ESTUDIANTES: {
-      required: ["fullName", "gradeLevel"],
+      required: ["studentDocType", "studentDocNumber", "fullName", "gradeLevel"],
       optional: ["birthDate", "studentGroup", "isActive"],
       dates: ["birthDate"],
       booleans: ["isActive"],
@@ -2574,15 +2624,19 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       ],
       emails: ["contactEmail"],
       dates: ["studentBirthDate"],
-      enums: { gradeLevel: gradeValues, status: ["PENDING", "APPROVED", "REJECTED"] },
+      enums: { gradeLevel: gradeValues, status: Object.keys(admissionStatusMap) },
     },
+
     FACTURAS: {
-      required: ["studentDocNumber", "amount", "dueDate"],
+      required: ["invoiceId", "studentDocNumber", "amount", "dueDate"],
       optional: ["status"],
       dates: ["dueDate"],
       numbers: ["amount"],
-      enums: { status: ["PENDING", "PAID", "OVERDUE"] },
+      enums: {
+        status: ["PENDING", "PAID", "OVERDUE"],
+      },
     },
+
     PAGOS: {
       required: ["invoiceId", "amount", "paidAt", "method"],
       optional: ["reference"],
@@ -2650,6 +2704,15 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         }
         for (const [field, values] of Object.entries(config.enums || {})) {
           const value = normalizeText(row[field]).toUpperCase();
+
+          console.log({
+            sheet,
+            field,
+            original: row[field],
+            normalized: value,
+            allowed: values,
+          });
+
           if (value && !values.includes(value)) {
             addError(sheet, rowNumber, `${field} no esta dentro de los valores permitidos.`);
           }
@@ -2919,75 +2982,301 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     result.created.guardians += 1;
   };
 
-  const resolveStudentForEnrollment = async (
-    row: Record<string, any>,
-    classEntity: any,
-    rowNumber: number
-  ) => {
-    const rawStudentId = normalizeText(row.studentId);
-    if (rawStudentId) {
-      const byId = await db.student.findUnique({ where: { id: rawStudentId } });
-      if (byId) return byId;
+  const resolveStudent = async (row: Record<string, any>, classEntity: any, rowNumber: number) => {
+    const internalId = normalizeText(row.studentId);
 
-      const byEnrollmentDoc = await db.enrollment.findFirst({
-        where: { studentDocNumber: rawStudentId },
-        include: { student: true },
-      });
-      if (byEnrollmentDoc?.student) return byEnrollmentDoc.student;
+    const documentNumber = normalizeText(
+      row.studentDocNumber || row.documentNumber || row.studentId
+    );
+    // ======================================================
+    // Buscar primero en la cache por documento
+    // ======================================================
+    if (documentNumber && studentCacheByDocument.has(documentNumber)) {
+      return studentCacheByDocument.get(documentNumber);
     }
 
+    const documentType = normalizeText(row.studentDocType || row.documentType);
+
     const fullName = normalizeText(row.studentFullName || row.fullName || row.studentName);
+
     const birthDate = parseDate(row.studentBirthDate || row.birthDate);
+
     const gradeLevel = normalizeText(
       row.studentGradeLevel || row.gradeLevel || classEntity?.gradeLevel
     ).toUpperCase();
 
-    if (!fullName) {
-      result.errors.push({
-        sheet: "MATRICULAS",
-        row: rowNumber,
-        message: "No se pudo identificar el estudiante. Usa studentId valido o studentFullName.",
+    // Solo registrar llamadas desde la hoja MATRICULAS
+    if (classEntity) {
+      console.log("========================================");
+      console.log("RESOLVE STUDENT - MATRICULAS");
+      console.log({
+        rowNumber,
+
+        studentFullName: row.studentFullName || row.fullName || row.studentName,
+
+        studentDocNumber: row.studentDocNumber,
+
+        studentDocType: row.studentDocType,
+
+        studentGradeLevel: row.studentGradeLevel,
+
+        studentGroup: row.studentGroup,
+
+        classId: classEntity.id,
+
+        classGradeLevel: classEntity.gradeLevel,
+
+        classGroup: classEntity.studentGroup,
+
+        academicYear: row.academicYear,
       });
-      result.skipped += 1;
-      return null;
     }
+    //-------------------------------------------------------
+    // 1. Buscar por ID interno
+    //-------------------------------------------------------
 
-    if (!gradeValues.includes(gradeLevel)) {
-      result.errors.push({
-        sheet: "MATRICULAS",
-        row: rowNumber,
-        message: "studentGradeLevel invalido o no se pudo inferir desde la clase.",
+    if (internalId) {
+      const cached = studentCacheById.get(internalId);
+      if (cached) {
+        return cached;
+      }
+
+      const byId = await db.student.findUnique({
+        where: {
+          id: internalId,
+        },
       });
-      result.skipped += 1;
-      return null;
+
+      if (byId) {
+        studentCacheById.set(byId.id, byId);
+
+        if (byId.documentNumber) {
+          studentCacheByDocument.set(byId.documentNumber, byId);
+        }
+
+        return byId;
+      }
     }
 
-    const existing = await db.student.findFirst({
-      where: {
-        fullName: { equals: fullName, mode: "insensitive" },
-        ...(birthDate ? { birthDate } : { gradeLevel: gradeLevel as any }),
-      },
-    });
-    if (existing) {
-      const updateData: any = { gradeLevel: gradeLevel as any };
-      if (birthDate) updateData.birthDate = birthDate;
-      await db.student.update({ where: { id: existing.id }, data: updateData });
-      return { ...existing, ...updateData };
+    //-------------------------------------------------------
+    // 2. Buscar por documento (NUEVO)
+    //-------------------------------------------------------
+
+    if (documentNumber) {
+      const cached = studentCacheByDocument.get(documentNumber);
+      if (cached) {
+        return cached;
+      }
+      if (classEntity) {
+        console.log("Buscando estudiante por documento:", documentNumber);
+      }
+      const byDocument = await db.student.findUnique({
+        where: {
+          documentNumber,
+        },
+      });
+
+      if (byDocument) {
+        if (classEntity) {
+          console.log("✅ Estudiante encontrado:", byDocument.id);
+        }
+
+        const updateData: any = {
+          documentType: documentType || byDocument.documentType,
+          birthDate: birthDate || byDocument.birthDate,
+        };
+
+        if (gradeLevel) {
+          updateData.gradeLevel = gradeLevel as any;
+        }
+
+        const updatedStudent = await db.student.update({
+          where: {
+            id: byDocument.id,
+          },
+          data: updateData,
+        });
+
+        // Guardar el registro actualizado en caché
+        studentCacheById.set(updatedStudent.id, updatedStudent);
+
+        if (updatedStudent.documentNumber) {
+          studentCacheByDocument.set(updatedStudent.documentNumber, updatedStudent);
+        }
+
+        return updatedStudent;
+      }
     }
 
-    const created = await db.student.create({
-      data: {
+    //-------------------------------------------------------
+    // 3. Compatibilidad con importaciones viejas
+    //-------------------------------------------------------
+
+    if (documentNumber) {
+      const oldEnrollment = await db.enrollment.findFirst({
+        where: {
+          studentDocNumber: documentNumber,
+        },
+        include: {
+          student: true,
+        },
+        orderBy: {
+          year: "desc",
+        },
+      });
+
+      if (oldEnrollment?.student) return oldEnrollment.student;
+    }
+
+    //-------------------------------------------------------
+    // 4. Buscar por nombre + fecha
+    //-------------------------------------------------------
+
+    if (fullName) {
+      const byName = await db.student.findFirst({
+        where: {
+          fullName: {
+            equals: fullName,
+            mode: "insensitive",
+          },
+
+          ...(birthDate ? { birthDate } : {}),
+        },
+      });
+
+      if (byName) {
+        const updateData: any = {
+          documentType: documentType || byName.documentType,
+          documentNumber: documentNumber || byName.documentNumber,
+          birthDate: birthDate || byName.birthDate,
+        };
+
+        if (gradeLevel) {
+          updateData.gradeLevel = gradeLevel as any;
+        }
+
+        const updatedStudent = await db.student.update({
+          where: {
+            id: byName.id,
+          },
+          data: updateData,
+        });
+
+        // Guardar el registro actualizado en caché
+        studentCacheById.set(updatedStudent.id, updatedStudent);
+
+        if (updatedStudent.documentNumber) {
+          studentCacheByDocument.set(updatedStudent.documentNumber, updatedStudent);
+        }
+
+        return updatedStudent;
+      }
+    }
+
+    //-------------------------------------------------------
+    // 5. Crear estudiante
+    //-------------------------------------------------------
+
+    const createData: any = {
+      fullName,
+      birthDate,
+      documentType: documentType || null,
+      documentNumber: documentNumber || null,
+      isActive: true,
+    };
+
+    console.log("===== CREATE DATA =====");
+    console.dir(createData, { depth: null });
+    console.log("=======================");
+
+    if (gradeLevel) {
+      createData.gradeLevel = gradeLevel as any;
+    }
+    if (classEntity) {
+      console.log("❌ No se encontró el estudiante. Se va a crear uno nuevo.");
+    }
+    let created;
+
+    try {
+      console.log("================================");
+      console.log("SE VA A CREAR UN ESTUDIANTE");
+      console.log({
+        rowNumber,
+        documentNumber,
         fullName,
+        classEntity: classEntity ? "MATRICULA" : "ESTUDIANTES",
+      });
+
+      created = await db.student.create({
+        data: createData,
+      });
+    } catch (error: any) {
+      console.error("================================");
+
+      console.error("BUSCANDO NUEVAMENTE EL DOCUMENTO...");
+
+      const duplicate = documentNumber
+        ? await db.student.findUnique({
+            where: {
+              documentNumber,
+            },
+          })
+        : null;
+
+      console.error("RESULTADO DE LA BUSQUEDA:");
+
+      console.dir(duplicate, {
+        depth: null,
+      });
+
+      console.error("ERROR P2002 AL CREAR ESTUDIANTE");
+      console.error({
+        rowNumber,
+        fullName,
+        documentNumber,
+        documentType,
         birthDate,
-        gradeLevel: gradeLevel as any,
-        isActive: true,
-      },
-    });
-    result.created.students += 1;
+        gradeLevel,
+        createData,
+      });
+      console.error("================================");
+
+      // Si otro proceso ya creó el estudiante,
+      // volver a buscarlo por documento.
+      if (error?.code === "P2002" && documentNumber) {
+        const existing = await db.student.findUnique({
+          where: {
+            documentNumber,
+          },
+        });
+
+        if (existing) {
+          studentCacheById.set(existing.id, existing);
+
+          if (existing.documentNumber) {
+            studentCacheByDocument.set(existing.documentNumber, existing);
+          }
+
+          return existing;
+        }
+      }
+
+      throw error;
+    }
+
+    // Guardar en cache
+    studentCacheById.set(created.id, created);
+
+    if (created.documentNumber) {
+      studentCacheByDocument.set(created.documentNumber, created);
+    }
+
+    result.created.students++;
+
     return created;
   };
 
-  const resolveStudentForGuardian = async (row: Record<string, any>, rowNumber: number) => {
+  const _resolveStudentForGuardian = async (row: Record<string, any>, rowNumber: number) => {
     const rawStudentId = normalizeText(row.studentId);
     if (rawStudentId) {
       const byId = await db.student.findUnique({ where: { id: rawStudentId } });
@@ -3135,6 +3424,8 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     await validateEnrollmentClassRelations();
   }
 
+  const invoiceMap = new Map<string, string>();
+
   const executeImport = async () => {
     const usersSheet = sheetRows("USUARIOS");
     if (
@@ -3247,7 +3538,10 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
             result.updated.teachers += 1;
           } else {
             await db.teacher.create({
-              data: { user: { connect: { id: user.id } }, ...updateData },
+              data: {
+                user: { connect: { id: user.id } },
+                ...updateData,
+              },
             });
             result.created.teachers += 1;
           }
@@ -3256,9 +3550,17 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     }
 
     const studentsSheet = sheetRows("ESTUDIANTES");
+    console.log("==================================");
+    console.log("HOJA ESTUDIANTES");
+    console.log("Filas:", studentsSheet.rows.length);
     if (
       studentsSheet.rows.length &&
-      ensureHeaders("ESTUDIANTES", studentsSheet.headers, ["fullName", "gradeLevel"])
+      ensureHeaders("ESTUDIANTES", studentsSheet.headers, [
+        "studentDocType",
+        "studentDocNumber",
+        "fullName",
+        "gradeLevel",
+      ])
     ) {
       for (let i = 0; i < studentsSheet.rows.length; i += 1) {
         const row = studentsSheet.rows[i];
@@ -3273,31 +3575,92 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           result.skipped += 1;
           continue;
         }
-        if (modeIsImport) {
+        /* if (modeIsImport) {
           const birthDate = parseDate(row.birthDate);
           const studentGroup = normalizeText(row.studentGroup) || null;
           const isActive = parseBoolean(row.isActive, true);
-          const existing = await db.student.findFirst({
-            where: {
-              fullName,
-              ...(birthDate ? { birthDate } : {}),
-              ...(birthDate
-                ? {}
-                : { gradeLevel: gradeLevel as any, studentGroup: studentGroup || undefined }),
-            },
-          });
+          const documentType = normalizeText(row.studentDocType);
+          const documentNumber = normalizeText(row.studentDocNumber);
+
+          console.log(
+            `ESTUDIANTE fila ${i + 2}:`,
+            fullName,
+            documentNumber
+          );
+
+          let existing: Awaited<ReturnType<typeof db.student.findUnique>> = null;
+
+          if (documentNumber) {
+            existing = await db.student.findUnique({
+              where: {
+                documentNumber,
+              },
+            });
+          }
+
+          if (!existing) {
+            existing = await db.student.findFirst({
+              where: {
+                fullName: {
+                  equals: fullName,
+                  mode: "insensitive",
+                },
+                ...(birthDate ? { birthDate } : {}),
+              },
+            });
+          }
           if (existing) {
             await db.student.update({
               where: { id: existing.id },
-              data: { gradeLevel: gradeLevel as any, studentGroup, birthDate, isActive },
+              data: {
+                gradeLevel: gradeLevel as any,
+                studentGroup,
+                birthDate,
+                isActive,
+                documentType: documentType || existing.documentType,
+                documentNumber: documentNumber || existing.documentNumber,
+              },
             });
             result.updated.students += 1;
           } else {
+            console.log("=== CREANDO ESTUDIANTE ===");
+            console.log({
+              fila: i + 2,
+              fullName,
+              documentNumber,
+              documentType,
+              birthDate,
+              gradeLevel,
+              studentGroup,
+            });
             await db.student.create({
-              data: { fullName, birthDate, gradeLevel: gradeLevel as any, studentGroup, isActive },
+              data: {
+                fullName,
+                birthDate,
+                gradeLevel: gradeLevel as any,
+                studentGroup,
+                isActive,
+                documentType,
+                documentNumber,
+              },
             });
             result.created.students += 1;
           }
+        } */
+
+        if (modeIsImport) {
+          await resolveStudent(
+            {
+              studentFullName: fullName,
+              studentDocNumber: row.studentDocNumber,
+              studentDocType: row.studentDocType,
+              studentBirthDate: row.birthDate,
+              studentGradeLevel: gradeLevel,
+              studentGroup: row.studentGroup,
+            },
+            null,
+            i + 2
+          );
         }
       }
     }
@@ -3386,12 +3749,14 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         "academicYear",
       ])
     ) {
+      console.log("Filas en hoja MATRICULAS:", enrollSheet.rows.length);
       for (let i = 0; i < enrollSheet.rows.length; i += 1) {
         const row = enrollSheet.rows[i];
         const gradeLevel = normalizeText(row.studentGradeLevel).toUpperCase();
         const studentGroup = normalizeText(row.studentGroup);
         const academicYear = Number(row.academicYear);
 
+        console.log(`Procesando fila ${i + 2}:`, row.studentDocNumber, row.studentFullName);
         if (!gradeLevel || !studentGroup || !academicYear) {
           result.errors.push({
             sheet: "MATRICULAS",
@@ -3406,12 +3771,28 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           const classEntity = await resolveClass(gradeLevel, studentGroup, academicYear, i + 2);
 
           if (!classEntity) {
+            console.log(
+              `❌ Fila ${i + 2}: no se encontró la clase para ${
+                row.studentFullName || row.studentDocNumber
+              }`
+            );
             continue;
           }
 
           const classId = classEntity.id;
-          const student = await resolveStudentForEnrollment(row, classEntity, i + 2);
+          console.log(
+            `Procesando MATRICULA fila ${i + 2}: ${row.studentFullName || row.studentDocNumber}`
+          );
+          const student = await resolveStudent(row, classEntity, i + 2);
+          console.log(
+            `✔ Matrícula asociada al estudiante ${student.fullName} (${student.documentNumber})`
+          );
           if (!student) {
+            console.log(
+              `❌ Fila ${i + 2}: no se pudo resolver el estudiante ${
+                row.studentFullName || row.studentDocNumber
+              }`
+            );
             continue;
           }
           const studentId = student.id;
@@ -3466,6 +3847,16 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       }
     }
 
+    console.log("========== RESUMEN MATRICULAS ==========");
+    console.log({
+      matriculasCreadas: result.created.enrollments,
+      matriculasActualizadas: result.updated.enrollments,
+      estudiantesCreados: result.created.students,
+      estudiantesActualizados: result.updated.students,
+      errores: result.errors.length,
+      omitidos: result.skipped,
+    });
+
     const guardiansSheet = sheetRows("ACUDIENTES");
     if (
       guardiansSheet.rows.length &&
@@ -3491,11 +3882,14 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           continue;
         }
         if (modeIsImport) {
-          const student = await resolveStudentForGuardian(row, i + 2);
-          if (!student) {
+          const resolveStudentForGuardian = async (row: Record<string, any>, rowNumber: number) => {
+            return resolveStudent(row, null, rowNumber);
+          };
+          const studentId = (await resolveStudentForGuardian(row, i + 2))?.id;
+          if (!studentId) {
+            result.skipped += 1;
             continue;
           }
-          const studentId = student.id;
           let user = await db.user.findUnique({ where: { email: parentEmail } });
           if (!user) {
             const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
@@ -3563,11 +3957,9 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         }
         if (modeIsImport) {
           const admissionStatusRaw = normalizeText(row.status).toUpperCase();
-          const admissionStatus: AdmissionStatus = ["PENDING", "APPROVED", "REJECTED"].includes(
-            admissionStatusRaw
-          )
-            ? (admissionStatusRaw as AdmissionStatus)
-            : "PENDING";
+
+          const admissionStatus: AdmissionStatus =
+            admissionStatusMap[admissionStatusRaw] ?? "PENDING";
           await db.admission.create({
             data: {
               studentName,
@@ -3592,18 +3984,25 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     const invoicesSheet = sheetRows("FACTURAS");
     if (
       invoicesSheet.rows.length &&
-      ensureHeaders("FACTURAS", invoicesSheet.headers, ["studentDocNumber", "amount", "dueDate"])
+      ensureHeaders("FACTURAS", invoicesSheet.headers, [
+        "invoiceId",
+        "studentDocNumber",
+        "amount",
+        "dueDate",
+      ])
     ) {
       for (let i = 0; i < invoicesSheet.rows.length; i += 1) {
         const row = invoicesSheet.rows[i];
+        const invoiceCode = normalizeText(row.invoiceId);
         const studentDocNumber = normalizeText(row.studentDocNumber);
         const amount = Number(row.amount);
         const dueDate = parseDate(row.dueDate);
-        if (!studentDocNumber || !amount || !dueDate) {
+
+        if (!invoiceCode || !studentDocNumber || !amount || !dueDate) {
           result.errors.push({
             sheet: "FACTURAS",
             row: i + 2,
-            message: "studentDocNumber, amount o dueDate inválido.",
+            message: "invoiceId, studentDocNumber, amount o dueDate inválido.",
           });
           result.skipped += 1;
           continue;
@@ -3632,7 +4031,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           )
             ? (invoiceStatusRaw as InvoiceStatus)
             : "PENDING";
-          await db.invoice.create({
+          const invoice = await db.invoice.create({
             data: {
               studentId: enrollmentForStudent.studentId,
               amount,
@@ -3640,6 +4039,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
               status: invoiceStatus,
             },
           });
+          invoiceMap.set(invoiceCode, invoice.id);
           result.created.invoices += 1;
         }
       }
@@ -3652,6 +4052,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     ) {
       for (let i = 0; i < paymentsSheet.rows.length; i += 1) {
         const row = paymentsSheet.rows[i];
+
         const invoiceId = normalizeText(row.invoiceId);
         const amount = Number(row.amount);
         const paidAt = parseDate(row.paidAt);
@@ -3666,9 +4067,21 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           continue;
         }
         if (modeIsImport) {
+          const realInvoiceId = invoiceMap.get(invoiceId);
+
+          if (!realInvoiceId) {
+            result.errors.push({
+              sheet: "PAGOS",
+              row: i + 2,
+              message: `No existe una factura importada con invoiceId '${invoiceId}'.`,
+            });
+
+            result.skipped += 1;
+            continue;
+          }
           await db.payment.create({
             data: {
-              invoiceId,
+              invoiceId: realInvoiceId,
               amount,
               paidAt,
               method,
@@ -3684,20 +4097,20 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   if (result.errors.length === 0) {
     if (modeIsImport) {
       try {
-        await prisma.$transaction(
-          async (tx) => {
-            db = tx;
-            await executeImport();
-            if (result.errors.length > 0) {
-              throw new Error("IMPORT_VALIDATION_FAILED");
-            }
-          },
-          { timeout: 120_000 }
-        );
+        db = prisma;
+
+        await executeImport();
+
+        if (result.errors.length > 0) {
+          throw new Error("IMPORT_VALIDATION_FAILED");
+        }
       } catch (error) {
+        console.error("ERROR EN LA TRANSACCION:", error);
+
         if (!(error instanceof Error) || error.message !== "IMPORT_VALIDATION_FAILED") {
           throw error;
         }
+
         result.created = {
           users: 0,
           teachers: 0,

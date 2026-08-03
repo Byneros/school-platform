@@ -248,6 +248,8 @@ model Student {
   id String @id @default(cuid())
   userId String? @unique
   user User? @relation(fields:[userId],references:[id])
+  documentType String?
+  documentNumber String? @unique
   fullName String
   birthDate DateTime?
   gradeLevel GradeLevel
@@ -413,8 +415,12 @@ model Enrollment {
   year      Int
   status    String
   admissionId String? @unique
+  campus    String?
+  shift     String?
+  enrollmentDate DateTime @default(now())
+  studentGroup String?
 
-  studentFullName      String
+  studentFullName      String?
   studentBirthDate     DateTime?
   studentBirthPlaceDept String?
   studentBirthPlaceCity String?

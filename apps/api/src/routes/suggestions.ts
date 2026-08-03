@@ -403,7 +403,7 @@ router.get("/", requireAuth, async (req, res) => {
       where: q
         ? {
             OR: [
-              { studentFullName: { contains: q, mode: "insensitive" } },
+              { student: { fullName: { contains: q, mode: "insensitive" } } },
               { guardianFullName: { contains: q, mode: "insensitive" } },
             ],
           }
@@ -413,19 +413,20 @@ router.get("/", requireAuth, async (req, res) => {
         studentFullName: true,
         guardianFullName: true,
         studentGradeLevel: true,
-        student: { select: { studentGroup: true } },
+        student: { select: { fullName: true, studentGroup: true } },
       },
-      orderBy: { studentFullName: "asc" },
+      orderBy: { student: { fullName: "asc" } },
       take: limit,
     });
     const options = enrollments.flatMap((e) => {
+      const studentName = e.student?.fullName || e.studentFullName || "";
       const gradeText = e.studentGradeLevel ? gradeLabel(e.studentGradeLevel) : "";
       const group = e.student?.studentGroup ? String(e.student.studentGroup) : "";
       return [
         {
           id: e.id,
-          value: e.studentFullName,
-          label: `Estudiante: ${e.studentFullName}${gradeText || group ? ` — ${[gradeText, group].filter(Boolean).join(" ")}` : ""}`,
+          value: studentName,
+          label: `Estudiante: ${studentName}${gradeText || group ? ` — ${[gradeText, group].filter(Boolean).join(" ")}` : ""}`,
         },
         {
           id: e.id,
@@ -499,19 +500,20 @@ router.get("/", requireAuth, async (req, res) => {
         id: true,
         studentFullName: true,
         studentGradeLevel: true,
-        student: { select: { studentGroup: true } },
+        student: { select: { fullName: true, studentGroup: true } },
       },
-      orderBy: { studentFullName: "asc" },
+      orderBy: { student: { fullName: "asc" } },
       take: limit,
     });
     const options = enrollments.map((e) => {
+      const studentName = e.student?.fullName || e.studentFullName || "";
       const gradeText = e.studentGradeLevel ? gradeLabel(e.studentGradeLevel) : "";
       const group = e.student?.studentGroup ? String(e.student.studentGroup) : "";
       const suffix = [gradeText, group].filter(Boolean).join(" ");
       return {
         id: e.id,
-        value: e.studentFullName,
-        label: suffix ? `${e.studentFullName} — ${suffix}` : e.studentFullName,
+        value: studentName,
+        label: suffix ? `${studentName} - ${suffix}` : studentName,
       };
     });
     return respond(dedupeOptions(options).slice(0, limit));

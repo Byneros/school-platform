@@ -26,13 +26,6 @@ const gradeLabels: Record<string, string> = {
   ONCE: "Once",
 };
 
-function normalizeDateOrNull(value?: string) {
-  if (value === undefined) return undefined;
-  const normalized = String(value).trim();
-  if (!normalized) return null;
-  return new Date(normalized);
-}
-
 function classGradeLevelValue(classEntity: any) {
   return String(classEntity?.gradeLevel || "").trim();
 }
@@ -45,6 +38,21 @@ function normalizeEmail(value?: string | null) {
 
 function isEmailLike(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function enrollmentView<T extends Record<string, any>>(enrollment: T) {
+  const student = enrollment.student || {};
+  const classEntity = enrollment.class || {};
+  return {
+    ...enrollment,
+    studentFullName: enrollment.studentFullName || student.fullName || "",
+    studentBirthDate: enrollment.studentBirthDate || student.birthDate || null,
+    studentDocType: enrollment.studentDocType || student.documentType || "",
+    studentDocNumber: enrollment.studentDocNumber || student.documentNumber || "",
+    studentGradeLevel:
+      enrollment.studentGradeLevel || classGradeLevelValue(classEntity) || student.gradeLevel,
+    studentGroup: enrollment.studentGroup || classEntity.studentGroup || student.studentGroup || "",
+  };
 }
 
 async function linkParentToStudent(
@@ -96,11 +104,7 @@ router.post(
   async (req, res) => {
     const { body } = (req as any).validated;
     const requiredEnrollmentFields: Array<{ key: string; label: string }> = [
-      { key: "admissionId", label: "Admision aprobada" },
-      { key: "studentFullName", label: "Nombre del estudiante" },
-      { key: "studentBirthDate", label: "Fecha de nacimiento" },
-      { key: "studentDocType", label: "Tipo de documento del estudiante" },
-      { key: "studentDocNumber", label: "Numero de documento del estudiante" },
+      { key: "studentId", label: "Estudiante existente" },
       { key: "studentGradeLevel", label: "Nivel/Grado" },
       { key: "guardianFullName", label: "Nombre del acudiente" },
       { key: "guardianDocNumber", label: "Documento del acudiente" },
@@ -162,62 +166,16 @@ router.post(
           }
         }
 
-        let studentId = body.studentId;
-        if (studentId) {
-          const existingStudent = await tx.student.findUnique({ where: { id: studentId } });
-          if (!existingStudent) {
-            // Si llega un ID invalido desde UI, continuar por flujo de alta/reuso por nombre.
-            studentId = undefined;
-          }
-        } else {
-          const normalizedDoc = String(body.studentDocNumber || "").trim();
-          const fallbackName = body.studentFullName.trim();
-
-          // Try to reuse an existing student by exact full name.
-          const reusedStudent = await tx.student.findFirst({
-            where: { fullName: { equals: fallbackName, mode: "insensitive" } },
-            select: { id: true },
-          });
-
-          if (reusedStudent) {
-            studentId = reusedStudent.id;
-          } else {
-            const createdStudent = await tx.student.create({
-              data: {
-                fullName: fallbackName,
-                birthDate: body.studentBirthDate ? new Date(body.studentBirthDate) : undefined,
-                gradeLevel: body.studentGradeLevel,
-              },
-              select: { id: true },
-            });
-            studentId = createdStudent.id;
-          }
-
-          if (!studentId && !normalizedDoc) {
-            throw new Error("No se pudo determinar el estudiante para matricular");
-          }
+        const student = await tx.student.findUnique({
+          where: { id: body.studentId },
+          select: { id: true, fullName: true, gradeLevel: true, studentGroup: true },
+        });
+        if (!student) {
+          throw new Error(
+            "Selecciona un estudiante existente antes de crear la matricula. La matricula no crea estudiantes."
+          );
         }
-
-        if (!studentId) {
-          const fallbackName = body.studentFullName.trim();
-          const reusedStudent = await tx.student.findFirst({
-            where: { fullName: { equals: fallbackName, mode: "insensitive" } },
-            select: { id: true },
-          });
-          if (reusedStudent) {
-            studentId = reusedStudent.id;
-          } else {
-            const createdStudent = await tx.student.create({
-              data: {
-                fullName: fallbackName,
-                birthDate: body.studentBirthDate ? new Date(body.studentBirthDate) : undefined,
-                gradeLevel: body.studentGradeLevel,
-              },
-              select: { id: true },
-            });
-            studentId = createdStudent.id;
-          }
-        }
+        const studentId = student.id;
 
         const duplicated = await tx.enrollment.findFirst({
           where: { studentId, classId: body.classId, year: body.year },
@@ -249,15 +207,11 @@ router.post(
             year: body.year,
             status: body.status,
             admissionId: body.admissionId,
-            studentFullName: body.studentFullName,
-            studentBirthDate: body.studentBirthDate ? new Date(body.studentBirthDate) : undefined,
-            studentBirthPlaceDept: body.studentBirthPlaceDept,
-            studentBirthPlaceCity: body.studentBirthPlaceCity,
-            studentGender: body.studentGender,
-            studentDocType: body.studentDocType,
-            studentDocNumber: body.studentDocNumber,
+            campus: body.campus,
+            shift: body.shift,
+            enrollmentDate: body.enrollmentDate ? new Date(body.enrollmentDate) : undefined,
             studentGradeLevel: body.studentGradeLevel,
-            studentAddress: body.studentAddress,
+            studentGroup: body.studentGroup || student.studentGroup,
             guardianFullName: body.guardianFullName?.trim() || "Sin registrar",
             guardianDocType: body.guardianDocType,
             guardianDocNumber: body.guardianDocNumber?.trim() || "N/A",
@@ -266,6 +220,10 @@ router.post(
             contactEmail: body.contactEmail,
             documents: body.documents,
             documentsNotes: body.documentsNotes,
+          },
+          include: {
+            student: true,
+            class: { include: { teacher: { include: { user: { select: { fullName: true } } } } } },
           },
         });
 
@@ -286,7 +244,7 @@ router.post(
         return created;
       });
 
-      res.json(enrollment);
+      res.json(enrollmentView(enrollment));
     } catch (error: any) {
       res.status(400).json({ message: error?.message || "No fue posible registrar la matricula" });
     }
@@ -307,7 +265,8 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
     ...(search
       ? {
           OR: [
-            { studentFullName: { contains: search, mode: "insensitive" as const } },
+            { student: { fullName: { contains: search, mode: "insensitive" as const } } },
+            { student: { documentNumber: { contains: search, mode: "insensitive" as const } } },
             { guardianFullName: { contains: search, mode: "insensitive" as const } },
             ...(matchedGradeLevel
               ? [
@@ -333,21 +292,21 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
       prisma.enrollment.findMany({
         where,
         include,
-        orderBy: [{ year: "desc" }, { studentFullName: "asc" }],
+        orderBy: [{ year: "desc" }, { student: { fullName: "asc" } }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
       prisma.enrollment.count({ where }),
     ]);
-    return res.json({ data, total, page, pageSize });
+    return res.json({ data: data.map(enrollmentView), total, page, pageSize });
   }
 
   const data = await prisma.enrollment.findMany({
     where,
     include,
-    orderBy: [{ year: "desc" }, { studentFullName: "asc" }],
+    orderBy: [{ year: "desc" }, { student: { fullName: "asc" } }],
   });
-  return res.json(data);
+  return res.json(data.map(enrollmentView));
 });
 
 router.patch(
@@ -362,7 +321,7 @@ router.patch(
       const updated = await prisma.$transaction(async (tx) => {
         const enrollment = await tx.enrollment.findUnique({
           where: { id: params.id },
-          include: { class: { select: { id: true, gradeLevel: true } } },
+          include: { class: { select: { id: true, gradeLevel: true, studentGroup: true } } },
         });
         if (!enrollment) throw new Error("Matricula no encontrada");
 
@@ -408,15 +367,11 @@ router.patch(
             classId,
             year,
             status: body.status,
-            studentFullName: body.studentFullName,
-            studentBirthDate: normalizeDateOrNull(body.studentBirthDate),
-            studentBirthPlaceDept: body.studentBirthPlaceDept,
-            studentBirthPlaceCity: body.studentBirthPlaceCity,
-            studentGender: body.studentGender,
-            studentDocType: body.studentDocType,
-            studentDocNumber: body.studentDocNumber,
+            campus: body.campus,
+            shift: body.shift,
+            enrollmentDate: body.enrollmentDate ? new Date(body.enrollmentDate) : undefined,
             studentGradeLevel,
-            studentAddress: body.studentAddress,
+            studentGroup: body.studentGroup,
             guardianFullName: body.guardianFullName,
             guardianDocType: body.guardianDocType,
             guardianDocNumber: body.guardianDocNumber,
@@ -433,7 +388,7 @@ router.patch(
         });
       });
 
-      return res.json(updated);
+      return res.json(enrollmentView(updated));
     } catch (error: any) {
       return res
         .status(400)
@@ -478,9 +433,10 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
 router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const data = await prisma.enrollment.findMany({
     include: {
+      student: true,
       class: { include: { teacher: { include: { user: { select: { fullName: true } } } } } },
     },
-    orderBy: [{ year: "desc" }, { studentFullName: "asc" }],
+    orderBy: [{ year: "desc" }, { student: { fullName: "asc" } }],
   });
 
   const branding = await getBrandingSettings();
@@ -497,15 +453,18 @@ router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (_req, res)
       { key: "status", label: "Estado", width: 52, align: "center" },
       { key: "guardianFullName", label: "Acudiente", width: 100 },
     ],
-    rows: data.map((item) => ({
-      studentFullName: item.studentFullName,
-      studentGradeLevel: gradeLabels[item.studentGradeLevel] || item.studentGradeLevel,
-      gradeAssigned: classGradeLevelValue(item.class) || "-",
-      teacher: item.class?.teacher?.user?.fullName || "-",
-      year: item.year,
-      status: item.status,
-      guardianFullName: item.guardianFullName,
-    })),
+    rows: data.map((raw) => {
+      const item = enrollmentView(raw);
+      return {
+        studentFullName: item.studentFullName,
+        studentGradeLevel: gradeLabels[item.studentGradeLevel] || item.studentGradeLevel,
+        gradeAssigned: classGradeLevelValue(item.class) || "-",
+        teacher: item.class?.teacher?.user?.fullName || "-",
+        year: item.year,
+        status: item.status,
+        guardianFullName: item.guardianFullName,
+      };
+    }),
   });
 });
 
