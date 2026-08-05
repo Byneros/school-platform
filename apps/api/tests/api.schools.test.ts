@@ -208,3 +208,120 @@ test("PATCH /api/schools actualiza un colegio correctamente", async () => {
     assert.equal(body.website, "https://actualizado.edu");
   });
 });
+
+test("GET /api/schools/:id devuelve un colegio existente", async () => {
+  await withServer(async (baseUrl) => {
+    const token = authToken("SUPER_ADMIN");
+
+    const payload = createSchoolPayload();
+
+    const created = await apiPost(baseUrl, token, "/api/schools", payload);
+
+    assert.equal(created.status, 201);
+
+    const createdBody = (await created.json()) as {
+      school: {
+        id: string;
+      };
+    };
+
+    const response = await apiGet(baseUrl, token, `/api/schools/${createdBody.school.id}`);
+
+    assert.equal(response.status, 200);
+
+    const body = (await response.json()) as {
+      id: string;
+      code: string;
+      name: string;
+    };
+
+    assert.equal(body.id, createdBody.school.id);
+    assert.equal(body.code, payload.school.code);
+    assert.equal(body.name, payload.school.name);
+  });
+});
+
+test("GET /api/schools/:id responde 404 cuando el colegio no existe", async () => {
+  await withServer(async (baseUrl) => {
+    const token = authToken("SUPER_ADMIN");
+
+    const response = await apiGet(baseUrl, token, "/api/schools/cmxxxxxxxxxxxxxxxxxxxxxxxx");
+
+    assert.equal(response.status, 404);
+
+    const body = (await response.json()) as {
+      error: string;
+    };
+
+    assert.equal(body.error, "School not found");
+  });
+});
+
+test("PATCH /api/schools/:id responde 404 cuando el colegio no existe", async () => {
+  await withServer(async (baseUrl) => {
+    const token = authToken("SUPER_ADMIN");
+
+    const response = await apiPatch(baseUrl, token, "/api/schools/cmxxxxxxxxxxxxxxxxxxxxxxxx", {
+      name: "Colegio Inexistente",
+    });
+
+    assert.equal(response.status, 404);
+
+    const body = (await response.json()) as {
+      message?: string;
+      error?: string;
+    };
+
+    assert.ok(body.message === "School not found" || body.error === "School not found");
+  });
+});
+
+test("PATCH /api/schools valida los datos enviados", async () => {
+  await withServer(async (baseUrl) => {
+    const token = authToken("SUPER_ADMIN");
+
+    const payload = createSchoolPayload();
+
+    const created = await apiPost(baseUrl, token, "/api/schools", payload);
+
+    assert.equal(created.status, 201);
+
+    const createdBody = (await created.json()) as {
+      school: {
+        id: string;
+      };
+    };
+
+    const response = await apiPatch(baseUrl, token, `/api/schools/${createdBody.school.id}`, {
+      name: "A",
+    });
+
+    assert.equal(response.status, 400);
+
+    const body = (await response.json()) as {
+      error?: string;
+      issues?: unknown[];
+      message?: string;
+    };
+
+    assert.ok(body.error === "Validation error" || body.message !== undefined);
+  });
+});
+
+test("PATCH /api/schools con rol TEACHER responde 403", async () => {
+  await withServer(async (baseUrl) => {
+    const token = authToken("TEACHER");
+
+    const response = await apiPatch(baseUrl, token, "/api/schools/cmxxxxxxxxxxxxxxxxxxxxxxxx", {
+      name: "Nuevo Nombre",
+    });
+
+    assert.equal(response.status, 403);
+
+    const body = (await response.json()) as {
+      error?: string;
+    };
+
+    assert.equal(body.error, "Forbidden");
+  });
+});
