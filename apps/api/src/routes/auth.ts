@@ -1,8 +1,11 @@
 import bcrypt from "bcryptjs";
+
+import type { JwtPayload } from "jsonwebtoken";
 import jwt from "jsonwebtoken";
 import { createHash, randomInt, randomUUID } from "crypto";
 import prisma from "../utils/prisma.js";
 import { validate } from "../utils/validate.js";
+import type { AppRole } from "../utils/rbac.js";
 import {
   loginSchema,
   revokeRoleSessionsSchema,
@@ -24,11 +27,10 @@ import {
   revokeRefreshSession,
   rotateRefreshSession,
 } from "../utils/refreshTokens.js";
-
+type Role = AppRole;
 const router = Router();
 const jwtExpiresIn = getAccessTokenTtl();
 
-type Role = "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER";
 type LoginAttempt = { count: number; resetAt: number; blockedUntil?: number };
 type TwoFactorSession = {
   userId: string;
@@ -41,7 +43,9 @@ type TwoFactorSession = {
 };
 
 const twoFactorEnabledEnv = String(process.env.ADMIN_2FA_ENABLED || "").toLowerCase();
-const twoFactorRolesEnv = String(process.env.TWO_FACTOR_ROLES || "ADMIN,TEACHER,PARENT,DEVELOPER");
+const twoFactorRolesEnv = String(
+  process.env.TWO_FACTOR_ROLES || "SUPER_ADMIN,ADMIN,TEACHER,PARENT,DEVELOPER"
+);
 const isProd = process.env.NODE_ENV === "production";
 const twoFactorEnabled = twoFactorEnabledEnv
   ? ["true", "1", "yes"].includes(twoFactorEnabledEnv)
@@ -159,7 +163,7 @@ async function sendTwoFactorCodeEmail(email: string, code: string) {
   return sendEmail({ to: email, subject, text, html });
 }
 
-function signToken(payload: { userId: string; role: Role }) {
+function signToken(payload: { userId: string; role: Role; schoolId: string | null }) {
   const jwtSecret = process.env.JWT_SECRET || "";
   if (!jwtSecret)
     throw httpError(503, "Servicio de autenticacion no configurado: falta JWT_SECRET.");
@@ -173,9 +177,23 @@ function signToken(payload: { userId: string; role: Role }) {
   };
 }
 
-async function issueSessionTokens(res: any, req: Request, user: { id: string; role: Role }) {
-  const signed = signToken({ userId: user.id, role: user.role });
+async function issueSessionTokens(
+  res: any,
+  req: Request,
+  user: {
+    id: string;
+    role: Role;
+    schoolId: string | null;
+  }
+) {
+  const signed = signToken({
+    userId: user.id,
+    role: user.role,
+    schoolId: user.schoolId,
+  });
+
   await createRefreshSession(user.id, req, res);
+
   return signed;
 }
 
@@ -259,6 +277,7 @@ router.post(
     const signed = await issueSessionTokens(res, req, {
       id: user.id,
       role: user.role as Role,
+      schoolId: user.schoolId,
     });
 
     return res.json({
@@ -297,7 +316,11 @@ router.post(
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const signed = await issueSessionTokens(res, req, { id: user.id, role: user.role as Role });
+    const signed = await issueSessionTokens(res, req, {
+      id: user.id,
+      role: user.role as Role,
+      schoolId: user.schoolId,
+    });
     twoFactorSessions.delete(token);
 
     return res.json({
@@ -381,7 +404,13 @@ router.post(
       }
 
       await rotateRefreshSession(session, req, res);
-      const signed = signToken({ userId: session.userId, role: session.user.role as Role });
+
+      const signed = signToken({
+        userId: session.userId,
+        role: session.user.role as Role,
+        schoolId: session.user.schoolId,
+      });
+
       return res.json({
         token: signed.token,
         role: session.user.role,
@@ -394,13 +423,14 @@ router.post(
     if (!token) return res.status(401).json({ error: "Missing token" });
 
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET || "") as {
-        userId: string;
-        role: Role;
-      };
+      const payload = jwt.verify(token, process.env.JWT_SECRET || "") as JwtPayload;
       const user = await prisma.user.findUnique({ where: { id: payload.userId } });
       if (!user || !user.isActive) return res.status(401).json({ error: "Invalid token" });
-      const signed = signToken({ userId: user.id, role: user.role as Role });
+      const signed = signToken({
+        userId: user.id,
+        role: user.role,
+        schoolId: user.schoolId,
+      });
       return res.json({
         token: signed.token,
         role: user.role,

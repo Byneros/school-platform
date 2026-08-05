@@ -6,17 +6,20 @@ export type UserRole = AppRole;
 export interface JwtPayload {
   userId: string;
   role: UserRole;
+  schoolId: string | null;
   iat?: number;
   exp?: number;
 }
 
 export interface AuthenticatedRequest extends Request {
   auth: JwtPayload;
+  schoolId: string | null;
 }
 
 export interface SessionUser {
   userId: string;
   role: UserRole;
+  schoolId: string | null;
 }
 
 export interface TokenResponse {

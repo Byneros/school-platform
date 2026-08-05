@@ -9,6 +9,7 @@ datasource db {
   
 
 enum RoleName {
+  SUPER_ADMIN
   ADMIN
   TEACHER
   PARENT
@@ -120,6 +121,40 @@ enum Gender {
   OTHER
 }
 
+enum InstitutionType {
+  SCHOOL
+  UNIVERSITY
+  INSTITUTE
+  ACADEMY
+  KINDERGARTEN
+}
+
+model School {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  nit       String?
+  email     String?
+  phone     String?
+  address   String?
+  website   String?
+  logo      String?
+
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users       User[]
+  students    Student[]
+  teachers    Teacher[]
+  parents     Parent[]
+  classes      Class[]
+  enrollments Enrollment[]
+  admissions Admission[]
+  notifications Notification[]
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -136,7 +171,8 @@ model User {
   isActive     Boolean @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
+  schoolId String?
+  school   School? @relation(fields: [schoolId], references: [id])
   teacher Teacher?
   parent  Parent?
   student Student?
@@ -222,6 +258,8 @@ model Teacher{
 
    id String @id @default(cuid())
    userId String @unique
+   schoolId String?
+   school School? @relation(fields: [schoolId], references: [id])
    professionalProfile String?
    subjects Json?
    subjectHours Json?
@@ -239,6 +277,8 @@ model Parent {
   id     String @id @default(cuid())
   userId String @unique
   user   User   @relation(fields: [userId], references: [id])
+  schoolId String?
+  school School? @relation(fields: [schoolId], references: [id])
   guardians Guardian[]
   notificationRecipients NotificationRecipient[]
 }
@@ -248,6 +288,8 @@ model Student {
   id String @id @default(cuid())
   userId String? @unique
   user User? @relation(fields:[userId],references:[id])
+  schoolId String?
+  school School? @relation(fields: [schoolId], references: [id])
   documentType String?
   documentNumber String? @unique
   fullName String
@@ -349,6 +391,8 @@ model AcademicClosureResult {
 
 model Admission {
   id                  String          @id @default(cuid())
+  schoolId String?
+  school   School? @relation(fields: [schoolId], references: [id])
   studentName         String
   gradeLevel          GradeLevel
   status              AdmissionStatus @default(PENDING)
@@ -392,6 +436,8 @@ model Guardian {
 
 model Class {
   id            String @id @default(cuid())
+  schoolId String?
+  school   School? @relation(fields: [schoolId], references: [id])
 
   teacherId      String
   gradeLevel     GradeLevel
@@ -410,6 +456,8 @@ model Class {
 
 model Enrollment {
   id        String @id @default(cuid())
+  schoolId String?
+  school   School? @relation(fields: [schoolId], references: [id])
   studentId String
   classId   String
   year      Int
@@ -544,6 +592,8 @@ model Payment {
 
 model Notification {
   id           String              @id @default(cuid())
+  schoolId String?
+  school School? @relation(fields: [schoolId], references: [id])
   title        String
   body         String
   status       NotificationStatus

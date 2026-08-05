@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
 import prisma from "../utils/prisma.js";
+import { studentScope, withSchool } from "../utils/schoolDb.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { validate } from "../utils/validate.js";
 import { createStudentSchema, updateStudentSchema } from "../schemas/students.js";
@@ -84,6 +85,7 @@ router.get("/", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_req, res
     : {};
 
   const finalWhere: Prisma.StudentWhereInput = {
+    ...studentScope(_req),
     ...whereFromSearch,
     ...(gradeLevel ? { gradeLevel: gradeLevel as any } : {}),
   };
@@ -102,6 +104,7 @@ router.get("/", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_req, res
 
 router.get("/simple", requireAuth, requireRole(["TEACHER", "ADMIN"]), async (_req, res) => {
   const students = await prisma.student.findMany({
+    where: studentScope(_req),
     select: {
       id: true,
       fullName: true,
@@ -130,8 +133,11 @@ router.get("/:id/profile", requireAuth, requireRole(["ADMIN", "TEACHER"]), async
   const studentId = String(req.params.id || "").trim();
   if (!studentId) return res.status(400).json({ message: "Estudiante invalido" });
 
-  const student = await prisma.student.findUnique({
-    where: { id: studentId },
+  const student = await prisma.student.findFirst({
+    where: {
+      id: studentId,
+      ...studentScope(req),
+    },
     include: {
       enrollments: {
         include: { class: true },
@@ -189,10 +195,10 @@ router.post(
       });
     }
     const student = await prisma.student.create({
-      data: {
+      data: withSchool(req, {
         ...body,
         studentGroup: normalizedGroup,
-      },
+      }),
     });
     res.json(student);
   }
@@ -205,9 +211,16 @@ router.patch(
   validate(updateStudentSchema),
   async (req, res) => {
     const { params, body } = (req as any).validated;
-    const current = await prisma.student.findUnique({
-      where: { id: params.id },
-      select: { gradeLevel: true, studentGroup: true },
+    const current = await prisma.student.findFirst({
+      where: {
+        id: params.id,
+        ...studentScope(req),
+      },
+      select: {
+        id: true,
+        gradeLevel: true,
+        studentGroup: true,
+      },
     });
     if (!current) return res.status(404).json({ message: "Estudiante no encontrado" });
 
@@ -241,7 +254,12 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   if (!studentId) return res.status(400).json({ message: "Estudiante invalido" });
 
   try {
-    const student = await prisma.student.findUnique({ where: { id: studentId } });
+    const student = await prisma.student.findFirst({
+      where: {
+        id: studentId,
+        ...studentScope(req),
+      },
+    });
     if (!student) return res.status(404).json({ message: "Estudiante no encontrado" });
 
     await prisma.$transaction(async (tx) => {

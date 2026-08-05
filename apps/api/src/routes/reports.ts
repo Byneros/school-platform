@@ -19,6 +19,10 @@ import { validate } from "../utils/validate.js";
 import { composeNotificationBodyWithMeta } from "../utils/notificationMeta.js";
 import { isDeveloperRole } from "../utils/rbac.js";
 
+export function isSuperAdminRole(role: unknown): role is "SUPER_ADMIN" {
+  return String(role || "").toUpperCase() === "SUPER_ADMIN";
+}
+
 const admissionStatusMap: Record<string, AdmissionStatus> = {
   PENDING: "PENDING",
   PENDIENTE: "PENDING",

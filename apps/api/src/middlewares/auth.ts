@@ -19,6 +19,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     const payload = jwt.verify(token, process.env.JWT_SECRET || "") as JwtPayload;
 
     req.auth = payload;
+    req.schoolId = payload.schoolId;
 
     next();
   } catch {

@@ -27,43 +27,116 @@ async function main() {
   const adminPassword = await bcrypt.hash("Admin123!", 10);
   const teacherPassword = await bcrypt.hash("Teacher123!", 10);
   const parentPassword = await bcrypt.hash("Parent123!", 10);
+  const school = await prisma.school.upsert({
+    where: {
+      code: "DEMO",
+    },
+    update: {
+      name: "School Platform Demo",
+      isActive: true,
+    },
+    create: {
+      code: "DEMO",
+      name: "School Platform Demo",
+      email: "admin@schoolplatform.com",
+      website: "https://schoolplatform.app",
+      isActive: true,
+    },
+  });
+
+  const schoolCartagena = await prisma.school.upsert({
+    where: {
+      code: "CARTAGENA",
+    },
+    update: {
+      name: "Colegio Cartagena",
+      isActive: true,
+    },
+    create: {
+      code: "CARTAGENA",
+      name: "Colegio Cartagena",
+      email: "admin@colegiocartagena.edu",
+      website: "https://colegiocartagena.edu",
+      isActive: true,
+    },
+  });
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@colegio.edu" },
-    update: { passwordHash: adminPassword, fullName: "Administrador Principal", role: "ADMIN" },
+    update: {
+      passwordHash: adminPassword,
+      fullName: "Administrador Principal",
+      role: "SUPER_ADMIN",
+      schoolId: school.id,
+    },
     create: {
       email: "admin@colegio.edu",
       passwordHash: adminPassword,
       fullName: "Administrador Principal",
+      role: "SUPER_ADMIN",
+      schoolId: school.id,
+    },
+  });
+
+  const adminCartagena = await prisma.user.upsert({
+    where: {
+      email: "admin.cartagena@colegio.edu",
+    },
+    update: {
+      passwordHash: adminPassword,
+      fullName: "Administrador Colegio Cartagena",
       role: "ADMIN",
+      isActive: true,
+      schoolId: schoolCartagena.id,
+    },
+    create: {
+      email: "admin.cartagena@colegio.edu",
+      passwordHash: adminPassword,
+      fullName: "Administrador Colegio Cartagena",
+      role: "ADMIN",
+      isActive: true,
+      schoolId: schoolCartagena.id,
     },
   });
 
   const teacherUser = await prisma.user.upsert({
     where: { email: "docente@colegio.edu" },
-    update: { passwordHash: teacherPassword, fullName: "Docente Demo", role: "TEACHER" },
+    update: {
+      passwordHash: teacherPassword,
+      fullName: "Docente Demo",
+      role: "TEACHER",
+      schoolId: school.id,
+    },
     create: {
       email: "docente@colegio.edu",
       passwordHash: teacherPassword,
       fullName: "Docente Demo",
       role: "TEACHER",
+      schoolId: school.id,
     },
   });
 
   const parentUser = await prisma.user.upsert({
     where: { email: "padre@colegio.edu" },
-    update: { passwordHash: parentPassword, fullName: "Padre Demo", role: "PARENT" },
+    update: {
+      passwordHash: parentPassword,
+      fullName: "Padre Demo",
+      role: "PARENT",
+      schoolId: school.id,
+    },
     create: {
       email: "padre@colegio.edu",
       passwordHash: parentPassword,
       fullName: "Padre Demo",
       role: "PARENT",
+      schoolId: school.id,
     },
   });
 
   const teacher = await prisma.teacher.upsert({
     where: { userId: teacherUser.id },
     update: {
+      schoolId: school.id,
       professionalProfile: "Docente de apoyo academico institucional.",
       subjects: ["General"],
       subjectHours: { General: 10 },
@@ -75,6 +148,7 @@ async function main() {
     },
     create: {
       userId: teacherUser.id,
+      schoolId: school.id,
       professionalProfile: "Docente de apoyo academico institucional.",
       subjects: ["General"],
       subjectHours: { General: 10 },
@@ -151,6 +225,7 @@ async function main() {
         fullName: t.fullName,
         role: "TEACHER",
         isActive: true,
+        schoolId: school.id,
       },
       create: {
         email: t.email,
@@ -158,12 +233,14 @@ async function main() {
         fullName: t.fullName,
         role: "TEACHER",
         isActive: true,
+        schoolId: school.id,
       },
     });
 
     await prisma.teacher.upsert({
       where: { userId: user.id },
       update: {
+        schoolId: school.id,
         professionalProfile: t.profile,
         subjects: t.subjects,
         subjectHours: Object.fromEntries(
@@ -179,6 +256,7 @@ async function main() {
       },
       create: {
         userId: user.id,
+        schoolId: school.id,
         professionalProfile: t.profile,
         subjects: t.subjects,
         subjectHours: Object.fromEntries(
@@ -197,8 +275,13 @@ async function main() {
 
   const parent = await prisma.parent.upsert({
     where: { userId: parentUser.id },
-    update: {},
-    create: { userId: parentUser.id },
+    update: {
+      schoolId: school.id,
+    },
+    create: {
+      userId: parentUser.id,
+      schoolId: school.id,
+    },
   });
 
   // Clases por grado
@@ -206,14 +289,16 @@ async function main() {
   for (const grade of gradeLevels) {
     const cls = await prisma.class.upsert({
       where: { id: `class-${grade.toLowerCase()}` },
-      update: { gradeLevel: grade },
+      update: {
+        schoolId: school.id,
+        gradeLevel: grade,
+      },
       create: {
         id: `class-${grade.toLowerCase()}`,
+        schoolId: school.id,
         teacherId: teacher.id,
         gradeLevel: grade,
-
         studentGroup: "A",
-
         academicYear: new Date().getFullYear(),
       },
     });
@@ -234,8 +319,15 @@ async function main() {
   for (const s of students) {
     await prisma.student.upsert({
       where: { id: s.id },
-      update: {},
-      create: { id: s.id, fullName: s.fullName, gradeLevel: s.gradeLevel },
+      update: {
+        schoolId: school.id,
+      },
+      create: {
+        id: s.id,
+        schoolId: school.id,
+        fullName: s.fullName,
+        gradeLevel: s.gradeLevel,
+      },
     });
   }
 
@@ -253,8 +345,11 @@ async function main() {
     const cls = classes.find((c, idx) => idx === students.indexOf(s)) || classes[0];
     await prisma.enrollment.upsert({
       where: { studentId_classId_year: { studentId: s.id, classId: cls.id, year: 2026 } },
-      update: {},
+      update: {
+        schoolId: school.id,
+      },
       create: {
+        schoolId: school.id,
         studentId: s.id,
         classId: cls.id,
         year: 2026,
@@ -318,6 +413,7 @@ async function main() {
   await prisma.notification.createMany({
     data: [
       {
+        schoolId: school.id,
         title: "Bienvenidos al ciclo 2026",
         body: "Comunicado de bienvenida para familias y estudiantes.",
         status: "APPROVED",
@@ -326,6 +422,7 @@ async function main() {
         approvedAt: new Date(),
       },
       {
+        schoolId: school.id,
         title: "Tarea de ciencias",
         body: "Entregar actividad el viernes.",
         status: "PENDING",
@@ -341,6 +438,7 @@ async function main() {
     update: {},
     create: {
       id: "adm-1",
+      schoolId: school.id,
       studentName: "Luis Gomez",
       gradeLevel: "PRE_JARDIN",
       status: "PENDING",
@@ -353,6 +451,7 @@ async function main() {
     update: {},
     create: {
       id: "adm-2",
+      schoolId: school.id,
       studentName: "Carla Mendez",
       gradeLevel: "PRIMERO",
       status: "APPROVED",
