@@ -78,7 +78,7 @@ async function main() {
     },
   });
 
-  const adminCartagena = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: {
       email: "admin.cartagena@colegio.edu",
     },

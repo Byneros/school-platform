@@ -27,6 +27,7 @@ router.get("/", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_req, res
   const pageSize = Number(_req.query.pageSize || 10);
   const search = String(_req.query.search || "").trim();
   const gradeLevel = String(_req.query.gradeLevel || "").trim();
+  const excludeEnrolledYear = Number(_req.query.excludeEnrolledYear || 0);
 
   const normalizeGrade = (s: string) =>
     s
@@ -88,6 +89,9 @@ router.get("/", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_req, res
     ...studentScope(_req),
     ...whereFromSearch,
     ...(gradeLevel ? { gradeLevel: gradeLevel as any } : {}),
+    ...(excludeEnrolledYear
+      ? { enrollments: { none: { year: excludeEnrolledYear, status: { not: "INACTIVE" } } } }
+      : {}),
   };
 
   const [data, total] = await Promise.all([

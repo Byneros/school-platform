@@ -7,6 +7,13 @@ import { createEnrollmentSchema, updateEnrollmentSchema } from "../schemas/enrol
 import { sendTabularPdf } from "../utils/reportExport.js";
 import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { validateGuardianRelationAndAdultDoc } from "../utils/guardianValidation.js";
+import {
+  admissionScope,
+  classScope,
+  enrollmentScope,
+  studentScope,
+  withSchool,
+} from "../utils/schoolDb.js";
 
 const router = Router();
 const gradeLabels: Record<string, string> = {
@@ -53,6 +60,32 @@ function enrollmentView<T extends Record<string, any>>(enrollment: T) {
       enrollment.studentGradeLevel || classGradeLevelValue(classEntity) || student.gradeLevel,
     studentGroup: enrollment.studentGroup || classEntity.studentGroup || student.studentGroup || "",
   };
+}
+
+const enrollmentInclude = {
+  school: true,
+  admission: true,
+  student: true,
+  class: {
+    include: {
+      school: true,
+      teacher: { include: { user: { select: { fullName: true } } } },
+    },
+  },
+} satisfies Prisma.EnrollmentInclude;
+
+async function syncStudentFromEnrollmentClass(
+  tx: Prisma.TransactionClient,
+  params: { studentId: string; classEntity: { gradeLevel: any; studentGroup?: string | null } }
+) {
+  await tx.student.update({
+    where: { id: params.studentId },
+    data: {
+      gradeLevel: params.classEntity.gradeLevel,
+      studentGroup: params.classEntity.studentGroup || null,
+      isActive: true,
+    },
+  });
 }
 
 async function linkParentToStudent(
@@ -132,9 +165,9 @@ router.post(
 
     try {
       const enrollment = await prisma.$transaction(async (tx) => {
-        const classEntity = await tx.class.findUnique({
-          where: { id: body.classId },
-          select: { id: true, gradeLevel: true },
+        const classEntity = await tx.class.findFirst({
+          where: { id: body.classId, ...classScope(req) },
+          select: { id: true, gradeLevel: true, studentGroup: true },
         });
 
         if (!classEntity) {
@@ -147,8 +180,8 @@ router.post(
 
         let admission: any = null;
         if (body.admissionId) {
-          admission = await tx.admission.findUnique({
-            where: { id: body.admissionId },
+          admission = await tx.admission.findFirst({
+            where: { id: body.admissionId, ...admissionScope(req) },
             include: { enrollment: true },
           });
 
@@ -166,8 +199,8 @@ router.post(
           }
         }
 
-        const student = await tx.student.findUnique({
-          where: { id: body.studentId },
+        const student = await tx.student.findFirst({
+          where: { id: body.studentId, ...studentScope(req) },
           select: { id: true, fullName: true, gradeLevel: true, studentGroup: true },
         });
         if (!student) {
@@ -201,7 +234,7 @@ router.post(
         }
 
         const created = await tx.enrollment.create({
-          data: {
+          data: withSchool(req, {
             studentId: studentId!,
             classId: body.classId,
             year: body.year,
@@ -220,12 +253,11 @@ router.post(
             contactEmail: body.contactEmail,
             documents: body.documents,
             documentsNotes: body.documentsNotes,
-          },
-          include: {
-            student: true,
-            class: { include: { teacher: { include: { user: { select: { fullName: true } } } } } },
-          },
+          }),
+          include: enrollmentInclude,
         });
+
+        await syncStudentFromEnrollmentClass(tx, { studentId: created.studentId, classEntity });
 
         await linkParentToStudent(tx, {
           studentId: created.studentId,
@@ -255,13 +287,25 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const page = Number(req.query.page || 0);
   const pageSize = Number(req.query.pageSize || 10);
   const search = String(req.query.search || "").trim();
+  const year = Number(req.query.year || 0);
+  const status = String(req.query.status || "").trim();
+  const gradeLevel = String(req.query.gradeLevel || "").trim();
+  const group = String(req.query.group || "").trim();
   const matchedGradeLevel = Object.keys(gradeLabels).find((grade) => {
     const normalizedSearch = search.toUpperCase().replace(/\s+/g, "_");
     const normalizedLabel = gradeLabels[grade].toUpperCase().replace(/\s+/g, "_");
     return grade === normalizedSearch || normalizedLabel === normalizedSearch;
   });
 
-  const where = {
+  const classFilters: Prisma.ClassWhereInput = {
+    ...(gradeLevel ? { gradeLevel: gradeLevel as any } : {}),
+    ...(group ? { studentGroup: { equals: group, mode: "insensitive" } } : {}),
+  };
+  const where: Prisma.EnrollmentWhereInput = {
+    ...enrollmentScope(req),
+    ...(year ? { year } : {}),
+    ...(status ? { status } : {}),
+    ...(Object.keys(classFilters).length ? { class: classFilters } : {}),
     ...(search
       ? {
           OR: [
@@ -282,16 +326,11 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
       : {}),
   };
 
-  const include = {
-    student: true,
-    class: { include: { teacher: { include: { user: { select: { fullName: true } } } } } },
-  };
-
   if (page > 0) {
     const [data, total] = await Promise.all([
       prisma.enrollment.findMany({
         where,
-        include,
+        include: enrollmentInclude,
         orderBy: [{ year: "desc" }, { student: { fullName: "asc" } }],
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -303,10 +342,23 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
 
   const data = await prisma.enrollment.findMany({
     where,
-    include,
+    include: enrollmentInclude,
     orderBy: [{ year: "desc" }, { student: { fullName: "asc" } }],
   });
   return res.json(data.map(enrollmentView));
+});
+
+router.get("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
+  const id = String(req.params.id || "").trim();
+  if (!id) return res.status(400).json({ message: "Matricula invalida" });
+
+  const enrollment = await prisma.enrollment.findFirst({
+    where: { id, ...enrollmentScope(req) },
+    include: enrollmentInclude,
+  });
+
+  if (!enrollment) return res.status(404).json({ message: "Matricula no encontrada" });
+  return res.json(enrollmentView(enrollment));
 });
 
 router.patch(
@@ -319,21 +371,21 @@ router.patch(
 
     try {
       const updated = await prisma.$transaction(async (tx) => {
-        const enrollment = await tx.enrollment.findUnique({
-          where: { id: params.id },
+        const enrollment = await tx.enrollment.findFirst({
+          where: { id: params.id, ...enrollmentScope(req) },
           include: { class: { select: { id: true, gradeLevel: true, studentGroup: true } } },
         });
         if (!enrollment) throw new Error("Matricula no encontrada");
 
         const classId = body.classId || enrollment.classId;
-        const studentGradeLevel = body.studentGradeLevel || enrollment.studentGradeLevel;
         const year = body.year ?? enrollment.year;
 
-        const classEntity = await tx.class.findUnique({
-          where: { id: classId },
-          select: { id: true, gradeLevel: true },
+        const classEntity = await tx.class.findFirst({
+          where: { id: classId, ...classScope(req) },
+          select: { id: true, gradeLevel: true, studentGroup: true },
         });
         if (!classEntity) throw new Error("Clase no encontrada");
+        const studentGradeLevel = body.studentGradeLevel || classEntity.gradeLevel;
         if (classGradeLevelValue(classEntity) !== studentGradeLevel) {
           throw new Error("La clase seleccionada no corresponde al nivel/grado del estudiante");
         }
@@ -361,7 +413,7 @@ router.patch(
           }
         }
 
-        return tx.enrollment.update({
+        const updated = await tx.enrollment.update({
           where: { id: enrollment.id },
           data: {
             classId,
@@ -371,7 +423,7 @@ router.patch(
             shift: body.shift,
             enrollmentDate: body.enrollmentDate ? new Date(body.enrollmentDate) : undefined,
             studentGradeLevel,
-            studentGroup: body.studentGroup,
+            studentGroup: body.studentGroup || classEntity.studentGroup,
             guardianFullName: body.guardianFullName,
             guardianDocType: body.guardianDocType,
             guardianDocNumber: body.guardianDocNumber,
@@ -382,10 +434,16 @@ router.patch(
             documentsNotes: body.documentsNotes,
           },
           include: {
-            student: true,
-            class: { include: { teacher: { include: { user: { select: { fullName: true } } } } } },
+            ...enrollmentInclude,
           },
         });
+
+        await syncStudentFromEnrollmentClass(tx, {
+          studentId: updated.studentId,
+          classEntity,
+        });
+
+        return updated;
       });
 
       return res.json(enrollmentView(updated));
@@ -407,7 +465,11 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
         where: { id: enrollmentId },
         select: { id: true, admissionId: true },
       });
-      if (!enrollment) throw new Error("Matricula no encontrada");
+      const scopedEnrollment = await tx.enrollment.findFirst({
+        where: { id: enrollmentId, ...enrollmentScope(req) },
+        select: { id: true, admissionId: true },
+      });
+      if (!enrollment || !scopedEnrollment) throw new Error("Matricula no encontrada");
 
       await tx.academicClosureResult.deleteMany({ where: { enrollmentId } });
       await tx.taskScore.deleteMany({ where: { enrollmentId } });
@@ -430,10 +492,13 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   }
 });
 
-router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
+router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const data = await prisma.enrollment.findMany({
+    where: enrollmentScope(req),
     include: {
       student: true,
+      school: true,
+      admission: true,
       class: { include: { teacher: { include: { user: { select: { fullName: true } } } } } },
     },
     orderBy: [{ year: "desc" }, { student: { fullName: "asc" } }],

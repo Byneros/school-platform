@@ -722,15 +722,16 @@ export default function AdminAdmissions() {
     setSelectedEnrollment(enrollment);
     setEditingEnrollmentId(enrollment.id);
     setEditingEnrollmentForm({
-      studentFullName: enrollment.studentFullName || "",
-      studentBirthDate: enrollment.studentBirthDate
-        ? String(enrollment.studentBirthDate).slice(0, 10)
-        : "",
+      studentFullName: enrollment.studentFullName || enrollment.student?.fullName || "",
+      studentBirthDate:
+        enrollment.studentBirthDate || enrollment.student?.birthDate
+          ? String(enrollment.studentBirthDate || enrollment.student?.birthDate).slice(0, 10)
+          : "",
       studentBirthPlaceDept: enrollment.studentBirthPlaceDept || "",
       studentBirthPlaceCity: enrollment.studentBirthPlaceCity || "",
       studentGender: enrollment.studentGender || "",
-      studentDocType: enrollment.studentDocType || "",
-      studentDocNumber: enrollment.studentDocNumber || "",
+      studentDocType: enrollment.studentDocType || enrollment.student?.documentType || "",
+      studentDocNumber: enrollment.studentDocNumber || enrollment.student?.documentNumber || "",
       studentGradeLevel: enrollment.studentGradeLevel || "PRE_JARDIN",
       classId: enrollment.classId || "",
       year: String(enrollment.year || new Date().getFullYear()),
@@ -762,18 +763,10 @@ export default function AdminAdmissions() {
     setEditingEnrollmentMessage("");
     try {
       const updated = await apiPatch(`/enrollments/${editingEnrollmentId}`, {
-        studentFullName: editingEnrollmentForm.studentFullName,
-        studentBirthDate: editingEnrollmentForm.studentBirthDate || undefined,
-        studentBirthPlaceDept: editingEnrollmentForm.studentBirthPlaceDept,
-        studentBirthPlaceCity: editingEnrollmentForm.studentBirthPlaceCity,
-        studentGender: editingEnrollmentForm.studentGender,
-        studentDocType: editingEnrollmentForm.studentDocType,
-        studentDocNumber: editingEnrollmentForm.studentDocNumber,
         studentGradeLevel: editingEnrollmentForm.studentGradeLevel,
         classId: editingEnrollmentForm.classId,
         year: Number(editingEnrollmentForm.year),
         status: editingEnrollmentForm.status,
-        studentAddress: editingEnrollmentForm.studentAddress,
         guardianFullName: editingEnrollmentForm.guardianFullName,
         guardianDocType: editingEnrollmentForm.guardianDocType,
         guardianDocNumber: editingEnrollmentForm.guardianDocNumber,
@@ -1440,7 +1433,9 @@ export default function AdminAdmissions() {
                     <span className="tag">{gradeLabel(item.studentGradeLevel)}</span>
                   </td>
                   <td>
-                    <span className="tag">{item.student?.studentGroup || "-"}</span>
+                    <span className="tag">
+                      {item.studentGroup || item.student?.studentGroup || "-"}
+                    </span>
                   </td>
                   <td>{item.year}</td>
                   <td>
@@ -1549,6 +1544,10 @@ export default function AdminAdmissions() {
             <div>
               <strong>Grado y clase</strong>
               <div>{gradeLabel(selectedEnrollment.studentGradeLevel)}</div>
+              <div style={{ color: "#64748b" }}>
+                Grupo:{" "}
+                {selectedEnrollment.studentGroup || selectedEnrollment.student?.studentGroup || "-"}
+              </div>
               <div style={{ color: "#64748b" }}>
                 {selectedEnrollment.class?.teacher?.user?.fullName
                   ? `Docente: ${selectedEnrollment.class.teacher.user.fullName}`
