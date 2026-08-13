@@ -4,7 +4,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 type Props = {
-  roles?: Array<"ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER">;
+  roles?: Array<"SUPER_ADMIN" | "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER">;
   children: React.ReactElement;
 };
 

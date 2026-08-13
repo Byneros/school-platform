@@ -1,6 +1,6 @@
 type AuthUser = {
   token: string;
-  role: "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER";
+  role: "SUPER_ADMIN" | "ADMIN" | "TEACHER" | "PARENT" | "DEVELOPER";
   fullName: string;
   email?: string;
 };

@@ -37,6 +37,7 @@ export default function LoginPage() {
         return;
       }
       const user = result.user;
+      if (user.role === "SUPER_ADMIN") navigate("/super/colegios");
       if (user.role === "ADMIN") navigate("/admin");
       if (user.role === "DEVELOPER") navigate("/dev");
       if (user.role === "TEACHER") navigate("/teacher");
@@ -61,6 +62,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await verifyTwoFactor(twoFactorToken, twoFactorCode);
+      if (user.role === "SUPER_ADMIN") navigate("/super/colegios");
       if (user.role === "ADMIN") navigate("/admin");
       if (user.role === "DEVELOPER") navigate("/dev");
       if (user.role === "TEACHER") navigate("/teacher");
@@ -113,6 +115,7 @@ export default function LoginPage() {
   };
 
   const roleLabel = (role: string) => {
+    if (role === "SUPER_ADMIN") return "Super administrador";
     if (role === "ADMIN") return "Administrador";
     if (role === "DEVELOPER") return "Desarrollador";
     if (role === "TEACHER") return "Docente";

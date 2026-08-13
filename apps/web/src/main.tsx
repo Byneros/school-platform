@@ -31,6 +31,7 @@ import ParentComunicados from "./pages/ParentComunicados";
 import StudentFollowup from "./pages/StudentFollowup";
 import SessionsPage from "./pages/SessionsPage";
 import TeacherGrades from "./pages/TeacherGrades";
+import SuperAdminSchools from "./pages/SuperAdminSchools";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -39,6 +40,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/" element={<AppShell />}>
             <Route index element={<LoginPage />} />
+            <Route
+              path="super/colegios"
+              element={
+                <ProtectedRoute roles={["SUPER_ADMIN"]}>
+                  <SuperAdminSchools />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="admin"
               element={

@@ -15,6 +15,7 @@ type BrandingSettings = {
 export default function AppShell() {
   const { user, logout, initializing, inactivityWarning, extendSession } = useAuth();
   const isDeveloper = user?.role === "DEVELOPER";
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
   const isAdminLike = user?.role === "ADMIN" || isDeveloper;
   const [branding, setBranding] = useState<BrandingSettings>({
     schoolName: "School Platform",
@@ -140,6 +141,7 @@ export default function AppShell() {
           {!initializing && user && (
             <div className="nav-links">
               {isAdminLike && <Link to="/admin">Admin</Link>}
+              {isSuperAdmin && <Link to="/super/colegios">Colegios</Link>}
               {user.role === "TEACHER" && <Link to="/teacher">Docente</Link>}
               {user.role === "PARENT" && <Link to="/parent">Padre</Link>}
               {isDeveloper && <Link to="/dev">Developer</Link>}
@@ -230,6 +232,11 @@ export default function AppShell() {
                   )}
                 </>
               )}
+              {isSuperAdmin && (
+                <>
+                  <NavLink to="/super/colegios">Colegios</NavLink>
+                </>
+              )}
               {user.role === "TEACHER" && !isDeveloper && (
                 <>
                   <NavLink to="/teacher">Dashboard</NavLink>
@@ -283,6 +290,13 @@ export default function AppShell() {
                   )}
                   <Link className="button secondary" to="/feedback">
                     Ver feedback
+                  </Link>
+                </div>
+              )}
+              {isSuperAdmin && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <Link className="button secondary" to="/super/colegios">
+                    Crear colegio
                   </Link>
                 </div>
               )}
