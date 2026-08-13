@@ -149,7 +149,7 @@ Write-Host ""
 Write-Host "Results:"
 $results | Format-Table -AutoSize
 
-$failed = $results | Where-Object { -not $_.Ok }
+$failed = @($results | Where-Object { -not $_.Ok })
 if ($failed.Count -gt 0) {
   Write-Host ""
   Write-Host "Some checks failed. Review the details above."
