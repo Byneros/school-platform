@@ -10,6 +10,7 @@ import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { sendEmail } from "../utils/mailer.js";
 import { enqueueEmail } from "../services/emailQueue.js";
 import { canManageDeveloperUsers, canViewDeveloperUsers, isDeveloperRole } from "../utils/rbac.js";
+import { withSchool } from "../utils/schoolDb.js";
 
 const router = Router();
 
@@ -396,14 +397,21 @@ router.post(
     try {
       user = await prisma.$transaction(async (tx) => {
         const created = await tx.user.create({
-          data: {
+          data: withSchool(req, {
             email: normalizedEmail,
             passwordHash,
             fullName: body.fullName,
             role: body.role,
             isActive: body.isActive ?? true,
+          }),
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            fullName: true,
+            isActive: true,
+            schoolId: true,
           },
-          select: { id: true, email: true, role: true, fullName: true, isActive: true },
         });
 
         if (body.role === "TEACHER") {

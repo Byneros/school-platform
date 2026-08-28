@@ -591,102 +591,49 @@ export default function AdminAdmissions() {
     }
   };
 
-  const createEnrollment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (missingImportantEnrollmentFields.length > 0) {
-      setEnrollmentError(
-        `Completa los datos obligatorios para matricular: ${missingImportantEnrollmentFields.join(", ")}`
-      );
-      setEnrollmentMessage("");
-      return;
-    }
-    setEnrollmentBusy(true);
-    setEnrollmentError("");
-    setEnrollmentMessage("");
-    try {
-      const classIdFromGrade = classes.find(
-        (c) => getClassGradeLevel(c) === String(enrollmentForm.studentGradeLevel || "")
-      )?.id;
-      const classIdToUse = classIdFromGrade || enrollmentForm.classId;
-      if (!classIdToUse) {
-        setEnrollmentError("No hay una clase configurada para el grado seleccionado.");
-        setEnrollmentBusy(false);
-        return;
-      }
-      await apiPost("/enrollments", {
-        studentId: enrollmentForm.studentId,
-        classId: classIdToUse,
-        year: Number(enrollmentForm.year),
-        status: enrollmentForm.status,
-        admissionId: enrollmentForm.admissionId || undefined,
-        studentFullName: enrollmentForm.studentFullName,
-        studentBirthDate: enrollmentForm.studentBirthDate,
-        studentBirthPlaceDept: enrollmentForm.studentBirthPlaceDept,
-        studentBirthPlaceCity: enrollmentForm.studentBirthPlaceCity,
-        studentGender: enrollmentForm.studentGender,
-        studentDocType: enrollmentForm.studentDocType,
-        studentDocNumber: enrollmentForm.studentDocNumber,
-        studentGradeLevel: enrollmentForm.studentGradeLevel,
-        studentAddress: enrollmentForm.studentAddress,
-        guardianFullName: enrollmentForm.guardianFullName,
-        guardianDocType: enrollmentForm.guardianDocType,
-        guardianDocNumber: enrollmentForm.guardianDocNumber,
-        guardianRelation: enrollmentForm.guardianRelation,
-        contactPhone: enrollmentForm.contactPhone,
-        contactEmail: enrollmentForm.contactEmail || undefined,
-        documents: enrollmentForm.documents,
-        documentsNotes: enrollmentForm.documentsNotes,
-      });
-      setEnrollmentMessage("Matricula registrada correctamente");
-      if (enrollmentForm.admissionId) {
-        setAdmissions((prev) => prev.filter((a) => a.id !== enrollmentForm.admissionId));
-      }
-      setEnrollmentForm({
-        studentId: "",
-        admissionId: "",
-        classId: "",
-        year: "2026",
-        status: "ACTIVE",
-        studentFullName: "",
-        studentBirthDate: "",
-        studentBirthPlaceDept: "",
-        studentBirthPlaceCity: "",
-        studentGender: "",
-        studentDocType: "",
-        studentDocNumber: "",
-        studentGradeLevel: "PRE_JARDIN",
-        studentAddress: "",
-        guardianFullName: "",
-        guardianDocType: "",
-        guardianDocNumber: "",
-        guardianRelation: "",
-        contactPhone: "",
-        contactEmail: "",
-        documents: {
-          civilRegistry: false,
-          guardianId: false,
-          residenceProof: false,
-          healthCertificate: false,
-          vaccinationCard: false,
-          previousReport: false,
-        },
-        documentsNotes: "",
-      });
-      load();
-      loadApprovedAdmissions();
-      loadEnrollments();
-    } catch (error: any) {
-      setEnrollmentError(error?.message || "No fue posible registrar la matricula");
-    } finally {
-      setEnrollmentBusy(false);
-    }
-  };
-
-  const applyApprovedAdmission = (adm: any) => {
+  const applyApprovedAdmission = async (adm: any) => {
     if (!adm) return;
+    let matchedStudentId = "";
+    try {
+      const studentName = String(adm.studentFullName || adm.studentName || "").trim();
+      const query = encodeURIComponent(studentName);
+      const response = await apiGet(`/suggestions?type=students&q=${query}&limit=8`);
+      const studentOptions = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.data)
+          ? response.data
+          : [];
+
+      const normalizedAdmissionName = studentName.toLowerCase();
+      const normalizedGrade = String(adm.gradeLevel || "")
+        .trim()
+        .toUpperCase();
+      const exactStudent = studentOptions.find((student: any) => {
+        const studentNameValue = String(
+          student.value || student.label || student.fullName || student.studentName || ""
+        )
+          .trim()
+          .toLowerCase();
+
+        const studentGrade = String(student.gradeLevel || "")
+          .trim()
+          .toUpperCase();
+
+        return (
+          studentNameValue === normalizedAdmissionName &&
+          (!normalizedGrade || studentGrade === normalizedGrade)
+        );
+      });
+
+      matchedStudentId = String(exactStudent?.id || "");
+    } catch {
+      matchedStudentId = "";
+    }
+
     setEnrollmentForm((prev) => ({
       ...prev,
-      studentId: "",
+
+      studentId: matchedStudentId,
       admissionId: adm.id || "",
       studentFullName: adm.studentFullName || adm.studentName || "",
       studentBirthDate: adm.studentBirthDate ? String(adm.studentBirthDate).slice(0, 10) : "",
@@ -714,6 +661,130 @@ export default function AdminAdmissions() {
         ),
       },
     }));
+  };
+
+  const createEnrollment = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (missingImportantEnrollmentFields.length > 0) {
+      setEnrollmentError(
+        `Completa los datos obligatorios para matricular: ${missingImportantEnrollmentFields.join(", ")}`
+      );
+      setEnrollmentMessage("");
+      return;
+    }
+
+    setEnrollmentBusy(true);
+    setEnrollmentError("");
+    setEnrollmentMessage("");
+
+    try {
+      const classIdFromGrade = classes.find(
+        (c) => getClassGradeLevel(c) === String(enrollmentForm.studentGradeLevel || "")
+      )?.id;
+
+      const classIdToUse = classIdFromGrade || enrollmentForm.classId;
+
+      if (!classIdToUse) {
+        setEnrollmentError("No hay una clase configurada para el grado seleccionado.");
+        setEnrollmentBusy(false);
+        return;
+      }
+
+      await apiPost("/enrollments", {
+        studentId: enrollmentForm.studentId,
+        classId: classIdToUse,
+        year: Number(enrollmentForm.year),
+        status: enrollmentForm.status,
+
+        admissionId: enrollmentForm.admissionId || undefined,
+
+        studentFullName: enrollmentForm.studentFullName,
+
+        studentBirthDate: enrollmentForm.studentBirthDate,
+
+        studentBirthPlaceDept: enrollmentForm.studentBirthPlaceDept,
+
+        studentBirthPlaceCity: enrollmentForm.studentBirthPlaceCity,
+
+        studentGender: enrollmentForm.studentGender,
+
+        studentDocType: enrollmentForm.studentDocType,
+
+        studentDocNumber: enrollmentForm.studentDocNumber,
+
+        studentGradeLevel: enrollmentForm.studentGradeLevel,
+
+        studentAddress: enrollmentForm.studentAddress,
+
+        guardianFullName: enrollmentForm.guardianFullName,
+
+        guardianDocType: enrollmentForm.guardianDocType,
+
+        guardianDocNumber: enrollmentForm.guardianDocNumber,
+
+        guardianRelation: enrollmentForm.guardianRelation,
+
+        contactPhone: enrollmentForm.contactPhone,
+
+        contactEmail: enrollmentForm.contactEmail || undefined,
+
+        documents: enrollmentForm.documents,
+
+        documentsNotes: enrollmentForm.documentsNotes,
+      });
+
+      setEnrollmentMessage("Matricula registrada correctamente");
+
+      if (enrollmentForm.admissionId) {
+        setAdmissions((prev) => prev.filter((a) => a.id !== enrollmentForm.admissionId));
+      }
+
+      setEnrollmentForm({
+        studentId: "",
+        admissionId: "",
+        classId: "",
+        year: "2026",
+        status: "ACTIVE",
+
+        studentFullName: "",
+        studentBirthDate: "",
+        studentBirthPlaceDept: "",
+        studentBirthPlaceCity: "",
+        studentGender: "",
+        studentDocType: "",
+        studentDocNumber: "",
+        studentGradeLevel: "PRE_JARDIN",
+        studentAddress: "",
+
+        guardianFullName: "",
+        guardianDocType: "",
+        guardianDocNumber: "",
+        guardianRelation: "",
+
+        contactPhone: "",
+        contactEmail: "",
+
+        documents: {
+          civilRegistry: false,
+          guardianId: false,
+          residenceProof: false,
+          healthCertificate: false,
+          vaccinationCard: false,
+          previousReport: false,
+        },
+
+        documentsNotes: "",
+      });
+
+      load();
+      loadApprovedAdmissions();
+      loadEnrollments();
+    } catch (error: any) {
+      setEnrollmentError(error?.message || "No fue posible registrar la matricula");
+    } finally {
+      setEnrollmentBusy(false);
+    }
   };
 
   const startEditEnrollment = (enrollment: any) => {
@@ -763,19 +834,39 @@ export default function AdminAdmissions() {
     setEditingEnrollmentMessage("");
     try {
       const updated = await apiPatch(`/enrollments/${editingEnrollmentId}`, {
+        // Datos del estudiante
+        studentFullName: editingEnrollmentForm.studentFullName,
+        studentBirthDate: editingEnrollmentForm.studentBirthDate || undefined,
+        studentBirthPlaceDept: editingEnrollmentForm.studentBirthPlaceDept || undefined,
+        studentBirthPlaceCity: editingEnrollmentForm.studentBirthPlaceCity || undefined,
+        studentGender: editingEnrollmentForm.studentGender || undefined,
+        studentDocType: editingEnrollmentForm.studentDocType || undefined,
+        studentDocNumber: editingEnrollmentForm.studentDocNumber || undefined,
         studentGradeLevel: editingEnrollmentForm.studentGradeLevel,
-        classId: editingEnrollmentForm.classId,
+        studentAddress: editingEnrollmentForm.studentAddress || undefined,
+
+        // Clase
+        classId: editingEnrollmentForm.classId || undefined,
+
+        // Matrícula
         year: Number(editingEnrollmentForm.year),
         status: editingEnrollmentForm.status,
+
+        // Acudiente
         guardianFullName: editingEnrollmentForm.guardianFullName,
         guardianDocType: editingEnrollmentForm.guardianDocType,
         guardianDocNumber: editingEnrollmentForm.guardianDocNumber,
         guardianRelation: editingEnrollmentForm.guardianRelation,
+
+        // Contacto
         contactPhone: editingEnrollmentForm.contactPhone,
         contactEmail: editingEnrollmentForm.contactEmail || undefined,
+
+        // Documentos
         documents: editingEnrollmentForm.documents,
         documentsNotes: editingEnrollmentForm.documentsNotes,
       });
+
       setEnrollments((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       setSelectedEnrollment(updated);
       loadEnrollments();

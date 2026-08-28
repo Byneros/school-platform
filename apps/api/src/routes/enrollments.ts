@@ -416,20 +416,37 @@ router.patch(
         const updated = await tx.enrollment.update({
           where: { id: enrollment.id },
           data: {
+            // Matrícula
             classId,
             year,
             status: body.status,
             campus: body.campus,
             shift: body.shift,
             enrollmentDate: body.enrollmentDate ? new Date(body.enrollmentDate) : undefined,
+
+            // Datos del estudiante
+            studentFullName: body.studentFullName,
+            studentBirthDate: body.studentBirthDate ? new Date(body.studentBirthDate) : undefined,
+            studentBirthPlaceDept: body.studentBirthPlaceDept,
+            studentBirthPlaceCity: body.studentBirthPlaceCity,
+            studentGender: body.studentGender,
+            studentDocType: body.studentDocType,
+            studentDocNumber: body.studentDocNumber,
             studentGradeLevel,
             studentGroup: body.studentGroup || classEntity.studentGroup,
+            studentAddress: body.studentAddress,
+
+            // Acudiente
             guardianFullName: body.guardianFullName,
             guardianDocType: body.guardianDocType,
             guardianDocNumber: body.guardianDocNumber,
             guardianRelation: body.guardianRelation,
+
+            // Contacto
             contactPhone: body.contactPhone,
             contactEmail: body.contactEmail,
+
+            // Documentos
             documents: body.documents,
             documentsNotes: body.documentsNotes,
           },

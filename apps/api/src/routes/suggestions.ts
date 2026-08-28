@@ -2,6 +2,7 @@ import { Router } from "express";
 import prisma from "../utils/prisma.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { isDeveloperRole } from "../utils/rbac.js";
+import { schoolScope } from "../utils/schoolDb.js";
 
 const router = Router();
 const suggestionsCache = new Map<string, { expiresAt: number; data: any }>();
@@ -176,11 +177,27 @@ router.get("/", requireAuth, async (req, res) => {
       return res.status(403).json({ message: "Sin permisos" });
     }
     const students = await prisma.student.findMany({
-      where: q ? { fullName: { contains: q, mode: "insensitive" } } : {},
-      select: { id: true, fullName: true, gradeLevel: true, studentGroup: true },
+      where: {
+        ...schoolScope(req),
+        ...(q
+          ? {
+              fullName: {
+                contains: q,
+                mode: "insensitive",
+              },
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        fullName: true,
+        gradeLevel: true,
+        studentGroup: true,
+      },
       orderBy: { fullName: "asc" },
       take: limit,
     });
+
     const options = students.map((s) => ({
       id: s.id,
       value: s.fullName,

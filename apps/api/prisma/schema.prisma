@@ -305,6 +305,7 @@ model Student {
   certificateRequests CertificateRequest[]
   invoices Invoice[]
   notifications Notification[]
+  admissions Admission[]
 
 }
 
@@ -393,6 +394,8 @@ model Admission {
   id                  String          @id @default(cuid())
   schoolId String?
   school   School? @relation(fields: [schoolId], references: [id])
+  studentId String?
+  student   Student? @relation(fields: [studentId], references: [id])
   studentName         String
   gradeLevel          GradeLevel
   status              AdmissionStatus @default(PENDING)

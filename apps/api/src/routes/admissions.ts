@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
+
 import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { validate } from "../utils/validate.js";
@@ -11,6 +12,7 @@ import {
 import { buildCsvReport, buildXlsxReportBuffer, sendTabularPdf } from "../utils/reportExport.js";
 import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { validateGuardianRelationAndAdultDoc } from "../utils/guardianValidation.js";
+import { getSchoolId, withSchool } from "../utils/schoolDb.js";
 
 const router = Router();
 
@@ -25,57 +27,6 @@ function addBusinessDays(start: Date, days: number) {
     }
   }
   return result;
-}
-
-function normalizeEmail(value?: string | null) {
-  return String(value || "")
-    .trim()
-    .toLowerCase();
-}
-
-function isEmailLike(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
-}
-
-async function linkParentToStudent(
-  tx: Prisma.TransactionClient,
-  params: {
-    studentId: string;
-    guardianRelation?: string | null;
-    contactEmail?: string | null;
-    guardianFullName?: string | null;
-  }
-) {
-  const email = normalizeEmail(params.contactEmail || "");
-  if (!isEmailLike(email)) return;
-  const user = await tx.user.findUnique({
-    where: { email },
-    select: { id: true, role: true },
-  });
-  if (!user || user.role !== "PARENT") return;
-
-  const parent = await tx.parent.upsert({
-    where: { userId: user.id },
-    update: {},
-    create: { userId: user.id },
-    select: { id: true },
-  });
-
-  const relation = String(params.guardianRelation || "").trim() || "Acudiente";
-  await tx.guardian.upsert({
-    where: {
-      parentId_studentId: {
-        parentId: parent.id,
-        studentId: params.studentId,
-      },
-    },
-    update: { relation },
-    create: {
-      parentId: parent.id,
-      studentId: params.studentId,
-      relation,
-    },
-  });
 }
 
 router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
@@ -243,6 +194,7 @@ router.post(
 
     const admission = await prisma.admission.create({
       data: {
+        schoolId: getSchoolId(req),
         studentName: body.studentName,
         gradeLevel: body.gradeLevel,
         notes: body.notes,
@@ -324,97 +276,102 @@ router.patch(
           include: { enrollment: true },
         });
 
+        // Si no se está aprobando, o ya existe matrícula,
+        // no se crea/vincula ningún estudiante.
         if (!isApproved || admission.enrollment) {
           return admission;
         }
 
-        const fullName = (admission.studentFullName || admission.studentName).trim();
+        const fullName = (admission.studentFullName || admission.studentName || "").trim();
 
-        const existingStudent = await tx.student.findFirst({
-          where: { fullName: { equals: fullName, mode: "insensitive" } },
-          select: { id: true },
-        });
+        if (!fullName) {
+          throw new Error("La admision no contiene el nombre del estudiante.");
+        }
 
+        const schoolId = getSchoolId(req);
+
+        let existingStudent: { id: string } | null = null;
+
+        // 1. Buscar por número de documento dentro del colegio.
+        const documentNumber = admission.studentDocNumber?.trim();
+
+        if (documentNumber) {
+          existingStudent = await tx.student.findFirst({
+            where: {
+              schoolId,
+              documentNumber,
+            },
+            select: {
+              id: true,
+            },
+          });
+        }
+
+        // 2. Si no existe por documento, buscar por nombre + grado
+        //    dentro del mismo colegio.
+        if (!existingStudent) {
+          existingStudent = await tx.student.findFirst({
+            where: {
+              schoolId,
+              fullName: {
+                equals: fullName,
+                mode: "insensitive",
+              },
+              gradeLevel: admission.gradeLevel,
+            },
+            select: {
+              id: true,
+            },
+          });
+        }
+
+        // 3. Si no existe, crear el Student asociado al colegio.
         const studentId = existingStudent
           ? existingStudent.id
           : (
               await tx.student.create({
-                data: {
+                data: withSchool(req, {
                   fullName,
                   birthDate: admission.studentBirthDate ?? undefined,
                   gradeLevel: admission.gradeLevel,
+                  documentType: admission.studentDocType || undefined,
+                  documentNumber: documentNumber || undefined,
+                  gender: admission.studentGender || undefined,
+                  address: admission.studentAddress || undefined,
+                }),
+                select: {
+                  id: true,
                 },
-                select: { id: true },
               })
             ).id;
 
-        const classForGrade = await tx.class.findFirst({
-          where: { gradeLevel: admission.gradeLevel },
-          orderBy: { id: "asc" },
-          select: { id: true },
+        // 4. Vincular definitivamente la admisión con el Student.
+        await tx.admission.update({
+          where: {
+            id: admission.id,
+          },
+          data: {
+            studentId,
+          },
         });
 
-        if (!classForGrade) {
-          throw new Error(`No hay clases configuradas para el grado ${admission.gradeLevel}`);
-        }
-
-        const year = new Date().getFullYear();
-        const duplicated = await tx.enrollment.findFirst({
-          where: { studentId, classId: classForGrade.id, year },
-          select: { id: true },
-        });
-
-        if (!duplicated) {
-          const guardianValidationError = validateGuardianRelationAndAdultDoc({
-            guardianRelation: admission.guardianRelation,
-            guardianDocType: admission.guardianDocType,
-          });
-          if (!guardianValidationError) {
-            await tx.enrollment.create({
-              data: {
-                studentId,
-                classId: classForGrade.id,
-                year,
-                status: "ACTIVE",
-                admissionId: admission.id,
-                studentFullName: fullName,
-                studentBirthDate: admission.studentBirthDate ?? undefined,
-                studentBirthPlaceDept: admission.studentBirthPlaceDept,
-                studentBirthPlaceCity: admission.studentBirthPlaceCity,
-                studentGender: admission.studentGender,
-                studentDocType: admission.studentDocType,
-                studentDocNumber: admission.studentDocNumber,
-                studentGradeLevel: admission.gradeLevel,
-                studentAddress: admission.studentAddress,
-                guardianFullName: admission.guardianFullName || "Sin registrar",
-                guardianDocType: admission.guardianDocType,
-                guardianDocNumber: admission.guardianDocNumber || "N/A",
-                guardianRelation: admission.guardianRelation || "ACUDIENTE_LEGAL",
-                contactPhone: admission.contactPhone || "N/A",
-                contactEmail: admission.contactEmail,
-              },
-            });
-
-            await linkParentToStudent(tx, {
-              studentId,
-              guardianRelation: admission.guardianRelation,
-              contactEmail: admission.contactEmail,
-              guardianFullName: admission.guardianFullName,
-            });
-          }
-        }
-
+        // 5. Devolver la admisión con su Student relacionado.
         return tx.admission.findUnique({
-          where: { id: admission.id },
-          include: { enrollment: true },
+          where: {
+            id: admission.id,
+          },
+          include: {
+            enrollment: true,
+            student: true,
+          },
         });
       });
 
-      res.json(result);
+      return res.json(result);
     } catch (error: any) {
-      res
-        .status(400)
-        .json({ message: error?.message || "No fue posible actualizar el estado de admision" });
+      return res.status(400).json({
+        message: error?.message || "No fue posible actualizar el estado de admision",
+      });
     }
   }
 );

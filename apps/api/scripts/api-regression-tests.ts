@@ -8,16 +8,33 @@ function fail(message: string): never {
 }
 
 async function request(baseUrl: string, path: string, init?: RequestInit) {
-  const res = await fetch(`${baseUrl}${path}`, init);
-  const contentType = res.headers.get("content-type") || "";
-  let json: JsonValue = {};
-  let text = "";
-  if (contentType.includes("application/json")) {
-    json = (await res.json()) as JsonValue;
-  } else {
-    text = await res.text();
+  const url = `${baseUrl}${path}`;
+
+  console.log(`Regression API REQUEST: ${init?.method || "GET"} ${url}`);
+
+  try {
+    const res = await fetch(url, init);
+
+    console.log(`Regression API RESPONSE: ${init?.method || "GET"} ${url} -> ${res.status}`);
+
+    const contentType = res.headers.get("content-type") || "";
+    let json: JsonValue = {};
+    let text = "";
+
+    if (contentType.includes("application/json")) {
+      json = (await res.json()) as JsonValue;
+    } else {
+      text = await res.text();
+    }
+
+    return { res, json, text };
+  } catch (error) {
+    console.error(`Regression API REQUEST ERROR: ${init?.method || "GET"} ${url}`);
+    console.error(
+      error instanceof Error ? `${error.name}: ${error.message}\n${error.stack || ""}` : error
+    );
+    throw error;
   }
-  return { res, json, text };
 }
 
 async function login(baseUrl: string, email: string, password: string) {
