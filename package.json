@@ -55,7 +55,7 @@
     "pm2:save": "npx pm2 save",
     "pm2:startup": "npx pm2 startup",
     "doctor": "npx react-doctor@latest",
-    "prepare": "husky"
+    "prepare": "node .husky/install.mjs"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
