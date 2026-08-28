@@ -89,23 +89,25 @@ const trustProxyEnv = String(process.env.TRUST_PROXY || "").toLowerCase();
 
 const trustProxy = trustProxyEnv === "true" || trustProxyEnv === "1" || trustProxyEnv === "yes";
 
-type TokenScope = { role: string; userId: string };
+type TokenScope = { role: string; userId: string; schoolId: string };
 
 function getTokenScope(req: express.Request): TokenScope {
   const header = String(req.headers.authorization || "");
-  if (!header.toLowerCase().startsWith("bearer ")) return { role: "ANON", userId: "" };
+  if (!header.toLowerCase().startsWith("bearer "))
+    return { role: "ANON", userId: "", schoolId: "" };
   const token = header.slice(7).trim();
-  if (!token) return { role: "ANON", userId: "" };
+  if (!token) return { role: "ANON", userId: "", schoolId: "" };
   const secret = process.env.JWT_SECRET || "";
-  if (!secret) return { role: "ANON", userId: "" };
+  if (!secret) return { role: "ANON", userId: "", schoolId: "" };
   try {
     const payload = jwt.verify(token, secret) as any;
     return {
       role: String(payload?.role || "ANON"),
       userId: String(payload?.userId || ""),
+      schoolId: String(payload?.schoolId || ""),
     };
   } catch {
-    return { role: "ANON", userId: "" };
+    return { role: "ANON", userId: "", schoolId: "" };
   }
 }
 
@@ -114,6 +116,9 @@ function cacheScopeForPath(req: express.Request) {
   const path = req.path || "";
   if (path.startsWith("/api/parent") || path.startsWith("/api/teacher")) {
     return scope.userId ? `${scope.role}:${scope.userId}` : scope.role;
+  }
+  if (scope.role === "ADMIN") {
+    return scope.schoolId ? `${scope.role}:school:${scope.schoolId}` : `${scope.role}:no-school`;
   }
   return scope.role;
 }
@@ -141,6 +146,7 @@ function cacheTagsForPath(req: express.Request) {
   const scope = getTokenScope(req);
   const roleTag = scope.role ? `role:${scope.role}` : "role:ANON";
   tags.add(roleTag);
+  if (scope.schoolId) tags.add(`school:${scope.schoolId}`);
 
   if (base) tags.add(base);
 

@@ -1,5 +1,6 @@
 import prisma from "../utils/prisma.js";
 import bcrypt from "bcryptjs";
+import type { DocumentType } from "@prisma/client";
 import { conflict } from "../utils/httpErrors.js";
 import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { sendEmail } from "../utils/mailer.js";
@@ -33,6 +34,9 @@ function normalizeCreateSchoolInput(data: CreateSchoolInput): CreateSchoolInput 
     admin: {
       fullName: data.admin.fullName.trim(),
       email: normalizeEmail(data.admin.email),
+      docType: data.admin.docType,
+      docNumber: cleanOptional(data.admin.docNumber),
+      phone: cleanOptional(data.admin.phone),
       password: data.admin.password,
     },
   };
@@ -95,6 +99,9 @@ export interface CreateSchoolInput {
   admin: {
     fullName: string;
     email: string;
+    docType?: DocumentType;
+    docNumber?: string;
+    phone?: string;
     password: string;
   };
 }
@@ -154,6 +161,21 @@ export async function createSchool(data: CreateSchoolInput) {
       throw conflict("Ya existe un usuario con ese correo electronico.");
     }
 
+    if (admin.docType && admin.docNumber) {
+      const existingDocument = await tx.user.findUnique({
+        where: {
+          docType_docNumber: {
+            docType: admin.docType,
+            docNumber: admin.docNumber,
+          },
+        },
+      });
+
+      if (existingDocument) {
+        throw conflict("Ya existe un usuario con ese documento.");
+      }
+    }
+
     const createdSchool = await tx.school.create({
       data: school,
     });
@@ -163,6 +185,9 @@ export async function createSchool(data: CreateSchoolInput) {
         email: admin.email,
         passwordHash,
         fullName: admin.fullName,
+        docType: admin.docType,
+        docNumber: admin.docNumber,
+        phone: admin.phone,
         role: "ADMIN",
         schoolId: createdSchool.id,
       },

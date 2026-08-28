@@ -1,11 +1,13 @@
 import { Router } from "express";
 import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
+import { classScope } from "../utils/schoolDb.js";
 
 const router = Router();
 
 router.get("/simple", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_req, res) => {
   const classes = await prisma.class.findMany({
+    where: classScope(_req),
     include: { teacher: { include: { user: true } } },
     orderBy: { id: "asc" },
   });
@@ -19,6 +21,7 @@ router.get("/simple", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_re
 
 router.get("/admin-hours", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const classes = await prisma.class.findMany({
+    where: classScope(_req),
     include: { teacher: { include: { user: true } } },
     orderBy: [{ teacherId: "asc" }, { id: "asc" }],
   });
@@ -47,8 +50,8 @@ router.put("/:id/hours", requireAuth, requireRole(["ADMIN"]), async (req, res) =
     return res.status(400).json({ message: "Las horas por semana deben estar entre 0 y 60" });
   }
 
-  const current = await prisma.class.findUnique({
-    where: { id: classId },
+  const current = await prisma.class.findFirst({
+    where: { id: classId, ...classScope(req) },
     select: { schedule: true },
   });
   if (!current) return res.status(404).json({ message: "Clase no encontrada" });

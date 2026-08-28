@@ -11,6 +11,7 @@ import {
   admissionScope,
   classScope,
   enrollmentScope,
+  getSchoolId,
   studentScope,
   withSchool,
 } from "../utils/schoolDb.js";
@@ -92,6 +93,7 @@ async function linkParentToStudent(
   tx: Prisma.TransactionClient,
   params: {
     studentId: string;
+    schoolId: string;
     guardianRelation?: string | null;
     contactEmail?: string | null;
     guardianFullName?: string | null;
@@ -107,8 +109,8 @@ async function linkParentToStudent(
 
   const parent = await tx.parent.upsert({
     where: { userId: user.id },
-    update: {},
-    create: { userId: user.id },
+    update: { schoolId: params.schoolId },
+    create: { userId: user.id, schoolId: params.schoolId },
     select: { id: true },
   });
 
@@ -137,7 +139,6 @@ router.post(
   async (req, res) => {
     const { body } = (req as any).validated;
     const requiredEnrollmentFields: Array<{ key: string; label: string }> = [
-      { key: "studentId", label: "Estudiante existente" },
       { key: "studentGradeLevel", label: "Nivel/Grado" },
       { key: "guardianFullName", label: "Nombre del acudiente" },
       { key: "guardianDocNumber", label: "Documento del acudiente" },
@@ -165,24 +166,11 @@ router.post(
 
     try {
       const enrollment = await prisma.$transaction(async (tx) => {
-        const classEntity = await tx.class.findFirst({
-          where: { id: body.classId, ...classScope(req) },
-          select: { id: true, gradeLevel: true, studentGroup: true },
-        });
-
-        if (!classEntity) {
-          throw new Error("Clase no encontrada");
-        }
-
-        if (classGradeLevelValue(classEntity) !== body.studentGradeLevel) {
-          throw new Error("La clase seleccionada no corresponde al nivel/grado del estudiante");
-        }
-
         let admission: any = null;
         if (body.admissionId) {
           admission = await tx.admission.findFirst({
             where: { id: body.admissionId, ...admissionScope(req) },
-            include: { enrollment: true },
+            include: { enrollment: true, student: true },
           });
 
           if (!admission) {
@@ -197,10 +185,23 @@ router.post(
           if (admission.enrollmentDueAt && new Date(admission.enrollmentDueAt) < new Date()) {
             throw new Error("El plazo de matricula para esta admision ya vencio");
           }
+          if (!admission.studentId) {
+            throw new Error(
+              "La admision aprobada no tiene un estudiante asociado. Aprueba de nuevo la admision o corrige el registro antes de matricular."
+            );
+          }
+        }
+
+        const schoolId = getSchoolId(req);
+        const requestedStudentId = admission?.studentId || body.studentId;
+        if (!requestedStudentId) {
+          throw new Error(
+            "Selecciona un estudiante existente antes de crear la matricula. La matricula no crea estudiantes."
+          );
         }
 
         const student = await tx.student.findFirst({
-          where: { id: body.studentId, ...studentScope(req) },
+          where: { id: requestedStudentId, ...studentScope(req) },
           select: { id: true, fullName: true, gradeLevel: true, studentGroup: true },
         });
         if (!student) {
@@ -209,9 +210,50 @@ router.post(
           );
         }
         const studentId = student.id;
+        const academicYear = Number(body.year);
+        const gradeLevel = String(body.studentGradeLevel || student.gradeLevel || "").trim();
+
+        let classEntity = await tx.class.findFirst({
+          where: body.classId
+            ? {
+                id: body.classId,
+                schoolId,
+                gradeLevel: gradeLevel as any,
+                academicYear,
+              }
+            : {
+                schoolId,
+                gradeLevel: gradeLevel as any,
+                academicYear,
+              },
+          select: { id: true, gradeLevel: true, studentGroup: true, academicYear: true },
+          orderBy: { studentGroup: "asc" },
+        });
+
+        if (!classEntity && body.classId) {
+          classEntity = await tx.class.findFirst({
+            where: {
+              schoolId,
+              gradeLevel: gradeLevel as any,
+              academicYear,
+            },
+            select: { id: true, gradeLevel: true, studentGroup: true, academicYear: true },
+            orderBy: { studentGroup: "asc" },
+          });
+        }
+
+        if (!classEntity) {
+          throw new Error(
+            `No hay una clase configurada para ${gradeLevel}-${academicYear} en este colegio. Crea primero la clase desde la plataforma.`
+          );
+        }
+
+        if (classGradeLevelValue(classEntity) !== body.studentGradeLevel) {
+          throw new Error("La clase seleccionada no corresponde al nivel/grado del estudiante");
+        }
 
         const duplicated = await tx.enrollment.findFirst({
-          where: { studentId, classId: body.classId, year: body.year },
+          where: { ...enrollmentScope(req), studentId, classId: classEntity.id, year: body.year },
           select: { id: true },
         });
         if (duplicated) {
@@ -220,6 +262,7 @@ router.post(
 
         const alreadyEnrolled = await tx.enrollment.findFirst({
           where: {
+            ...enrollmentScope(req),
             studentId,
             year: body.year,
           },
@@ -236,7 +279,7 @@ router.post(
         const created = await tx.enrollment.create({
           data: withSchool(req, {
             studentId: studentId!,
-            classId: body.classId,
+            classId: classEntity.id,
             year: body.year,
             status: body.status,
             admissionId: body.admissionId,
@@ -261,6 +304,7 @@ router.post(
 
         await linkParentToStudent(tx, {
           studentId: created.studentId,
+          schoolId: getSchoolId(req),
           guardianRelation: body.guardianRelation,
           contactEmail: body.contactEmail,
           guardianFullName: body.guardianFullName,
@@ -392,6 +436,7 @@ router.patch(
 
         const duplicated = await tx.enrollment.findFirst({
           where: {
+            ...enrollmentScope(req),
             id: { not: enrollment.id },
             studentId: enrollment.studentId,
             classId,

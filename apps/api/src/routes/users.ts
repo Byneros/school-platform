@@ -10,7 +10,7 @@ import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { sendEmail } from "../utils/mailer.js";
 import { enqueueEmail } from "../services/emailQueue.js";
 import { canManageDeveloperUsers, canViewDeveloperUsers, isDeveloperRole } from "../utils/rbac.js";
-import { withSchool } from "../utils/schoolDb.js";
+import { schoolScope, withSchool } from "../utils/schoolDb.js";
 
 const router = Router();
 
@@ -35,6 +35,7 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const search = String(req.query.search || "").trim();
   const role = String(req.query.role || "").trim();
   const where: Prisma.UserWhereInput = {
+    ...schoolScope(req),
     email: { not: "docente.sin.asignar@colegio.edu" },
     ...(!canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : {}),
     ...(search
@@ -53,7 +54,7 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   };
   const [principalAdmin, data, total] = await Promise.all([
     prisma.user.findFirst({
-      where: { role: "ADMIN" },
+      where: { role: "ADMIN", ...schoolScope(req) },
       orderBy: { createdAt: "asc" },
       select: { id: true },
     }),
@@ -131,7 +132,7 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
 router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const [enrollments, admissions, parentUsers] = await Promise.all([
     prisma.enrollment.findMany({
-      where: { status: { not: "INACTIVE" } },
+      where: { ...schoolScope(_req), status: { not: "INACTIVE" } },
       select: {
         guardianFullName: true,
         guardianDocNumber: true,
@@ -143,7 +144,7 @@ router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), asyn
       orderBy: [{ year: "desc" }, { studentFullName: "asc" }],
     }),
     prisma.admission.findMany({
-      where: { status: { not: "REJECTED" } },
+      where: { ...schoolScope(_req), status: { not: "REJECTED" } },
       select: {
         id: true,
         studentName: true,
@@ -156,7 +157,7 @@ router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), asyn
       orderBy: [{ createdAt: "desc" }],
     }),
     prisma.user.findMany({
-      where: { role: "PARENT" },
+      where: { ...schoolScope(_req), role: "PARENT" },
       select: {
         fullName: true,
         email: true,
@@ -281,7 +282,10 @@ router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), asyn
 router.get("/export/csv", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const auth = (_req as any).auth;
   const users = await prisma.user.findMany({
-    where: !canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : undefined,
+    where: {
+      ...schoolScope(_req),
+      ...(!canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : {}),
+    },
     select: { email: true, fullName: true, role: true, isActive: true },
   });
   const branding = await getBrandingSettings();
@@ -307,7 +311,10 @@ router.get("/export/csv", requireAuth, requireRole(["ADMIN"]), async (_req, res)
 router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const auth = (_req as any).auth;
   const users = await prisma.user.findMany({
-    where: !canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : undefined,
+    where: {
+      ...schoolScope(_req),
+      ...(!canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : {}),
+    },
     select: { email: true, fullName: true, role: true, isActive: true },
   });
   const branding = await getBrandingSettings();
@@ -336,7 +343,10 @@ router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (_req, re
 router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const auth = (_req as any).auth;
   const users = await prisma.user.findMany({
-    where: !canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : undefined,
+    where: {
+      ...schoolScope(_req),
+      ...(!canViewDeveloperUsers(auth?.role) ? { role: { not: "DEVELOPER" } } : {}),
+    },
     select: { email: true, fullName: true, role: true, isActive: true },
   });
   const branding = await getBrandingSettings();
@@ -417,7 +427,8 @@ router.post(
         if (body.role === "TEACHER") {
           await tx.teacher.create({
             data: {
-              user: { connect: { id: created.id } },
+              schoolId: created.schoolId,
+              userId: created.id,
               subjects: teacherSubjects,
               subjectHours: subjectHoursMap as Prisma.InputJsonValue,
               subjectSchedules: subjectSchedulesMap as Prisma.InputJsonValue,
@@ -433,6 +444,7 @@ router.post(
           await tx.parent.create({
             data: {
               userId: created.id,
+              schoolId: created.schoolId,
             },
           });
         }
@@ -512,7 +524,7 @@ router.patch(
       return res.status(404).json({ message: "Usuario no encontrado" });
     }
     const principalAdmin = await prisma.user.findFirst({
-      where: { role: "ADMIN" },
+      where: { role: "ADMIN", ...schoolScope(req) },
       orderBy: { createdAt: "asc" },
       select: { id: true },
     });
@@ -538,6 +550,12 @@ router.patch(
       data.passwordHash = await bcrypt.hash(body.password, 10);
       delete data.password;
     }
+    const current = await prisma.user.findFirst({
+      where: { id: params.id, ...schoolScope(req) },
+      select: { id: true },
+    });
+    if (!current) return res.status(404).json({ message: "Usuario no encontrado" });
+
     const user = await prisma.user.update({
       where: { id: params.id },
       data,
@@ -553,7 +571,7 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   if (!userId) return res.status(400).json({ message: "Usuario invalido" });
 
   const principalAdmin = await prisma.user.findFirst({
-    where: { role: "ADMIN" },
+    where: { role: "ADMIN", ...schoolScope(req) },
     orderBy: { createdAt: "asc" },
     select: { id: true },
   });
@@ -566,8 +584,8 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
       .json({ message: "Solo el administrador principal puede eliminar usuarios" });
   }
 
-  const target = await prisma.user.findUnique({
-    where: { id: userId },
+  const target = await prisma.user.findFirst({
+    where: { id: userId, ...schoolScope(req) },
     include: { teacher: true, parent: true },
   });
   if (!target) return res.status(404).json({ message: "Usuario no encontrado" });
@@ -596,9 +614,9 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
 
     if (target.teacher) {
       // Reasignar clases a un docente "sin asignar" para no perder datos academicos
-      const unassignedEmail = "docente.sin.asignar@colegio.edu";
-      let unassignedUser = await tx.user.findUnique({
-        where: { email: unassignedEmail },
+      const unassignedEmail = `docente.sin.asignar+${target.schoolId || "global"}@colegio.edu`;
+      let unassignedUser = await tx.user.findFirst({
+        where: { email: unassignedEmail, ...schoolScope(req) },
         include: { teacher: true },
       });
       if (!unassignedUser) {
@@ -610,6 +628,7 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
             fullName: "Docente sin asignar",
             role: "TEACHER",
             isActive: false,
+            schoolId: target.schoolId,
           },
           include: { teacher: true },
         });
@@ -617,7 +636,7 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
       let unassignedTeacherId = unassignedUser.teacher?.id;
       if (!unassignedTeacherId) {
         const t = await tx.teacher.create({
-          data: { user: { connect: { id: unassignedUser.id } } },
+          data: { schoolId: target.schoolId, userId: unassignedUser.id },
         });
         unassignedTeacherId = t.id;
       }

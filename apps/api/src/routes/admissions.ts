@@ -12,7 +12,7 @@ import {
 import { buildCsvReport, buildXlsxReportBuffer, sendTabularPdf } from "../utils/reportExport.js";
 import { getBrandingSettings } from "../utils/brandingSettings.js";
 import { validateGuardianRelationAndAdultDoc } from "../utils/guardianValidation.js";
-import { getSchoolId, withSchool } from "../utils/schoolDb.js";
+import { getSchoolId, schoolScope, withSchool } from "../utils/schoolDb.js";
 
 const router = Router();
 
@@ -38,6 +38,7 @@ router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const now = new Date();
 
   const where: Prisma.AdmissionWhereInput = {
+    ...schoolScope(req),
     enrollment: null,
     ...(status
       ? { status: status as any }
@@ -69,9 +70,21 @@ router.get("/approved", requireAuth, requireRole(["ADMIN"]), async (_req, res) =
   const now = new Date();
   const data = await prisma.admission.findMany({
     where: {
+      ...schoolScope(_req),
       status: "APPROVED",
       enrollment: null,
       OR: [{ enrollmentDueAt: null }, { enrollmentDueAt: { gte: now } }],
+    },
+    include: {
+      student: {
+        select: {
+          id: true,
+          fullName: true,
+          gradeLevel: true,
+          studentGroup: true,
+          documentNumber: true,
+        },
+      },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -80,6 +93,7 @@ router.get("/approved", requireAuth, requireRole(["ADMIN"]), async (_req, res) =
 
 router.get("/export/csv", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const data = await prisma.admission.findMany({
+    where: schoolScope(_req),
     select: {
       studentName: true,
       gradeLevel: true,
@@ -112,6 +126,7 @@ router.get("/export/csv", requireAuth, requireRole(["ADMIN"]), async (_req, res)
 
 router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const data = await prisma.admission.findMany({
+    where: schoolScope(_req),
     select: {
       studentName: true,
       gradeLevel: true,
@@ -147,6 +162,7 @@ router.get("/export/excel", requireAuth, requireRole(["ADMIN"]), async (_req, re
 
 router.get("/export/pdf", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const data = await prisma.admission.findMany({
+    where: schoolScope(_req),
     select: {
       studentName: true,
       gradeLevel: true,
@@ -236,6 +252,12 @@ router.patch(
       }
     }
 
+    const current = await prisma.admission.findFirst({
+      where: { id: params.id, ...schoolScope(req) },
+      select: { id: true },
+    });
+    if (!current) return res.status(404).json({ message: "Admision no encontrada" });
+
     const admission = await prisma.admission.update({
       where: { id: params.id },
       data: body,
@@ -257,8 +279,8 @@ router.patch(
         const now = new Date();
         const isApproved = body.status === "APPROVED";
 
-        const currentAdmission = await tx.admission.findUnique({
-          where: { id: params.id },
+        const currentAdmission = await tx.admission.findFirst({
+          where: { id: params.id, ...schoolScope(req) },
           include: { enrollment: true },
         });
 
@@ -380,8 +402,8 @@ router.delete("/:id", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const id = String(req.params.id || "").trim();
   if (!id) return res.status(400).json({ message: "Admision invalida" });
 
-  const admission = await prisma.admission.findUnique({
-    where: { id },
+  const admission = await prisma.admission.findFirst({
+    where: { id, ...schoolScope(req) },
     include: { enrollment: true },
   });
   if (!admission) return res.status(404).json({ message: "Admision no encontrada" });

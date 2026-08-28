@@ -18,7 +18,13 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET || "") as JwtPayload;
 
+    if (payload.role === "ADMIN" && !payload.schoolId) {
+      return res.status(403).json({ error: "Admin user has no school assigned." });
+    }
+
     req.auth = payload;
+    req.userId = payload.userId;
+    req.role = payload.role;
     req.schoolId = payload.schoolId;
 
     next();

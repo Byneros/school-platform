@@ -16,7 +16,7 @@ const guardianRelationSchema = z.enum([
 export const createEnrollmentSchema = z.object({
   body: z.object({
     studentId: z.string().min(1),
-    classId: z.string().min(1),
+    classId: z.string().min(1).optional(),
     year: z.number().int(),
     status: z.string().min(1),
     admissionId: z.string().optional(),

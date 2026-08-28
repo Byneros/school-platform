@@ -1,10 +1,10 @@
 import type { Request } from "express";
 
 import prisma from "./prisma.js";
-import { requireSchool, isSuperAdmin } from "./schoolContext.js";
+import { canUseGlobalSchoolContext, requireSchool } from "./schoolContext.js";
 
 export function canAccessAllSchools(req: Request): boolean {
-  return isSuperAdmin(req);
+  return canUseGlobalSchoolContext(req);
 }
 
 export function getSchoolId(req: Request): string {

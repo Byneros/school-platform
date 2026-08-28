@@ -593,7 +593,8 @@ export default function AdminAdmissions() {
 
   const applyApprovedAdmission = async (adm: any) => {
     if (!adm) return;
-    let matchedStudentId = "";
+    const linkedStudentId = String(adm.studentId || adm.student?.id || "");
+    let matchedStudentId = linkedStudentId;
     try {
       const studentName = String(adm.studentFullName || adm.studentName || "").trim();
       const query = encodeURIComponent(studentName);
@@ -625,9 +626,9 @@ export default function AdminAdmissions() {
         );
       });
 
-      matchedStudentId = String(exactStudent?.id || "");
+      matchedStudentId = matchedStudentId || String(exactStudent?.id || "");
     } catch {
-      matchedStudentId = "";
+      matchedStudentId = linkedStudentId;
     }
 
     setEnrollmentForm((prev) => ({
@@ -680,16 +681,12 @@ export default function AdminAdmissions() {
 
     try {
       const classIdFromGrade = classes.find(
-        (c) => getClassGradeLevel(c) === String(enrollmentForm.studentGradeLevel || "")
+        (c) =>
+          getClassGradeLevel(c) === String(enrollmentForm.studentGradeLevel || "") &&
+          Number(c.academicYear || 0) === Number(enrollmentForm.year)
       )?.id;
 
-      const classIdToUse = classIdFromGrade || enrollmentForm.classId;
-
-      if (!classIdToUse) {
-        setEnrollmentError("No hay una clase configurada para el grado seleccionado.");
-        setEnrollmentBusy(false);
-        return;
-      }
+      const classIdToUse = classIdFromGrade || enrollmentForm.classId || undefined;
 
       await apiPost("/enrollments", {
         studentId: enrollmentForm.studentId,

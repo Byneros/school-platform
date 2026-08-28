@@ -1,8 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
-import { isSuperAdmin } from "../utils/schoolContext";
+import { canUseGlobalSchoolContext } from "../utils/schoolContext";
 
 export function requireSchoolContext(req: Request, res: Response, next: NextFunction) {
-  if (isSuperAdmin(req)) {
+  if (canUseGlobalSchoolContext(req)) {
     return next();
   }
 

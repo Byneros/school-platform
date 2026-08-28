@@ -188,8 +188,25 @@ model User {
   notificationsApproved Notification[] @relation("NotificationApprover")
   notificationsTargeted Notification[] @relation("NotificationTarget")
   importHistories ImportHistory[] @relation("ImportHistoryCreator")
+  passwordResetTokens PasswordResetToken[]
 
   @@unique([docType, docNumber])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+  ip        String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt, usedAt])
 }
 
 model ImportHistory {

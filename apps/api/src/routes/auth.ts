@@ -2,12 +2,15 @@ import bcrypt from "bcryptjs";
 
 import type { JwtPayload } from "jsonwebtoken";
 import jwt from "jsonwebtoken";
-import { createHash, randomInt, randomUUID } from "crypto";
+import { createHash, randomBytes, randomInt, randomUUID } from "crypto";
 import prisma from "../utils/prisma.js";
 import { validate } from "../utils/validate.js";
 import type { AppRole } from "../utils/rbac.js";
 import {
+  forgotPasswordSchema,
   loginSchema,
+  registerSchoolSchema,
+  resetPasswordSchema,
   revokeRoleSessionsSchema,
   revokeSessionSchema,
   updateSessionLabelSchema,
@@ -17,6 +20,7 @@ import {
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { sendEmail } from "../utils/mailer.js";
 import { enqueueEmail } from "../services/emailQueue.js";
+import { createSchool } from "../services/schoolService.js";
 import {
   clearRefreshCookie,
   createRefreshSession,
@@ -67,6 +71,8 @@ const twoFactorResendCooldownMs = Math.max(
 );
 const twoFactorPepper = process.env.ADMIN_2FA_CODE_SECRET || "";
 const queueTwoFactorEmail = String(process.env.EMAIL_QUEUE_2FA || "").toLowerCase() === "true";
+const queuePasswordResetEmail =
+  String(process.env.EMAIL_QUEUE_PASSWORD_RESET || "").toLowerCase() === "true";
 const loginLockoutWindowMs = Math.max(
   60_000,
   Number(process.env.LOGIN_LOCKOUT_WINDOW_MS || 15 * 60 * 1000)
@@ -75,6 +81,10 @@ const loginLockoutMax = Math.max(3, Number(process.env.LOGIN_LOCKOUT_MAX || 5));
 const loginLockoutBlockMs = Math.max(
   60_000,
   Number(process.env.LOGIN_LOCKOUT_BLOCK_MS || 15 * 60 * 1000)
+);
+const passwordResetTtlMs = Math.max(
+  10 * 60 * 1000,
+  Number(process.env.PASSWORD_RESET_TTL_MS || 60 * 60 * 1000)
 );
 
 const loginAttempts = new Map<string, LoginAttempt>();
@@ -144,6 +154,42 @@ function hashTwoFactorCode(code: string) {
   return createHash("sha256").update(`${code}:${twoFactorPepper}`).digest("hex");
 }
 
+function hashPasswordResetToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function publicWebBaseUrl(req: Request) {
+  const configured =
+    process.env.PUBLIC_WEB_URL ||
+    process.env.FRONTEND_URL ||
+    process.env.WEB_BASE_URL ||
+    String(process.env.CORS_ORIGINS || "")
+      .split(",")[0]
+      ?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  return `${req.protocol}://${req.get("host")}`;
+}
+
+async function sendPasswordResetEmail(input: { req: Request; email: string; token: string }) {
+  const resetUrl = `${publicWebBaseUrl(input.req)}/?resetToken=${encodeURIComponent(input.token)}`;
+  const subject = "Restablecer contrasena";
+  const text = `Solicitaste restablecer tu contrasena.\n\nAbre este enlace para crear una nueva contrasena:\n${resetUrl}\n\nEste enlace expira en 60 minutos.`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #0f172a;">
+      <h2>Restablecer contrasena</h2>
+      <p>Solicitaste restablecer tu contrasena.</p>
+      <p><a href="${resetUrl}" style="display:inline-block;padding:10px 14px;background:#2563eb;color:white;text-decoration:none;border-radius:6px;">Crear nueva contrasena</a></p>
+      <p style="color:#64748b;">Este enlace expira en 60 minutos.</p>
+    </div>
+  `;
+
+  if (queuePasswordResetEmail) {
+    const queued = await enqueueEmail({ to: input.email, subject, text, html });
+    if (queued) return true;
+  }
+  return sendEmail({ to: input.email, subject, text, html });
+}
+
 async function sendTwoFactorCodeEmail(email: string, code: string) {
   const subject = "Codigo de verificacion";
   const text = `Tu codigo de verificacion es: ${code}\n\nEste codigo expira en 10 minutos.`;
@@ -167,6 +213,9 @@ function signToken(payload: { userId: string; role: Role; schoolId: string | nul
   const jwtSecret = process.env.JWT_SECRET || "";
   if (!jwtSecret)
     throw httpError(503, "Servicio de autenticacion no configurado: falta JWT_SECRET.");
+  if (payload.role === "ADMIN" && !payload.schoolId) {
+    throw httpError(403, "Usuario administrador sin colegio asignado.");
+  }
 
   const token = jwt.sign(payload, jwtSecret, { expiresIn: jwtExpiresIn as any });
   const decoded = jwt.decode(token) as jwt.JwtPayload | null;
@@ -209,6 +258,124 @@ function sessionResponse(user: { role: Role | string; fullName: string; email?: 
     ...(user.email ? { email: user.email } : {}),
   };
 }
+
+router.post(
+  "/register-school",
+  validate(registerSchoolSchema),
+  asyncHandler(async (req: any, res: Response) => {
+    ensureAuthConfig();
+
+    const { school, admin } = req.validated.body;
+    const result = await createSchool({
+      school,
+      admin: {
+        fullName: admin.fullName,
+        email: admin.email,
+        docType: admin.docType,
+        docNumber: admin.docNumber,
+        phone: admin.phone,
+        password: admin.password,
+      },
+    });
+
+    return res.status(201).json({
+      ok: true,
+      school: result.school,
+      admin: result.admin,
+      credentialsDelivery: result.credentialsDelivery,
+      messages: result.messages,
+    });
+  })
+);
+
+router.post(
+  "/forgot-password",
+  validate(forgotPasswordSchema),
+  asyncHandler(async (req: any, res: Response) => {
+    ensureAuthConfig();
+
+    const email = String(req.validated.body.email).trim().toLowerCase();
+    const genericMessage =
+      "Si el correo existe, enviaremos un enlace para restablecer la contrasena.";
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" }, isActive: true },
+    });
+
+    if (!user) {
+      return res.json({ ok: true, message: genericMessage });
+    }
+
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + passwordResetTtlMs);
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashPasswordResetToken(token),
+        expiresAt,
+        ip: req.ip || null,
+        userAgent: String(req.headers["user-agent"] || "").slice(0, 500) || null,
+      },
+    });
+
+    const emailSent = await sendPasswordResetEmail({ req, email: user.email, token });
+    if (!emailSent && isProd) {
+      throw httpError(503, "No se pudo enviar el correo de recuperacion.");
+    }
+
+    return res.json({
+      ok: true,
+      message: genericMessage,
+      ...(!isProd ? { devToken: token } : {}),
+    });
+  })
+);
+
+router.post(
+  "/reset-password",
+  validate(resetPasswordSchema),
+  asyncHandler(async (req: any, res: Response) => {
+    ensureAuthConfig();
+
+    const { token, password } = req.validated.body;
+    const tokenHash = hashPasswordResetToken(String(token).trim());
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (
+      !resetToken ||
+      resetToken.usedAt ||
+      resetToken.expiresAt <= new Date() ||
+      !resetToken.user.isActive
+    ) {
+      return res.status(400).json({ error: "El enlace de recuperacion no es valido o expiro." });
+    }
+
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    const usedAt = new Date();
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: resetToken.userId },
+        data: { passwordHash },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: { usedAt },
+      }),
+      prisma.passwordResetToken.updateMany({
+        where: { userId: resetToken.userId, usedAt: null, id: { not: resetToken.id } },
+        data: { usedAt },
+      }),
+      prisma.refreshSession.updateMany({
+        where: { userId: resetToken.userId, revokedAt: null },
+        data: { revokedAt: usedAt },
+      }),
+    ]);
+
+    return res.json({ ok: true, message: "Contrasena actualizada correctamente." });
+  })
+);
 
 router.post(
   "/login",

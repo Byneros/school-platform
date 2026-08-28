@@ -11,6 +11,7 @@ import {
 import { enqueueNotification } from "../services/notificationQueue.js";
 import PDFDocument from "pdfkit";
 import { validate } from "../utils/validate.js";
+import { schoolScope } from "../utils/schoolDb.js";
 import {
   createTaskSchema,
   deleteTaskSchema,
@@ -330,6 +331,7 @@ function findOwnOverlap(intervals: Interval[]) {
 
 router.get("/admin-subject-hours", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const teachers = await prisma.teacher.findMany({
+    where: schoolScope(_req),
     include: { user: { select: { fullName: true, email: true } } },
     orderBy: { user: { fullName: "asc" } },
   });
@@ -361,6 +363,7 @@ router.get(
   requireRole(["ADMIN"]),
   async (_req, res) => {
     const teachers = await prisma.teacher.findMany({
+      where: schoolScope(_req),
       include: { user: { select: { fullName: true, email: true } } },
       orderBy: { user: { fullName: "asc" } },
     });
@@ -441,6 +444,7 @@ router.get(
   requireRole(["ADMIN"]),
   async (_req, res) => {
     const teachers = await prisma.teacher.findMany({
+      where: schoolScope(_req),
       include: { user: { select: { fullName: true, email: true } } },
       orderBy: { user: { fullName: "asc" } },
     });
@@ -858,8 +862,8 @@ router.put("/:teacherId/subject-hours", requireAuth, requireRole(["ADMIN"]), asy
       ? req.body.subjectConfigs
       : [];
 
-  const teacher = await prisma.teacher.findUnique({
-    where: { id: teacherId },
+  const teacher = await prisma.teacher.findFirst({
+    where: { id: teacherId, ...schoolScope(req) },
     include: { user: { select: { fullName: true } } },
   });
   if (!teacher) return res.status(404).json({ message: "Docente no encontrado" });
@@ -894,7 +898,7 @@ router.put("/:teacherId/subject-hours", requireAuth, requireRole(["ADMIN"]), asy
     });
   }
   const otherTeachers = await prisma.teacher.findMany({
-    where: { id: { not: teacherId } },
+    where: { ...schoolScope(req), id: { not: teacherId } },
     include: { user: { select: { fullName: true } } },
   });
 
