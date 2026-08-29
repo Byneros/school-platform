@@ -110,6 +110,19 @@ function httpError(status: number, message: string) {
   return error;
 }
 
+function isPrismaSchemaError(error: unknown) {
+  const err = error as { code?: string; message?: string };
+  const code = String(err?.code || "");
+  const message = String(err?.message || "");
+  return (
+    code === "P2021" ||
+    code === "P2022" ||
+    message.includes("does not exist") ||
+    message.includes("no existe") ||
+    message.includes("RefreshSession")
+  );
+}
+
 function ensureAuthConfig() {
   if (!process.env.DATABASE_URL) {
     throw httpError(503, "Servicio de autenticacion no configurado: falta DATABASE_URL.");
@@ -241,7 +254,17 @@ async function issueSessionTokens(
     schoolId: user.schoolId,
   });
 
-  await createRefreshSession(user.id, req, res);
+  try {
+    await createRefreshSession(user.id, req, res);
+  } catch (error) {
+    if (isPrismaSchemaError(error)) {
+      throw httpError(
+        503,
+        "Migraciones de autenticacion pendientes. Ejecuta prisma:migrate:deploy y reinicia la API."
+      );
+    }
+    throw error;
+  }
 
   return signed;
 }

@@ -425,6 +425,7 @@ app.get("/ready", async (req, res) => {
 
   let dbOk = false;
   let redisOk = redis ? false : true;
+  let authSchemaOk = false;
 
   try {
     await prisma.$queryRawUnsafe("SELECT 1");
@@ -442,7 +443,22 @@ app.get("/ready", async (req, res) => {
     }
   }
 
-  const ok = dbOk && redisOk;
+  if (dbOk) {
+    try {
+      const rows = await prisma.$queryRawUnsafe<Array<{ users: string; refresh: string }>>(
+        `
+          SELECT
+            to_regclass('public."User"')::text AS users,
+            to_regclass('public."RefreshSession"')::text AS refresh
+        `
+      );
+      authSchemaOk = Boolean(rows[0]?.users && rows[0]?.refresh);
+    } catch {
+      authSchemaOk = false;
+    }
+  }
+
+  const ok = dbOk && redisOk && authSchemaOk;
 
   res.status(ok ? 200 : 503).json({
     ok,
@@ -450,6 +466,7 @@ app.get("/ready", async (req, res) => {
     checks: {
       db: dbOk ? "up" : "down",
       redis: redisOk ? "up" : "down",
+      authSchema: authSchemaOk ? "up" : "down",
     },
   });
 });
