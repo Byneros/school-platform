@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import ActionFeedback from "../components/ActionFeedback";
 import Autocomplete from "../components/Autocomplete";
@@ -114,6 +114,9 @@ export default function AdminAdmissions() {
   const [enrollmentBusy, setEnrollmentBusy] = useState(false);
   const [enrollmentMessage, setEnrollmentMessage] = useState("");
   const [enrollmentError, setEnrollmentError] = useState("");
+  const [enrollmentAction, setEnrollmentAction] = useState<{ label: string; path: string } | null>(
+    null
+  );
   const [editingId, setEditingId] = useState("");
   const [editingBusy, setEditingBusy] = useState(false);
   const [editingError, setEditingError] = useState("");
@@ -672,12 +675,14 @@ export default function AdminAdmissions() {
         `Completa los datos obligatorios para matricular: ${missingImportantEnrollmentFields.join(", ")}`
       );
       setEnrollmentMessage("");
+      setEnrollmentAction(null);
       return;
     }
 
     setEnrollmentBusy(true);
     setEnrollmentError("");
     setEnrollmentMessage("");
+    setEnrollmentAction(null);
 
     try {
       const classIdFromGrade = classes.find(
@@ -688,7 +693,11 @@ export default function AdminAdmissions() {
 
       const classIdToUse = classIdFromGrade || enrollmentForm.classId || undefined;
 
-      await apiPost("/enrollments", {
+      const enrollmentResponse = await apiPost<{
+        message?: string;
+        classAutoCreated?: boolean;
+        classAdminPath?: string;
+      }>("/enrollments", {
         studentId: enrollmentForm.studentId,
         classId: classIdToUse,
         year: Number(enrollmentForm.year),
@@ -731,7 +740,13 @@ export default function AdminAdmissions() {
         documentsNotes: enrollmentForm.documentsNotes,
       });
 
-      setEnrollmentMessage("Matricula registrada correctamente");
+      setEnrollmentMessage(enrollmentResponse.message || "Matricula registrada correctamente");
+      if (enrollmentResponse.classAutoCreated && enrollmentResponse.classAdminPath) {
+        setEnrollmentAction({
+          label: "Administrar horas docentes",
+          path: enrollmentResponse.classAdminPath,
+        });
+      }
 
       if (enrollmentForm.admissionId) {
         setAdmissions((prev) => prev.filter((a) => a.id !== enrollmentForm.admissionId));
@@ -779,6 +794,7 @@ export default function AdminAdmissions() {
       loadEnrollments();
     } catch (error: any) {
       setEnrollmentError(error?.message || "No fue posible registrar la matricula");
+      setEnrollmentAction(null);
     } finally {
       setEnrollmentBusy(false);
     }
@@ -1075,9 +1091,18 @@ export default function AdminAdmissions() {
           onDismiss={() => {
             setEnrollmentMessage("");
             setEnrollmentError("");
+            setEnrollmentAction(null);
           }}
+          autoHideMs={enrollmentAction ? 30000 : undefined}
           style={{ marginBottom: 10 }}
         />
+        {enrollmentAction && enrollmentMessage && (
+          <div style={{ marginBottom: 10 }}>
+            <Link className="button secondary" to={enrollmentAction.path}>
+              {enrollmentAction.label}
+            </Link>
+          </div>
+        )}
         <label>
           Admision aprobada (autocompletar)
           <select

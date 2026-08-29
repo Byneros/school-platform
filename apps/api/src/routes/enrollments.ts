@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import prisma from "../utils/prisma.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { validate } from "../utils/validate.js";
@@ -46,6 +47,98 @@ function normalizeEmail(value?: string | null) {
 
 function isEmailLike(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+async function findOrCreateUnassignedTeacher(tx: Prisma.TransactionClient, schoolId: string) {
+  const email = `docente.sin.asignar+${schoolId}@colegio.edu`;
+  let user = await tx.user.findFirst({
+    where: { email, schoolId },
+    include: { teacher: true },
+  });
+
+  if (!user) {
+    const passwordHash = await bcrypt.hash("Unassigned123!", 10);
+    user = await tx.user.create({
+      data: {
+        email,
+        passwordHash,
+        fullName: "Docente sin asignar",
+        role: "TEACHER",
+        isActive: false,
+        schoolId,
+      },
+      include: { teacher: true },
+    });
+  }
+
+  if (user.teacher?.id) return user.teacher.id;
+
+  const teacher = await tx.teacher.create({
+    data: { userId: user.id, schoolId },
+    select: { id: true },
+  });
+  return teacher.id;
+}
+
+async function findOrCreateEnrollmentClass(
+  tx: Prisma.TransactionClient,
+  params: {
+    schoolId: string;
+    classId?: string | null;
+    gradeLevel: string;
+    academicYear: number;
+    studentGroup?: string | null;
+  }
+) {
+  const select = { id: true, gradeLevel: true, studentGroup: true, academicYear: true };
+  let classEntity = await tx.class.findFirst({
+    where: params.classId
+      ? {
+          id: params.classId,
+          schoolId: params.schoolId,
+          gradeLevel: params.gradeLevel as any,
+          academicYear: params.academicYear,
+        }
+      : {
+          schoolId: params.schoolId,
+          gradeLevel: params.gradeLevel as any,
+          academicYear: params.academicYear,
+        },
+    select,
+    orderBy: { studentGroup: "asc" },
+  });
+
+  if (!classEntity && params.classId) {
+    classEntity = await tx.class.findFirst({
+      where: {
+        schoolId: params.schoolId,
+        gradeLevel: params.gradeLevel as any,
+        academicYear: params.academicYear,
+      },
+      select,
+      orderBy: { studentGroup: "asc" },
+    });
+  }
+
+  if (classEntity) {
+    return { classEntity, created: false };
+  }
+
+  const teacherId = await findOrCreateUnassignedTeacher(tx, params.schoolId);
+  const studentGroup = String(params.studentGroup || "").trim() || "1";
+  const created = await tx.class.create({
+    data: {
+      schoolId: params.schoolId,
+      teacherId,
+      gradeLevel: params.gradeLevel as any,
+      studentGroup,
+      academicYear: params.academicYear,
+      schedule: {},
+    },
+    select,
+  });
+
+  return { classEntity: created, created: true };
 }
 
 function enrollmentView<T extends Record<string, any>>(enrollment: T) {
@@ -165,7 +258,7 @@ router.post(
     }
 
     try {
-      const enrollment = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx) => {
         let admission: any = null;
         if (body.admissionId) {
           admission = await tx.admission.findFirst({
@@ -213,40 +306,13 @@ router.post(
         const academicYear = Number(body.year);
         const gradeLevel = String(body.studentGradeLevel || student.gradeLevel || "").trim();
 
-        let classEntity = await tx.class.findFirst({
-          where: body.classId
-            ? {
-                id: body.classId,
-                schoolId,
-                gradeLevel: gradeLevel as any,
-                academicYear,
-              }
-            : {
-                schoolId,
-                gradeLevel: gradeLevel as any,
-                academicYear,
-              },
-          select: { id: true, gradeLevel: true, studentGroup: true, academicYear: true },
-          orderBy: { studentGroup: "asc" },
+        const { classEntity, created: classAutoCreated } = await findOrCreateEnrollmentClass(tx, {
+          schoolId,
+          classId: body.classId,
+          gradeLevel,
+          academicYear,
+          studentGroup: body.studentGroup || student.studentGroup,
         });
-
-        if (!classEntity && body.classId) {
-          classEntity = await tx.class.findFirst({
-            where: {
-              schoolId,
-              gradeLevel: gradeLevel as any,
-              academicYear,
-            },
-            select: { id: true, gradeLevel: true, studentGroup: true, academicYear: true },
-            orderBy: { studentGroup: "asc" },
-          });
-        }
-
-        if (!classEntity) {
-          throw new Error(
-            `No hay una clase configurada para ${gradeLevel}-${academicYear} en este colegio. Crea primero la clase desde la plataforma.`
-          );
-        }
 
         if (classGradeLevelValue(classEntity) !== body.studentGradeLevel) {
           throw new Error("La clase seleccionada no corresponde al nivel/grado del estudiante");
@@ -317,10 +383,21 @@ router.post(
           });
         }
 
-        return created;
+        return { enrollment: created, classAutoCreated };
       });
 
-      res.json(enrollmentView(enrollment));
+      const response = enrollmentView(result.enrollment);
+      if (result.classAutoCreated) {
+        res.json({
+          ...response,
+          classAutoCreated: true,
+          classAdminPath: "/admin/horas-docentes",
+          message: `La seccion ${response.studentGradeLevel}-${response.studentGroup || "1"}-${response.year} no existia y fue creada automaticamente. Revisa su docente y horario en Horas docentes.`,
+        });
+        return;
+      }
+
+      res.json(response);
     } catch (error: any) {
       res.status(400).json({ message: error?.message || "No fue posible registrar la matricula" });
     }
