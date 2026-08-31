@@ -119,7 +119,11 @@ function isPrismaSchemaError(error: unknown) {
     code === "P2022" ||
     message.includes("does not exist") ||
     message.includes("no existe") ||
-    message.includes("RefreshSession")
+    message.includes("RefreshSession") ||
+    message.includes("School") ||
+    message.includes("schoolId") ||
+    message.includes("docType") ||
+    message.includes("docNumber")
   );
 }
 
@@ -289,17 +293,28 @@ router.post(
     ensureAuthConfig();
 
     const { school, admin } = req.validated.body;
-    const result = await createSchool({
-      school,
-      admin: {
-        fullName: admin.fullName,
-        email: admin.email,
-        docType: admin.docType,
-        docNumber: admin.docNumber,
-        phone: admin.phone,
-        password: admin.password,
-      },
-    });
+    let result;
+    try {
+      result = await createSchool({
+        school,
+        admin: {
+          fullName: admin.fullName,
+          email: admin.email,
+          docType: admin.docType,
+          docNumber: admin.docNumber,
+          phone: admin.phone,
+          password: admin.password,
+        },
+      });
+    } catch (error) {
+      if (isPrismaSchemaError(error)) {
+        throw httpError(
+          503,
+          "Migraciones de registro institucional pendientes. Ejecuta prisma:migrate:deploy y reinicia la API."
+        );
+      }
+      throw error;
+    }
 
     return res.status(201).json({
       ok: true,

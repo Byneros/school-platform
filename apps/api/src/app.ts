@@ -426,6 +426,7 @@ app.get("/ready", async (req, res) => {
   let dbOk = false;
   let redisOk = redis ? false : true;
   let authSchemaOk = false;
+  let schoolSchemaOk = false;
 
   try {
     await prisma.$queryRawUnsafe("SELECT 1");
@@ -445,20 +446,52 @@ app.get("/ready", async (req, res) => {
 
   if (dbOk) {
     try {
-      const rows = await prisma.$queryRawUnsafe<Array<{ users: string; refresh: string }>>(
+      const rows = await prisma.$queryRawUnsafe<
+        Array<{
+          users: string;
+          refresh: string;
+          schools: string;
+          user_school_id: boolean;
+          user_doc_type: boolean;
+          user_doc_number: boolean;
+        }>
+      >(
         `
           SELECT
             to_regclass('public."User"')::text AS users,
-            to_regclass('public."RefreshSession"')::text AS refresh
+            to_regclass('public."RefreshSession"')::text AS refresh,
+            to_regclass('public."School"')::text AS schools,
+            to_regclass('public."User"')::text IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'User' AND column_name = 'schoolId'
+              ) AS user_school_id,
+            to_regclass('public."User"')::text IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'User' AND column_name = 'docType'
+              ) AS user_doc_type,
+            to_regclass('public."User"')::text IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'User' AND column_name = 'docNumber'
+              ) AS user_doc_number
         `
       );
       authSchemaOk = Boolean(rows[0]?.users && rows[0]?.refresh);
+      schoolSchemaOk = Boolean(
+        rows[0]?.schools &&
+        rows[0]?.user_school_id &&
+        rows[0]?.user_doc_type &&
+        rows[0]?.user_doc_number
+      );
     } catch {
       authSchemaOk = false;
+      schoolSchemaOk = false;
     }
   }
 
-  const ok = dbOk && redisOk && authSchemaOk;
+  const ok = dbOk && redisOk && authSchemaOk && schoolSchemaOk;
 
   res.status(ok ? 200 : 503).json({
     ok,
@@ -467,6 +500,7 @@ app.get("/ready", async (req, res) => {
       db: dbOk ? "up" : "down",
       redis: redisOk ? "up" : "down",
       authSchema: authSchemaOk ? "up" : "down",
+      schoolSchema: schoolSchemaOk ? "up" : "down",
     },
   });
 });
