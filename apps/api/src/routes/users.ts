@@ -28,6 +28,45 @@ function enrollmentGroupLabel(enrollment: any) {
   return String(enrollment?.student?.studentGroup || "").trim();
 }
 
+async function linkParentToExistingEnrollments(
+  tx: Prisma.TransactionClient,
+  params: { parentId: string; schoolId: string | null; email: string }
+) {
+  const email = normalizeText(params.email);
+  if (!email || !params.schoolId) return;
+
+  const enrollments = await tx.enrollment.findMany({
+    where: {
+      schoolId: params.schoolId,
+      contactEmail: { equals: email, mode: "insensitive" },
+      status: { not: "INACTIVE" },
+    },
+    select: {
+      studentId: true,
+      guardianRelation: true,
+    },
+  });
+
+  for (const enrollment of enrollments) {
+    await tx.guardian.upsert({
+      where: {
+        parentId_studentId: {
+          parentId: params.parentId,
+          studentId: enrollment.studentId,
+        },
+      },
+      update: {
+        relation: enrollment.guardianRelation || "Acudiente",
+      },
+      create: {
+        parentId: params.parentId,
+        studentId: enrollment.studentId,
+        relation: enrollment.guardianRelation || "Acudiente",
+      },
+    });
+  }
+}
+
 router.get("/", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const auth = (req as any).auth;
   const page = Number(req.query.page || 1);
@@ -206,6 +245,10 @@ router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), asyn
       relation: String(e.guardianRelation || "").trim() || "Acudiente",
       students: [],
     };
+    current.guardianFullName = current.guardianFullName || name || "Sin nombre";
+    current.guardianDocNumber = current.guardianDocNumber || doc || "";
+    current.contactEmail = current.contactEmail || email || "";
+    current.relation = current.relation || String(e.guardianRelation || "").trim() || "Acudiente";
 
     const studentId = String(e.student?.id || "");
     if (studentId && !current.students.some((s) => s.studentId === studentId)) {
@@ -240,6 +283,10 @@ router.get("/parents/pending-account", requireAuth, requireRole(["ADMIN"]), asyn
       relation: String(a.guardianRelation || "").trim() || "Acudiente",
       students: [],
     };
+    current.guardianFullName = current.guardianFullName || name || "Sin nombre";
+    current.guardianDocNumber = current.guardianDocNumber || doc || "";
+    current.contactEmail = current.contactEmail || email || "";
+    current.relation = current.relation || String(a.guardianRelation || "").trim() || "Acudiente";
 
     const studentId = `admission:${a.id}`;
     if (studentId && !current.students.some((s) => s.studentId === studentId)) {
@@ -441,11 +488,17 @@ router.post(
         }
 
         if (body.role === "PARENT") {
-          await tx.parent.create({
+          const parent = await tx.parent.create({
             data: {
               userId: created.id,
               schoolId: created.schoolId,
             },
+            select: { id: true },
+          });
+          await linkParentToExistingEnrollments(tx, {
+            parentId: parent.id,
+            schoolId: created.schoolId,
+            email: normalizedEmail,
           });
         }
 
