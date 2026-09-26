@@ -11,6 +11,41 @@ import useSuggestions from "../hooks/useSuggestions";
 import { apiDelete, apiDownload, apiGet, apiPatch, apiPost } from "../services/api";
 import { feedbackTitles } from "../utils/feedback";
 
+type ImportErrorReportRow = {
+  sheet?: string;
+  row?: number;
+  field?: string;
+  value?: string;
+  message?: string;
+  recommendation?: string;
+};
+
+function downloadImportErrorReport(errors: ImportErrorReportRow[]) {
+  const escapeCsv = (value: unknown) => {
+    let text = String(value ?? "");
+    if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+  const rows = [
+    ["Hoja", "Fila", "Campo", "Valor", "Error", "Recomendacion"],
+    ...errors.map((error) => [
+      error.sheet,
+      error.row,
+      error.field,
+      error.value,
+      error.message,
+      error.recommendation,
+    ]),
+  ];
+  const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(",")).join("\r\n")}`;
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "errores-importacion.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function isStrongPassword(password: string) {
   return (
     password.length >= 8 &&
@@ -918,7 +953,23 @@ export default function AdminUsers() {
             )}
             {Array.isArray(importResult.errors) && importResult.errors.length > 0 && (
               <div style={{ marginTop: 6 }}>
-                <strong>Errores:</strong>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <strong>Errores:</strong>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => downloadImportErrorReport(importResult.errors)}
+                  >
+                    Descargar errores CSV
+                  </button>
+                </div>
                 <ul style={{ margin: "6px 0 0 16px", color: "#b91c1c" }}>
                   {importResult.errors.slice(0, 10).map((err: any, idx: number) => (
                     <li key={`${err.sheet}-${err.row}-${idx}`}>
