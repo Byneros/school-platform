@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import type { Prisma } from "@prisma/client";
 import { type AdmissionStatus, type InvoiceStatus } from "@prisma/client";
 import prisma from "../utils/prisma.js";
@@ -18,6 +18,7 @@ import {
 import { validate } from "../utils/validate.js";
 import { composeNotificationBodyWithMeta } from "../utils/notificationMeta.js";
 import { isDeveloperRole } from "../utils/rbac.js";
+import { schoolScope } from "../utils/schoolDb.js";
 
 export function isSuperAdminRole(role: unknown): role is "SUPER_ADMIN" {
   return String(role || "").toUpperCase() === "SUPER_ADMIN";
@@ -112,6 +113,7 @@ function buildDateFilter(from?: Date | null, to?: Date | null) {
 }
 
 async function loadAlertsReportData(params: {
+  scope: ReturnType<typeof schoolScope>;
   status?: string;
   from?: Date | null;
   to?: Date | null;
@@ -135,6 +137,7 @@ async function loadAlertsReportData(params: {
   ] = await Promise.all([
     prisma.admission.findMany({
       where: {
+        ...params.scope,
         enrollment: null,
         ...(status ? { status: status as any } : {}),
         ...(status === "APPROVED"
@@ -149,6 +152,7 @@ async function loadAlertsReportData(params: {
     }),
     prisma.notification.findMany({
       where: {
+        ...params.scope,
         ...(status ? { status: status as any } : {}),
         ...(dateFilter ? { createdAt: dateFilter } : {}),
       },
@@ -161,6 +165,7 @@ async function loadAlertsReportData(params: {
     }),
     prisma.certificateRequest.findMany({
       where: {
+        student: { is: params.scope },
         ...(status ? { status: status as any } : {}),
         ...(dateFilter ? { requestedAt: dateFilter } : {}),
       },
@@ -174,6 +179,7 @@ async function loadAlertsReportData(params: {
     includeOperational
       ? prisma.invoice.findMany({
           where: {
+            student: { is: params.scope },
             status: "PENDING",
             ...(dateFilter ? { dueDate: dateFilter } : {}),
           },
@@ -185,6 +191,7 @@ async function loadAlertsReportData(params: {
     includeOperational
       ? prisma.studentObservation.findMany({
           where: {
+            student: { is: params.scope },
             followUpCompleted: false,
             followUpDate: {
               not: null,
@@ -202,7 +209,7 @@ async function loadAlertsReportData(params: {
       ? (async () => {
           const [enrollments, parentUsers] = await Promise.all([
             prisma.enrollment.findMany({
-              where: { status: { not: "INACTIVE" } },
+              where: { ...params.scope, status: { not: "INACTIVE" } },
               select: {
                 guardianFullName: true,
                 guardianDocNumber: true,
@@ -213,7 +220,7 @@ async function loadAlertsReportData(params: {
               orderBy: [{ year: "desc" }, { studentFullName: "asc" }],
             }),
             prisma.user.findMany({
-              where: { role: "PARENT" },
+              where: { ...params.scope, role: "PARENT" },
               select: {
                 fullName: true,
                 email: true,
@@ -425,6 +432,7 @@ function studentsWhereFromQuery(req: any): Prisma.StudentWhereInput {
   const search = String(req.query.search || "").trim();
   const gradeLevel = String(req.query.gradeLevel || "").trim();
   return {
+    ...schoolScope(req),
     ...(search ? { fullName: { contains: search, mode: "insensitive" } } : {}),
     ...(gradeLevel ? { gradeLevel: gradeLevel as any } : {}),
   };
@@ -548,15 +556,18 @@ async function issueCertificate(params: {
   return issued;
 }
 
-async function buildAttendanceByStudentMatrix() {
+async function buildAttendanceByStudentMatrix(req: Request) {
+  const scope = schoolScope(req);
   const [enrollments, attendance] = await Promise.all([
     prisma.enrollment.findMany({
+      where: scope,
       include: {
         student: true,
         class: true,
       },
     }),
     prisma.attendance.findMany({
+      where: { enrollment: { is: scope } },
       include: {
         enrollment: {
           include: {
@@ -606,8 +617,9 @@ async function buildAttendanceByStudentMatrix() {
 }
 
 // Reporte: resumen de calificaciones por grado
-router.get("/grades-summary", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (_req, res) => {
+router.get("/grades-summary", requireAuth, requireRole(["ADMIN", "TEACHER"]), async (req, res) => {
   const grades = await prisma.grade.findMany({
+    where: { enrollment: { is: schoolScope(req) } },
     select: {
       score: true,
       maxScore: true,
@@ -633,12 +645,13 @@ router.get(
   "/attendance-summary",
   requireAuth,
   requireRole(["ADMIN", "TEACHER"]),
-  async (_req, res) => {
-    const total = await prisma.attendance.count();
-    const present = await prisma.attendance.count({ where: { status: "PRESENT" } });
-    const absent = await prisma.attendance.count({ where: { status: "ABSENT" } });
-    const late = await prisma.attendance.count({ where: { status: "LATE" } });
-    const excused = await prisma.attendance.count({ where: { status: "EXCUSED" } });
+  async (req, res) => {
+    const scope = { enrollment: { is: schoolScope(req) } };
+    const total = await prisma.attendance.count({ where: scope });
+    const present = await prisma.attendance.count({ where: { ...scope, status: "PRESENT" } });
+    const absent = await prisma.attendance.count({ where: { ...scope, status: "ABSENT" } });
+    const late = await prisma.attendance.count({ where: { ...scope, status: "LATE" } });
+    const excused = await prisma.attendance.count({ where: { ...scope, status: "EXCUSED" } });
     res.json({ total, present, absent, late, excused });
   }
 );
@@ -648,7 +661,7 @@ router.get(
   requireAuth,
   requireRole(["ADMIN"]),
   async (_req, res) => {
-    const { dates, rows } = await buildAttendanceByStudentMatrix();
+    const { dates, rows } = await buildAttendanceByStudentMatrix(_req);
 
     const columns: Array<{ key: string; label: string }> = [
       { key: "gradeLevel", label: "Grado" },
@@ -679,7 +692,7 @@ router.get(
   requireAuth,
   requireRole(["ADMIN"]),
   async (_req, res) => {
-    const { dates, rows } = await buildAttendanceByStudentMatrix();
+    const { dates, rows } = await buildAttendanceByStudentMatrix(_req);
 
     const dynamicDateColumns = dates.map((d) => ({
       key: d,
@@ -705,8 +718,11 @@ router.get(
 );
 
 // Reporte: resumen financiero
-router.get("/finance-summary", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
-  const invoices = await prisma.invoice.findMany({ select: { amount: true, status: true } });
+router.get("/finance-summary", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
+  const invoices = await prisma.invoice.findMany({
+    where: { student: { is: schoolScope(req) } },
+    select: { amount: true, status: true },
+  });
   const total = invoices.reduce((sum, i) => sum + i.amount, 0);
   const pending = invoices.filter((i) => i.status === "PENDING").reduce((s, i) => s + i.amount, 0);
   const overdue = invoices.filter((i) => i.status === "OVERDUE").reduce((s, i) => s + i.amount, 0);
@@ -714,8 +730,9 @@ router.get("/finance-summary", requireAuth, requireRole(["ADMIN"]), async (_req,
   res.json({ total, paid, pending, overdue });
 });
 
-router.get("/finance-csv", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
+router.get("/finance-csv", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const invoices = await prisma.invoice.findMany({
+    where: { student: { is: schoolScope(req) } },
     include: { student: true },
     orderBy: { createdAt: "desc" },
   });
@@ -743,8 +760,9 @@ router.get("/finance-csv", requireAuth, requireRole(["ADMIN"]), async (_req, res
   res.send(csv);
 });
 
-router.get("/finance-excel", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
+router.get("/finance-excel", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const invoices = await prisma.invoice.findMany({
+    where: { student: { is: schoolScope(req) } },
     include: { student: true },
     orderBy: { createdAt: "desc" },
   });
@@ -775,8 +793,9 @@ router.get("/finance-excel", requireAuth, requireRole(["ADMIN"]), async (_req, r
   res.send(xlsx);
 });
 
-router.get("/finance-pdf", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
+router.get("/finance-pdf", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
   const invoices = await prisma.invoice.findMany({
+    where: { student: { is: schoolScope(req) } },
     include: { student: true },
     orderBy: { createdAt: "desc" },
   });
@@ -957,8 +976,8 @@ router.get(
     }
     const periodFilter = String(req.query.period || "").trim();
 
-    const student = await prisma.student.findUnique({
-      where: { id: req.params.studentId },
+    const student = await prisma.student.findFirst({
+      where: { id: req.params.studentId, ...schoolScope(req) },
       include: {
         enrollments: {
           include: {
@@ -986,6 +1005,7 @@ router.get(
     const studentGroupKey = normalizeReportGroupKey(studentGroup);
 
     const teachers = await prisma.teacher.findMany({
+      where: schoolScope(req),
       select: { subjectSchedules: true },
     });
 
@@ -1624,8 +1644,8 @@ router.get(
     const studentId = String(req.params.studentId || "").trim();
     if (!studentId) return res.status(400).json({ error: "Student id required" });
 
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
+    const student = await prisma.student.findFirst({
+      where: { id: studentId, ...schoolScope(req) },
       include: {
         enrollments: {
           include: { class: true },
@@ -1637,7 +1657,7 @@ router.get(
     if (!student) return res.status(404).json({ error: "Student not found" });
 
     const observations = await prisma.studentObservation.findMany({
-      where: { studentId },
+      where: { studentId, student: { is: schoolScope(req) } },
       include: { createdBy: { select: { fullName: true } } },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       take: 20,
@@ -2001,8 +2021,8 @@ router.post(
     const studentId = String(body.studentId || "").trim();
     const type = String(body.type || "").trim() as "STUDY" | "ENROLLMENT";
 
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
+    const student = await prisma.student.findFirst({
+      where: { id: studentId, ...schoolScope(req) },
       select: { id: true },
     });
     if (!student) return res.status(404).json({ error: "Student not found" });
@@ -2034,8 +2054,8 @@ router.post(
       where: { id: auth.userId },
       select: { fullName: true, role: true },
     });
-    const studentInfo = await prisma.student.findUnique({
-      where: { id: studentId },
+    const studentInfo = await prisma.student.findFirst({
+      where: { id: studentId, ...schoolScope(req) },
       select: { fullName: true, gradeLevel: true, studentGroup: true },
     });
 
@@ -2057,6 +2077,7 @@ router.post(
         ),
         status: "PENDING",
         createdById: auth.userId,
+        schoolId: req.schoolId,
       },
     });
 
@@ -2078,6 +2099,7 @@ router.get(
     const data = await prisma.certificateRequest.findMany({
       where: {
         requestedById: auth.userId,
+        student: { is: schoolScope(req) },
         ...(studentId ? { studentId } : {}),
         ...(type === "STUDY" || type === "ENROLLMENT" ? { type: type as any } : {}),
       },
@@ -2105,16 +2127,18 @@ router.get("/certificate/requests", requireAuth, requireRole(["ADMIN"]), async (
   const student = String(req.query.student || "").trim();
   const requestedBy = String(req.query.requestedBy || "").trim();
 
+  const scope = schoolScope(req);
   const where: Prisma.CertificateRequestWhereInput = {
+    student: {
+      is: {
+        ...scope,
+        ...(student ? { fullName: { contains: student, mode: "insensitive" } } : {}),
+      },
+    },
     ...(status === "PENDING" || status === "APPROVED" || status === "REJECTED"
       ? { status: status as any }
       : {}),
     ...(type === "STUDY" || type === "ENROLLMENT" ? { type: type as any } : {}),
-    ...(student
-      ? {
-          student: { fullName: { contains: student, mode: "insensitive" } },
-        }
-      : {}),
     ...(requestedBy
       ? {
           requestedBy: { fullName: { contains: requestedBy, mode: "insensitive" } },
@@ -2148,7 +2172,9 @@ router.post(
   async (req, res) => {
     const auth = (req as any).auth;
     const id = String(req.params.id || "").trim();
-    const existing = await prisma.certificateRequest.findUnique({ where: { id } });
+    const existing = await prisma.certificateRequest.findFirst({
+      where: { id, student: { is: schoolScope(req) } },
+    });
     if (!existing) return res.status(404).json({ error: "Request not found" });
     if (existing.status !== "PENDING") {
       return res.status(400).json({ error: "Request already reviewed" });
@@ -2171,6 +2197,7 @@ router.get("/alerts/pdf", requireAuth, requireRole(["ADMIN"]), async (req, res) 
   const from = parseDateParam(String(req.query.fromDate || ""));
   const to = parseDateParam(String(req.query.toDate || ""));
   const { rows, branding, subtitle } = await loadAlertsReportData({
+    scope: schoolScope(req),
     status: String(req.query.status || ""),
     from,
     to,
@@ -2196,6 +2223,7 @@ router.get("/alerts/excel", requireAuth, requireRole(["ADMIN"]), async (req, res
   const from = parseDateParam(String(req.query.fromDate || ""));
   const to = parseDateParam(String(req.query.toDate || ""));
   const { rows, branding } = await loadAlertsReportData({
+    scope: schoolScope(req),
     status: String(req.query.status || ""),
     from,
     to,
@@ -2338,6 +2366,7 @@ router.get("/import-template/excel", requireAuth, requireRole(["ADMIN"]), async 
 
 router.get("/import-template/history", requireAuth, requireRole(["ADMIN"]), async (_req, res) => {
   const history = await prisma.importHistory.findMany({
+    where: { createdBy: { is: schoolScope(_req) } },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -2345,6 +2374,10 @@ router.get("/import-template/history", requireAuth, requireRole(["ADMIN"]), asyn
 });
 
 router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), async (req, res) => {
+  const importSchoolId = req.schoolId;
+  if (!importSchoolId) {
+    return res.status(403).json({ message: "Selecciona un colegio antes de importar datos." });
+  }
   const payload = (req as any).body || {};
   const rawBase64 = String(payload.fileBase64 || "").trim();
   const mode = String(payload.mode || "import").toLowerCase();
@@ -2356,6 +2389,9 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   let workbook: ImportedWorkbook;
   try {
     const buffer = Buffer.from(base64, "base64");
+    if (buffer.length > 8 * 1024 * 1024) {
+      return res.status(413).json({ message: "El archivo .xlsx debe ser menor o igual a 8 MB." });
+    }
     if (!isLikelyXlsxBuffer(buffer)) {
       return res.status(400).json({
         message:
@@ -2409,7 +2445,14 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     },
     skipped: 0,
     warnings: [] as Array<{ sheet: string; row: number; message: string }>,
-    errors: [] as Array<{ sheet: string; row: number; message: string }>,
+    errors: [] as Array<{
+      sheet: string;
+      row: number;
+      message: string;
+      field?: string;
+      value?: string;
+      recommendation?: string;
+    }>,
     defaultPasswordUsed: false,
   };
 
@@ -2530,8 +2573,19 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   const isEmailLike = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 
-  const addError = (sheet: string, row: number, message: string) => {
-    result.errors.push({ sheet, row, message });
+  const addError = (
+    sheet: string,
+    row: number,
+    message: string,
+    details: { field?: string; value?: unknown } = {}
+  ) => {
+    result.errors.push({
+      sheet,
+      row,
+      message,
+      ...(details.field ? { field: details.field } : {}),
+      ...(details.value !== undefined ? { value: String(details.value) } : {}),
+    });
     if (row > 1) result.skipped += 1;
   };
 
@@ -2798,7 +2852,10 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       const email = normalizeEmail(row.userEmail);
       if (email && !userRoles.has(email)) {
         relationChecks.push(
-          prisma.user.findUnique({ where: { email }, select: { role: true } }).then((user) => {
+          prisma.user.findFirst({
+            where: { email, schoolId: importSchoolId },
+            select: { role: true },
+          }).then((user) => {
             if (!user) addError("DOCENTES", index + 2, `No existe el usuario ${email}.`);
             else if (user.role !== "TEACHER")
               addError("DOCENTES", index + 2, `${email} no tiene rol TEACHER.`);
@@ -2810,7 +2867,10 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       const email = normalizeEmail(row.teacherEmail);
       if (email && !userRoles.has(email)) {
         relationChecks.push(
-          prisma.user.findUnique({ where: { email }, select: { role: true } }).then((user) => {
+          prisma.user.findFirst({
+            where: { email, schoolId: importSchoolId },
+            select: { role: true },
+          }).then((user) => {
             if (!user) addError("CLASES", index + 2, `No existe el docente ${email}.`);
             else if (user.role !== "TEACHER")
               addError("CLASES", index + 2, `${email} no tiene rol TEACHER.`);
@@ -2836,9 +2896,10 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     while (true) {
       const existing = await db.user.findUnique({
         where: { email: candidate },
-        select: { id: true, role: true },
+        select: { id: true, role: true, schoolId: true },
       });
-      if (!existing || existing.role === "PARENT") return candidate;
+      if (!existing || (existing.schoolId === importSchoolId && existing.role === "PARENT"))
+        return candidate;
       candidate = `${localPart}.pf${suffix}@${domain}`;
       suffix += 1;
     }
@@ -2851,7 +2912,9 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         select: { id: true },
       });
       if (!teacher) {
-        await db.teacher.create({ data: { user: { connect: { id: user.id } } } });
+        await db.teacher.create({
+          data: { userId: user.id, schoolId: importSchoolId },
+        });
         result.created.teachers += 1;
       }
     }
@@ -2861,7 +2924,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         select: { id: true },
       });
       if (!parent) {
-        await db.parent.create({ data: { userId: user.id } });
+        await db.parent.create({ data: { userId: user.id, schoolId: importSchoolId } });
         result.created.parents += 1;
       }
     }
@@ -2875,14 +2938,15 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     if (isEmailLike(contactEmail)) {
       const user = await db.user.findUnique({
         where: { email: contactEmail },
-        select: { id: true, role: true, fullName: true },
+        select: { id: true, role: true, fullName: true, schoolId: true },
       });
-      if (user) return user;
+      if (user?.schoolId === importSchoolId) return user;
     }
 
     if (guardianDoc && guardianDoc !== "SIN_DOCUMENTO" && guardianDoc !== "N/A") {
       const matchingEnrollment = await db.enrollment.findFirst({
         where: {
+          schoolId: importSchoolId,
           guardianDocNumber: { equals: guardianDoc, mode: "insensitive" },
         },
         select: { studentId: true },
@@ -2910,6 +2974,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       const user = await db.user.findFirst({
         where: {
           role: "PARENT",
+          schoolId: importSchoolId,
           fullName: { equals: guardianName, mode: "insensitive" },
         },
         select: { id: true, role: true, fullName: true },
@@ -2949,6 +3014,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           role: "PARENT",
           isActive: true,
           passwordHash,
+          schoolId: importSchoolId,
         },
         select: { id: true, role: true, fullName: true },
       });
@@ -2965,8 +3031,8 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
 
     const parent = await db.parent.upsert({
       where: { userId: user.id },
-      update: {},
-      create: { userId: user.id },
+      update: { schoolId: importSchoolId },
+      create: { userId: user.id, schoolId: importSchoolId },
       select: { id: true },
     });
     await db.guardian.upsert({
@@ -3051,7 +3117,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         },
       });
 
-      if (byId) {
+      if (byId?.schoolId === importSchoolId) {
         studentCacheById.set(byId.id, byId);
 
         if (byId.documentNumber) {
@@ -3059,6 +3125,15 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         }
 
         return byId;
+      }
+      if (byId) {
+        addError(
+          classEntity ? "MATRICULAS" : "ESTUDIANTES",
+          rowNumber,
+          "El estudiante indicado pertenece a otro colegio.",
+          { field: "studentId", value: internalId }
+        );
+        return null;
       }
     }
 
@@ -3081,6 +3156,15 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       });
 
       if (byDocument) {
+        if (byDocument.schoolId !== importSchoolId) {
+          addError(
+            classEntity ? "MATRICULAS" : "ESTUDIANTES",
+            rowNumber,
+            "El documento ya esta asociado a un estudiante de otro colegio.",
+            { field: "studentDocNumber", value: documentNumber }
+          );
+          return null;
+        }
         if (classEntity) {
           console.log("✅ Estudiante encontrado:", byDocument.id);
         }
@@ -3119,6 +3203,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     if (documentNumber) {
       const oldEnrollment = await db.enrollment.findFirst({
         where: {
+          schoolId: importSchoolId,
           studentDocNumber: documentNumber,
         },
         include: {
@@ -3139,6 +3224,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     if (fullName) {
       const byName = await db.student.findFirst({
         where: {
+          schoolId: importSchoolId,
           fullName: {
             equals: fullName,
             mode: "insensitive",
@@ -3187,6 +3273,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
       documentType: documentType || null,
       documentNumber: documentNumber || null,
       isActive: true,
+      schoolId: importSchoolId,
     };
 
     console.log("===== CREATE DATA =====");
@@ -3255,6 +3342,15 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         });
 
         if (existing) {
+          if (existing.schoolId !== importSchoolId) {
+            addError(
+              classEntity ? "MATRICULAS" : "ESTUDIANTES",
+              rowNumber,
+              "El documento ya esta asociado a un estudiante de otro colegio.",
+              { field: "studentDocNumber", value: documentNumber }
+            );
+            return null;
+          }
           studentCacheById.set(existing.id, existing);
 
           if (existing.documentNumber) {
@@ -3283,11 +3379,13 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   const _resolveStudentForGuardian = async (row: Record<string, any>, rowNumber: number) => {
     const rawStudentId = normalizeText(row.studentId);
     if (rawStudentId) {
-      const byId = await db.student.findUnique({ where: { id: rawStudentId } });
+      const byId = await db.student.findFirst({
+        where: { id: rawStudentId, schoolId: importSchoolId },
+      });
       if (byId) return byId;
 
       const byEnrollmentDoc = await db.enrollment.findFirst({
-        where: { studentDocNumber: rawStudentId },
+        where: { studentDocNumber: rawStudentId, schoolId: importSchoolId },
         include: { student: true },
       });
       if (byEnrollmentDoc?.student) return byEnrollmentDoc.student;
@@ -3297,7 +3395,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     const studentDocNumber = normalizeText(row.studentDocNumber);
     if (studentDocNumber) {
       const byEnrollmentDoc = await db.enrollment.findFirst({
-        where: { studentDocNumber },
+        where: { studentDocNumber, schoolId: importSchoolId },
         include: { student: true },
         orderBy: [{ year: "desc" }],
       });
@@ -3306,7 +3404,10 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
 
     if (fullName) {
       const byName = await db.student.findFirst({
-        where: { fullName: { equals: fullName, mode: "insensitive" } },
+        where: {
+          schoolId: importSchoolId,
+          fullName: { equals: fullName, mode: "insensitive" },
+        },
         orderBy: { createdAt: "desc" },
       });
       if (byName) return byName;
@@ -3330,6 +3431,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   ) => {
     const classes = await db.class.findMany({
       where: {
+        schoolId: importSchoolId,
         gradeLevel: gradeLevel as any,
         studentGroup,
         academicYear,
@@ -3340,6 +3442,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
     if (classes.length === 0) {
       const availableClasses = await db.class.findMany({
         where: {
+          schoolId: importSchoolId,
           gradeLevel: gradeLevel as any,
           academicYear,
         },
@@ -3454,6 +3557,14 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
         }
         if (modeIsImport) {
           const existing = await db.user.findUnique({ where: { email } });
+          if (existing && existing.schoolId !== importSchoolId) {
+            addError("USUARIOS", i + 2, "El correo ya esta asociado a un usuario de otro colegio.", {
+              field: "email",
+              value: email,
+            });
+            result.skipped += 1;
+            continue;
+          }
           if (existing) {
             const update: any = { fullName, role: role as any, isActive };
             if (password) {
@@ -3471,14 +3582,26 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
             if (!password) result.defaultPasswordUsed = true;
             const passwordHash = await bcrypt.hash(passwordValue, 10);
             const created = await db.user.create({
-              data: { email, fullName, role: role as any, isActive, passwordHash },
+              data: {
+                email,
+                fullName,
+                role: role as any,
+                isActive,
+                passwordHash,
+                schoolId: importSchoolId,
+              },
             });
             if (role === "TEACHER") {
-              await db.teacher.create({ data: { user: { connect: { id: created.id } } } });
+              await db.teacher.create({
+                data: {
+                  userId: created.id,
+                  schoolId: importSchoolId,
+                },
+              });
               result.created.teachers += 1;
             }
             if (role === "PARENT") {
-              await db.parent.create({ data: { userId: created.id } });
+              await db.parent.create({ data: { userId: created.id, schoolId: importSchoolId } });
               result.created.parents += 1;
             }
             result.created.users += 1;
@@ -3501,7 +3624,9 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           continue;
         }
         if (modeIsImport) {
-          const user = await db.user.findUnique({ where: { email } });
+          const user = await db.user.findFirst({
+            where: { email, schoolId: importSchoolId },
+          });
           if (!user) {
             result.errors.push({
               sheet: "DOCENTES",
@@ -3543,7 +3668,8 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           } else {
             await db.teacher.create({
               data: {
-                user: { connect: { id: user.id } },
+                userId: user.id,
+                schoolId: importSchoolId,
                 ...updateData,
               },
             });
@@ -3700,7 +3826,9 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           continue;
         }
         if (modeIsImport) {
-          const teacherUser = await db.user.findUnique({ where: { email: teacherEmail } });
+          const teacherUser = await db.user.findFirst({
+            where: { email: teacherEmail, schoolId: importSchoolId },
+          });
           if (!teacherUser) {
             result.errors.push({ sheet: "CLASES", row: i + 2, message: "Docente no encontrado." });
             result.skipped += 1;
@@ -3719,6 +3847,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           const schedule = parseJson(row.schedule) || undefined;
           const existing = await db.class.findFirst({
             where: {
+              schoolId: importSchoolId,
               teacherId: teacher.id,
               gradeLevel: gradeLevel as any,
               studentGroup,
@@ -3731,6 +3860,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           } else {
             await db.class.create({
               data: {
+                schoolId: importSchoolId,
                 teacherId: teacher.id,
                 gradeLevel: gradeLevel as any,
                 studentGroup,
@@ -3788,9 +3918,6 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
             `Procesando MATRICULA fila ${i + 2}: ${row.studentFullName || row.studentDocNumber}`
           );
           const student = await resolveStudent(row, classEntity, i + 2);
-          console.log(
-            `✔ Matrícula asociada al estudiante ${student.fullName} (${student.documentNumber})`
-          );
           if (!student) {
             console.log(
               `❌ Fila ${i + 2}: no se pudo resolver el estudiante ${
@@ -3799,6 +3926,9 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
             );
             continue;
           }
+          console.log(
+            `✔ Matrícula asociada al estudiante ${student.fullName} (${student.documentNumber})`
+          );
           const studentId = student.id;
           const studentGradeLevel = normalizeText(
             row.studentGradeLevel || row.gradeLevel || classEntity.gradeLevel || student.gradeLevel
@@ -3830,20 +3960,14 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
             contactPhone: normalizeText(row.contactPhone) || "SIN_TELEFONO",
             contactEmail: normalizeEmail(row.contactEmail) || "",
           };
-          const existing = await db.enrollment.findUnique({
-            where: {
-              studentId_classId_year: {
-                studentId,
-                classId,
-                year: academicYear,
-              },
-            },
+          const existing = await db.enrollment.findFirst({
+            where: { studentId, classId, year: academicYear, schoolId: importSchoolId },
           });
           if (existing) {
             await db.enrollment.update({ where: { id: existing.id }, data });
             result.updated.enrollments += 1;
           } else {
-            await db.enrollment.create({ data });
+            await db.enrollment.create({ data: { ...data, schoolId: importSchoolId } });
             result.created.enrollments += 1;
           }
           await ensureParentGuardianFromEnrollment(data, studentId, i + 2);
@@ -3895,6 +4019,14 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
             continue;
           }
           let user = await db.user.findUnique({ where: { email: parentEmail } });
+          if (user && user.schoolId !== importSchoolId) {
+            addError("ACUDIENTES", i + 2, "El correo ya esta asociado a un usuario de otro colegio.", {
+              field: "parentEmail",
+              value: parentEmail,
+            });
+            result.skipped += 1;
+            continue;
+          }
           if (!user) {
             const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
             result.defaultPasswordUsed = true;
@@ -3905,9 +4037,10 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
                 role: "PARENT",
                 isActive: true,
                 passwordHash,
+                schoolId: importSchoolId,
               },
             });
-            await db.parent.create({ data: { userId: user.id } });
+            await db.parent.create({ data: { userId: user.id, schoolId: importSchoolId } });
             result.created.users += 1;
             result.created.parents += 1;
           }
@@ -3922,8 +4055,8 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           }
           const parent = await db.parent.upsert({
             where: { userId: user.id },
-            update: {},
-            create: { userId: user.id },
+            update: { schoolId: importSchoolId },
+            create: { userId: user.id, schoolId: importSchoolId },
           });
           const relation = normalizeText(row.relation) || "Acudiente";
           await db.guardian.upsert({
@@ -3966,6 +4099,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
             admissionStatusMap[admissionStatusRaw] ?? "PENDING";
           await db.admission.create({
             data: {
+              schoolId: importSchoolId,
               studentName,
               gradeLevel: gradeLevel as any,
               status: admissionStatus,
@@ -4015,7 +4149,7 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
           const invoiceStatusRaw = normalizeText(row.status).toUpperCase();
 
           const enrollmentForStudent = await db.enrollment.findFirst({
-            where: { studentDocNumber },
+            where: { studentDocNumber, schoolId: importSchoolId },
             include: { student: true },
             orderBy: [{ year: "desc" }],
           });
@@ -4101,13 +4235,11 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   if (result.errors.length === 0) {
     if (modeIsImport) {
       try {
-        db = prisma;
-
-        await executeImport();
-
-        if (result.errors.length > 0) {
-          throw new Error("IMPORT_VALIDATION_FAILED");
-        }
+        await prisma.$transaction(async (tx) => {
+          db = tx;
+          await executeImport();
+          if (result.errors.length > 0) throw new Error("IMPORT_VALIDATION_FAILED");
+        });
       } catch (error) {
         console.error("ERROR EN LA TRANSACCION:", error);
 
@@ -4143,12 +4275,34 @@ router.post("/import-template/import", requireAuth, requireRole(["ADMIN"]), asyn
   }
 
   const auth = (req as any).auth;
-  const creator = await prisma.user.findUnique({
-    where: { id: auth.userId },
+  const creator = await prisma.user.findFirst({
+    where: { id: auth.userId, schoolId: importSchoolId },
     select: { fullName: true, email: true },
   });
   const status =
     result.errors.length > 0 ? "FAILED" : result.warnings.length > 0 ? "WARNING" : "OK";
+  const knownFields = Array.from(
+    new Set(Object.values(expectedSheets).flatMap((config) => [...config.required, ...(config.optional || [])]))
+  ).sort((a, b) => b.length - a.length);
+  result.errors = result.errors.map((issue) => {
+    const field =
+      issue.field ||
+      knownFields.find((candidate) => issue.message.toLowerCase().includes(candidate.toLowerCase())) ||
+      "general";
+    const row = issue.row > 1 ? sheetRows(issue.sheet).rows[issue.row - 2] : undefined;
+    const rawValue = issue.value ?? (row?.[field] === undefined ? "" : String(row[field] ?? ""));
+    const lowerMessage = issue.message.toLowerCase();
+    const recommendation =
+      issue.recommendation ||
+      (lowerMessage.includes("duplic")
+        ? "Revisa el registro duplicado y conserva una sola fila por entidad."
+        : lowerMessage.includes("no existe") || lowerMessage.includes("no encontrado")
+          ? "Verifica que la entidad relacionada exista en el mismo colegio."
+          : lowerMessage.includes("obligatorio") || lowerMessage.includes("requerid")
+            ? "Completa el campo indicado en la plantilla."
+            : "Corrige el dato de la fila y vuelve a validar la plantilla.");
+    return { ...issue, field, value: rawValue, recommendation };
+  });
   const summary = {
     created: result.created,
     updated: result.updated,
@@ -4181,7 +4335,9 @@ router.post(
   async (req, res) => {
     const auth = (req as any).auth;
     const id = String(req.params.id || "").trim();
-    const existing = await prisma.certificateRequest.findUnique({ where: { id } });
+    const existing = await prisma.certificateRequest.findFirst({
+      where: { id, student: { is: schoolScope(req) } },
+    });
     if (!existing) return res.status(404).json({ error: "Request not found" });
     if (existing.status !== "PENDING") {
       return res.status(400).json({ error: "Request already reviewed" });
@@ -4217,8 +4373,8 @@ router.get(
       return res.status(403).json({ error: "Requiere autorizacion administrativa" });
     }
 
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
+    const student = await prisma.student.findFirst({
+      where: { id: studentId, ...schoolScope(req) },
       include: {
         enrollments: {
           include: { class: true },
@@ -4307,7 +4463,7 @@ router.get(
     }
 
     const enrollment = await prisma.enrollment.findFirst({
-      where: { studentId },
+      where: { studentId, ...schoolScope(req) },
       include: { student: true, class: true },
       orderBy: { year: "desc" },
     });
@@ -4372,8 +4528,8 @@ router.get("/certificate/verify/:code", requireAuth, requireRole(["ADMIN"]), asy
     .toUpperCase();
   if (!code) return res.status(400).json({ message: "Codigo requerido" });
 
-  const issued = await prisma.certificateIssue.findUnique({
-    where: { code },
+  const issued = await prisma.certificateIssue.findFirst({
+    where: { code, student: { is: schoolScope(req) } },
     include: {
       student: { select: { id: true, fullName: true, gradeLevel: true, studentGroup: true } },
       issuedBy: { select: { id: true, fullName: true, role: true } },
@@ -4408,7 +4564,14 @@ router.get("/certificates", requireAuth, requireRole(["ADMIN"]), async (req, res
   const student = String(req.query.student || "").trim();
   const issuedBy = String(req.query.issuedBy || "").trim();
 
+  const scope = schoolScope(req);
   const where: Prisma.CertificateIssueWhereInput = {
+    student: {
+      is: {
+        ...scope,
+        ...(student ? { fullName: { contains: student, mode: "insensitive" } } : {}),
+      },
+    },
     ...(type ? { type: type as any } : {}),
     ...(code ? { code: { contains: code, mode: "insensitive" } } : {}),
     ...(fromDate || toDate
@@ -4416,13 +4579,6 @@ router.get("/certificates", requireAuth, requireRole(["ADMIN"]), async (req, res
           issuedAt: {
             ...(fromDate ? { gte: new Date(`${fromDate}T00:00:00.000Z`) } : {}),
             ...(toDate ? { lte: new Date(`${toDate}T23:59:59.999Z`) } : {}),
-          },
-        }
-      : {}),
-    ...(student
-      ? {
-          student: {
-            fullName: { contains: student, mode: "insensitive" },
           },
         }
       : {}),
@@ -4460,7 +4616,14 @@ router.get("/certificates/export/excel", requireAuth, requireRole(["ADMIN"]), as
   const student = String(req.query.student || "").trim();
   const issuedBy = String(req.query.issuedBy || "").trim();
 
+  const scope = schoolScope(req);
   const where: Prisma.CertificateIssueWhereInput = {
+    student: {
+      is: {
+        ...scope,
+        ...(student ? { fullName: { contains: student, mode: "insensitive" } } : {}),
+      },
+    },
     ...(type ? { type: type as any } : {}),
     ...(code ? { code: { contains: code, mode: "insensitive" } } : {}),
     ...(fromDate || toDate
@@ -4468,13 +4631,6 @@ router.get("/certificates/export/excel", requireAuth, requireRole(["ADMIN"]), as
           issuedAt: {
             ...(fromDate ? { gte: new Date(`${fromDate}T00:00:00.000Z`) } : {}),
             ...(toDate ? { lte: new Date(`${toDate}T23:59:59.999Z`) } : {}),
-          },
-        }
-      : {}),
-    ...(student
-      ? {
-          student: {
-            fullName: { contains: student, mode: "insensitive" },
           },
         }
       : {}),
@@ -4537,7 +4693,14 @@ router.get("/certificates/export/pdf", requireAuth, requireRole(["ADMIN"]), asyn
   const student = String(req.query.student || "").trim();
   const issuedBy = String(req.query.issuedBy || "").trim();
 
+  const scope = schoolScope(req);
   const where: Prisma.CertificateIssueWhereInput = {
+    student: {
+      is: {
+        ...scope,
+        ...(student ? { fullName: { contains: student, mode: "insensitive" } } : {}),
+      },
+    },
     ...(type ? { type: type as any } : {}),
     ...(code ? { code: { contains: code, mode: "insensitive" } } : {}),
     ...(fromDate || toDate
@@ -4545,13 +4708,6 @@ router.get("/certificates/export/pdf", requireAuth, requireRole(["ADMIN"]), asyn
           issuedAt: {
             ...(fromDate ? { gte: new Date(`${fromDate}T00:00:00.000Z`) } : {}),
             ...(toDate ? { lte: new Date(`${toDate}T23:59:59.999Z`) } : {}),
-          },
-        }
-      : {}),
-    ...(student
-      ? {
-          student: {
-            fullName: { contains: student, mode: "insensitive" },
           },
         }
       : {}),

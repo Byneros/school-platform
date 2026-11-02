@@ -11,6 +11,7 @@
     "start": "node dist/index.js",
     "test": "tsx scripts/api-smoke-tests.ts",
     "test:node": "tsx --test tests/**/*.test.ts",
+    "test:tenant": "tsx --test tests/api.tenant-isolation.test.ts",
     "test:regression": "tsx scripts/api-regression-tests.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

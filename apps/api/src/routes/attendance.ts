@@ -128,17 +128,18 @@ function parseAttendanceDateParts(input: string) {
   return { referenceDate, attendanceDate };
 }
 
-async function resolveTeacherByUser(userId: string) {
-  const teacher = await prisma.teacher.findUnique({
-    where: { userId },
-    select: { id: true, subjectSchedules: true },
+async function resolveTeacherByUser(userId: string, schoolId: string | null) {
+  if (!schoolId) throw new Error("School context not found.");
+  const teacher = await prisma.teacher.findFirst({
+    where: { userId, schoolId },
+    select: { id: true, schoolId: true, subjectSchedules: true },
   });
   if (!teacher) throw new Error("Docente no encontrado");
   return teacher;
 }
 
 async function upsertAttendanceForTeacher(
-  teacher: { id: string; subjectSchedules: unknown },
+  teacher: { id: string; schoolId: string | null; subjectSchedules: unknown },
   payload: {
     enrollmentId: string;
     date: string;
@@ -154,8 +155,12 @@ async function upsertAttendanceForTeacher(
     throw new Error("No se permite registrar asistencia en domingo");
   }
 
-  const enrollment = await prisma.enrollment.findUnique({
-    where: { id: payload.enrollmentId },
+  const enrollment = await prisma.enrollment.findFirst({
+    where: {
+      id: payload.enrollmentId,
+      schoolId: teacher.schoolId,
+      class: { teacherId: teacher.id },
+    },
     include: { class: true, student: { select: { studentGroup: true } } },
   });
   if (!enrollment) throw new Error("Matricula no encontrada");
@@ -227,11 +232,12 @@ router.post(
     const auth = (req as any).auth;
 
     try {
-      const teacher = await resolveTeacherByUser(auth.userId);
+      const teacher = await resolveTeacherByUser(auth.userId, auth.schoolId);
       const attendance = await upsertAttendanceForTeacher(teacher, body);
       res.json(attendance);
     } catch (error: any) {
       const message = String(error?.message || "");
+      if (message === "School context not found.") return res.status(403).json({ message });
       if (message === "Docente no encontrado") return res.status(404).json({ message });
       if (message === "Matricula no encontrada") return res.status(404).json({ message });
       if (message.includes("No tienes franja horaria")) return res.status(403).json({ message });
@@ -261,7 +267,7 @@ router.post(
     const auth = (req as any).auth;
 
     try {
-      const teacher = await resolveTeacherByUser(auth.userId);
+      const teacher = await resolveTeacherByUser(auth.userId, auth.schoolId);
       const results: Array<{ enrollmentId: string; ok: boolean; error?: string }> = [];
 
       for (const item of body.items) {
@@ -285,6 +291,7 @@ router.post(
       });
     } catch (error: any) {
       const message = String(error?.message || "");
+      if (message === "School context not found.") return res.status(403).json({ message });
       if (message === "Docente no encontrado") return res.status(404).json({ message });
       if (message.includes("No se permite registrar asistencia en domingo"))
         return res.status(403).json({ message });

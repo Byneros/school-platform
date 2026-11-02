@@ -67,6 +67,9 @@ jobs:
       - name: Prisma migrate + backfill
         run: npm run prisma:migrate:full
 
+      - name: Run tenant isolation tests
+        run: npm --workspace apps/api run test:tenant
+
       - name: Build API and Web
         run: npm run build
 
