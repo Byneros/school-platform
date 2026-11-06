@@ -9,6 +9,10 @@ type CacheWarmPayload = {
 const connection = getRedisConnectionOptions();
 const warmQueue = connection ? new Queue("cache-warm", { connection }) : null;
 
+export async function closeCacheWarmQueue() {
+  await warmQueue?.close();
+}
+
 export async function enqueueCacheWarm(urls: string[]) {
   if (!urls.length) return false;
   if (!warmQueue) {

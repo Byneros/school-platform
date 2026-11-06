@@ -13,6 +13,10 @@ export type EmailJobPayload = {
 const connection = getRedisConnectionOptions();
 const emailQueue = connection ? new Queue("emails", { connection }) : null;
 
+export async function closeEmailQueue() {
+  await emailQueue?.close();
+}
+
 export async function enqueueEmail(payload: EmailJobPayload) {
   try {
     if (!canSendEmail()) {

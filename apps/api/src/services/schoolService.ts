@@ -106,6 +106,27 @@ export interface CreateSchoolInput {
   };
 }
 
+function getUniqueConstraintTarget(error: unknown): string[] {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("code" in error) ||
+    error.code !== "P2002" ||
+    !("meta" in error) ||
+    typeof error.meta !== "object" ||
+    error.meta === null ||
+    !("target" in error.meta)
+  ) {
+    return [];
+  }
+
+  const target = error.meta.target;
+  if (typeof target === "string") return [target];
+  if (Array.isArray(target))
+    return target.filter((value): value is string => typeof value === "string");
+  return [];
+}
+
 export async function listSchools() {
   return prisma.school.findMany({
     orderBy: {
@@ -128,83 +149,101 @@ export async function createSchool(data: CreateSchoolInput) {
   if (!passwordHash) {
     throw new Error("No fue posible generar el hash de la contrasena.");
   }
-  const result = await prisma.$transaction(async (tx) => {
-    const existingSchool = await tx.school.findUnique({
-      where: {
-        code: school.code,
-      },
-    });
+  let result;
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      const existingSchool = await tx.school.findUnique({
+        where: {
+          code: school.code,
+        },
+      });
 
-    if (existingSchool) {
+      if (existingSchool) {
+        throw conflict("Ya existe un colegio con ese codigo.");
+      }
+
+      if (school.nit) {
+        const existingNit = await tx.school.findFirst({
+          where: {
+            nit: school.nit,
+          },
+        });
+
+        if (existingNit) {
+          throw conflict("Ya existe un colegio con ese NIT.");
+        }
+      }
+
+      const existingAdmin = await tx.user.findUnique({
+        where: {
+          email: admin.email,
+        },
+      });
+
+      if (existingAdmin) {
+        throw conflict("Ya existe un usuario con ese correo electronico.");
+      }
+
+      if (admin.docType && admin.docNumber) {
+        const existingDocument = await tx.user.findUnique({
+          where: {
+            docType_docNumber: {
+              docType: admin.docType,
+              docNumber: admin.docNumber,
+            },
+          },
+        });
+
+        if (existingDocument) {
+          throw conflict("Ya existe un usuario con ese documento.");
+        }
+      }
+
+      const createdSchool = await tx.school.create({
+        data: school,
+      });
+
+      const createdAdmin = await tx.user.create({
+        data: {
+          email: admin.email,
+          passwordHash,
+          fullName: admin.fullName,
+          docType: admin.docType,
+          docNumber: admin.docNumber,
+          phone: admin.phone,
+          role: "ADMIN",
+          schoolId: createdSchool.id,
+        },
+      });
+
+      return {
+        school: createdSchool,
+        admin: {
+          id: createdAdmin.id,
+          fullName: createdAdmin.fullName,
+          email: createdAdmin.email,
+          role: createdAdmin.role,
+          schoolId: createdAdmin.schoolId,
+        },
+        messages: ["Colegio creado correctamente.", "Administrador creado correctamente."],
+      };
+    });
+  } catch (error) {
+    const target = getUniqueConstraintTarget(error).join("_").toLowerCase();
+    if (target.includes("nit")) {
+      throw conflict("Ya existe un colegio con ese NIT.");
+    }
+    if (target.includes("code")) {
       throw conflict("Ya existe un colegio con ese codigo.");
     }
-
-    if (school.nit) {
-      const existingNit = await tx.school.findFirst({
-        where: {
-          nit: school.nit,
-        },
-      });
-
-      if (existingNit) {
-        throw conflict("Ya existe un colegio con ese NIT.");
-      }
-    }
-
-    const existingAdmin = await tx.user.findUnique({
-      where: {
-        email: admin.email,
-      },
-    });
-
-    if (existingAdmin) {
+    if (target.includes("email")) {
       throw conflict("Ya existe un usuario con ese correo electronico.");
     }
-
-    if (admin.docType && admin.docNumber) {
-      const existingDocument = await tx.user.findUnique({
-        where: {
-          docType_docNumber: {
-            docType: admin.docType,
-            docNumber: admin.docNumber,
-          },
-        },
-      });
-
-      if (existingDocument) {
-        throw conflict("Ya existe un usuario con ese documento.");
-      }
+    if (target.includes("doctype") || target.includes("docnumber")) {
+      throw conflict("Ya existe un usuario con ese documento.");
     }
-
-    const createdSchool = await tx.school.create({
-      data: school,
-    });
-
-    const createdAdmin = await tx.user.create({
-      data: {
-        email: admin.email,
-        passwordHash,
-        fullName: admin.fullName,
-        docType: admin.docType,
-        docNumber: admin.docNumber,
-        phone: admin.phone,
-        role: "ADMIN",
-        schoolId: createdSchool.id,
-      },
-    });
-
-    return {
-      school: createdSchool,
-      admin: {
-        id: createdAdmin.id,
-        fullName: createdAdmin.fullName,
-        email: createdAdmin.email,
-        role: createdAdmin.role,
-        schoolId: createdAdmin.schoolId,
-      },
-      messages: ["Colegio creado correctamente.", "Administrador creado correctamente."],
-    };
-  });
+    throw error;
+  }
 
   let credentialsDelivery: "queued" | "sent" | "failed" = "failed";
   try {

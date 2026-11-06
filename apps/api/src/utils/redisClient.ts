@@ -47,6 +47,11 @@ export function createRedisClient(): Redis | null {
   return client;
 }
 
+export function disconnectRedisClient() {
+  redisInstance?.disconnect();
+  redisInstance = null;
+}
+
 export function getRedisConnectionOptions() {
   const redisUrl = process.env.REDIS_URL;
 

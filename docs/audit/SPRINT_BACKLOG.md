@@ -179,5 +179,21 @@ ADMIN
 
 ## Estado
 
-Pendiente. Preparado para ejecutarse despues de cerrar la estabilidad de Sprint 1/importacion y
-validar el despliegue de Sprint 2 en Render.
+En progreso. La implementacion de registro y onboarding esta disponible en el codigo. El registro
+crea el colegio y su administrador en una transaccion, y el NIT tiene una restriccion unica en la
+base de datos para cubrir solicitudes concurrentes. Las pruebas de integracion verifican la
+respuesta sin credenciales, el `schoolId` del token, el rechazo de NIT duplicado concurrente y la
+ausencia de colegio/administrador parcial.
+
+Verificacion local el 2026-11-06: migraciones aplicadas en PostgreSQL temporal; pruebas de
+aislamiento/registro (6/6), incluyendo Redis, y build (web/API) correctos. La reejecucion de CI
+sobre `master` volvio a quedar detenida en las pruebas; se cancelo para no dejar un job bloqueado.
+Las pruebas locales detectaron y corrigieron el cierre de conexiones Redis/colas en el teardown.
+El CI de los cambios nuevos aun debe ejecutarse en GitHub.
+
+Pendiente antes de considerar completo:
+
+- Revisar si hay NIT duplicados en la base desplegada antes de aplicar la migracion; esta aborta
+  con un error explicito si los encuentra. No se verifico acceso a la base de produccion.
+- Definir reglas oficiales de documento y confirmar la configuracion SMTP/2FA de produccion.
+- Validar el flujo en el deployment real de Render y obtener CI completo verde.

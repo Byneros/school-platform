@@ -5,6 +5,10 @@ import { getQueueJobOptions } from "../utils/queueDefaults.js";
 const connection = getRedisConnectionOptions();
 const notificationQueue = connection ? new Queue("notifications", { connection }) : null;
 
+export async function closeNotificationQueue() {
+  await notificationQueue?.close();
+}
+
 export async function enqueueNotification(notificationId: string) {
   try {
     if (!notificationQueue) {
