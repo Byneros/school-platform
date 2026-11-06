@@ -185,11 +185,14 @@ base de datos para cubrir solicitudes concurrentes. Las pruebas de integracion v
 respuesta sin credenciales, el `schoolId` del token, el rechazo de NIT duplicado concurrente y la
 ausencia de colegio/administrador parcial.
 
-Verificacion local el 2026-11-06: migraciones aplicadas en PostgreSQL temporal; pruebas de
-aislamiento/registro (6/6), incluyendo Redis, y build (web/API) correctos. La reejecucion de CI
-sobre `master` volvio a quedar detenida en las pruebas; se cancelo para no dejar un job bloqueado.
-Las pruebas locales detectaron y corrigieron el cierre de conexiones Redis/colas en el teardown.
-El CI de los cambios nuevos aun debe ejecutarse en GitHub.
+Verificacion el 2026-11-06: migraciones aplicadas en PostgreSQL temporal; pruebas de
+aislamiento/registro (6/6), incluyendo Redis; typecheck, lint y build (web/API) correctos. La
+reejecucion antigua sobre `master` quedo detenida en las pruebas y se cancelo. En la rama de
+hardening, CI completo paso en la ejecucion
+https://github.com/Byneros/school-platform/actions/runs/42300647176: pruebas tenant/registro, build,
+inicio y health de API, y smoke tests. Durante la validacion tambien se corrigio el cierre de
+conexiones Redis/colas en el teardown, una importacion ESM sin extension y un token ADMIN incompleto
+en el fixture de smoke tests.
 
 Pendiente antes de considerar completo:
 
