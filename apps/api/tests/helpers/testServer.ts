@@ -1,6 +1,18 @@
 import type { AddressInfo } from "node:net";
+import { after } from "node:test";
 
 import app from "../../src/app.js";
+import { closeCacheWarmQueue } from "../../src/services/cacheWarmQueue.js";
+import { closeEmailQueue } from "../../src/services/emailQueue.js";
+import { closeNotificationQueue } from "../../src/services/notificationQueue.js";
+import prisma from "../../src/utils/prisma.js";
+import { disconnectRedisClient } from "../../src/utils/redisClient.js";
+
+after(async () => {
+  await Promise.all([closeCacheWarmQueue(), closeEmailQueue(), closeNotificationQueue()]);
+  disconnectRedisClient();
+  await prisma.$disconnect();
+});
 
 export async function withServer(run: (baseUrl: string) => Promise<void>) {
   const server = app.listen(0);

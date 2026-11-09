@@ -59,7 +59,11 @@ async function main() {
   }
 
   const secret = process.env.JWT_SECRET || "test-secret";
-  const adminToken = jwt.sign({ role: "ADMIN", userId: "test-admin" }, secret, { expiresIn: "1h" });
+  const adminToken = jwt.sign(
+    { role: "ADMIN", userId: "test-admin", schoolId: "test-school" },
+    secret,
+    { expiresIn: "1h" }
+  );
   const attendanceAdmin = await requestJson(`${baseUrl}/api/attendance`, {
     method: "POST",
     headers: {

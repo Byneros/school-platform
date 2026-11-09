@@ -133,7 +133,7 @@ model School {
   id        String   @id @default(cuid())
   code      String   @unique
   name      String
-  nit       String?
+  nit       String?  @unique
   email     String?
   phone     String?
   address   String?
